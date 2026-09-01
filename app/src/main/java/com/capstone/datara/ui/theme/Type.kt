@@ -4,28 +4,10 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.googlefonts.Font
-import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.sp
-import com.capstone.datara.R
 
-// Google Font Provider Setup
-val googleFontProvider = GoogleFont.Provider(
-    providerAuthority = "com.google.android.gms.fonts",
-    providerPackage = "com.google.android.gms",
-    certificates = R.array.com_google_android_gms_fonts_certs
-)
-
-// Plus Jakarta Sans - Modern Geometric Typeface
-val PlusJakartaSansFont = GoogleFont("Plus Jakarta Sans")
-
-val DataraFontFamily = FontFamily(
-    Font(googleFont = PlusJakartaSansFont, fontProvider = googleFontProvider, weight = FontWeight.Normal),
-    Font(googleFont = PlusJakartaSansFont, fontProvider = googleFontProvider, weight = FontWeight.Medium),
-    Font(googleFont = PlusJakartaSansFont, fontProvider = googleFontProvider, weight = FontWeight.SemiBold),
-    Font(googleFont = PlusJakartaSansFont, fontProvider = googleFontProvider, weight = FontWeight.Bold),
-    Font(googleFont = PlusJakartaSansFont, fontProvider = googleFontProvider, weight = FontWeight.ExtraBold)
-)
+// Modern Sans-Serif typography (instant resolution, 100% offline & emulator reliable)
+val DataraFontFamily = FontFamily.SansSerif
 
 val Typography = Typography(
     displayLarge = TextStyle(
