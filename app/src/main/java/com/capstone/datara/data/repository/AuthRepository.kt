@@ -6,6 +6,8 @@ import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 
+import io.github.jan.supabase.auth.OtpType
+
 class AuthRepository @Inject constructor(
     private val auth: Auth
 ) {
@@ -26,6 +28,29 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun signOut(): Result<Unit> = runCatching { auth.signOut() }
+
+    suspend fun resetPassword(email: String, redirectUrl: String? = null): Result<Unit> = runCatching {
+        auth.resetPasswordForEmail(email = email, redirectUrl = redirectUrl)
+    }
+
+    suspend fun verifyResetCode(email: String, code: String): Result<Unit> = runCatching {
+        auth.verifyEmailOtp(type = OtpType.Email.RECOVERY, email = email, token = code)
+    }
+
+    suspend fun updatePassword(newPassword: String): Result<Unit> = runCatching {
+        auth.updateUser {
+            password = newPassword
+        }
+        auth.signOut()
+    }
+
+    suspend fun confirmPasswordReset(email: String, code: String, newPassword: String): Result<Unit> = runCatching {
+        auth.verifyEmailOtp(type = OtpType.Email.RECOVERY, email = email, token = code)
+        auth.updateUser {
+            password = newPassword
+        }
+        auth.signOut()
+    }
 
     fun currentUserEmail(): String? = auth.currentUserOrNull()?.email
 }
