@@ -17,6 +17,20 @@ sealed interface AuthUiState {
     data class Error(val message: String) : AuthUiState
 }
 
+enum class ResetPasswordStep {
+    ENTER_EMAIL,
+    ENTER_CODE,
+    SET_NEW_PASSWORD,
+    SUCCESS
+}
+
+data class PasswordResetState(
+    val step: ResetPasswordStep = ResetPasswordStep.ENTER_EMAIL,
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val email: String = ""
+)
+
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val repository: AuthRepository
@@ -24,6 +38,9 @@ class AuthViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
+
+    private val _passwordResetState = MutableStateFlow(PasswordResetState())
+    val passwordResetState: StateFlow<PasswordResetState> = _passwordResetState.asStateFlow()
 
     fun register(email: String, password: String, confirmPassword: String) {
         if (password != confirmPassword) {
@@ -45,5 +62,137 @@ class AuthViewModel @Inject constructor(
                 .onSuccess { _uiState.value = AuthUiState.Success }
                 .onFailure { _uiState.value = AuthUiState.Error(it.message ?: "Login failed") }
         }
+    }
+
+    fun sendResetCode(email: String) {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isBlank()) {
+            _passwordResetState.value = _passwordResetState.value.copy(
+                error = "Please enter your email address"
+            )
+            return
+        }
+        viewModelScope.launch {
+            _passwordResetState.value = _passwordResetState.value.copy(isLoading = true, error = null)
+            repository.resetPassword(trimmedEmail)
+                .onSuccess {
+                    _passwordResetState.value = PasswordResetState(
+                        step = ResetPasswordStep.ENTER_CODE,
+                        isLoading = false,
+                        error = null,
+                        email = trimmedEmail
+                    )
+                }
+                .onFailure {
+                    _passwordResetState.value = _passwordResetState.value.copy(
+                        isLoading = false,
+                        error = it.message ?: "Failed to send reset code. Please try again."
+                    )
+                }
+        }
+    }
+
+    fun verifyResetCode(code: String) {
+        val trimmedCode = code.trim()
+        if (trimmedCode.length != 6) {
+            _passwordResetState.value = _passwordResetState.value.copy(
+                error = "Please enter the complete 6-digit verification code"
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _passwordResetState.value = _passwordResetState.value.copy(isLoading = true, error = null)
+            repository.verifyResetCode(
+                email = _passwordResetState.value.email,
+                code = trimmedCode
+            )
+                .onSuccess {
+                    _passwordResetState.value = _passwordResetState.value.copy(
+                        step = ResetPasswordStep.SET_NEW_PASSWORD,
+                        isLoading = false,
+                        error = null
+                    )
+                }
+                .onFailure {
+                    _passwordResetState.value = _passwordResetState.value.copy(
+                        isLoading = false,
+                        error = it.message ?: "Invalid or expired code. Please try again."
+                    )
+                }
+        }
+    }
+
+    fun updateNewPassword(newPassword: String, confirmPassword: String) {
+        if (newPassword.length < 6) {
+            _passwordResetState.value = _passwordResetState.value.copy(
+                error = "Password must be at least 6 characters"
+            )
+            return
+        }
+        if (newPassword != confirmPassword) {
+            _passwordResetState.value = _passwordResetState.value.copy(
+                error = "Passwords don't match"
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _passwordResetState.value = _passwordResetState.value.copy(isLoading = true, error = null)
+            repository.updatePassword(newPassword)
+                .onSuccess {
+                    _passwordResetState.value = PasswordResetState(
+                        step = ResetPasswordStep.SUCCESS,
+                        isLoading = false,
+                        error = null,
+                        email = _passwordResetState.value.email
+                    )
+                }
+                .onFailure {
+                    _passwordResetState.value = _passwordResetState.value.copy(
+                        isLoading = false,
+                        error = it.message ?: "Failed to update password. Please try again."
+                    )
+                }
+        }
+    }
+
+    fun resendResetCode() {
+        val email = _passwordResetState.value.email
+        if (email.isBlank()) return
+        viewModelScope.launch {
+            _passwordResetState.value = _passwordResetState.value.copy(isLoading = true, error = null)
+            repository.resetPassword(email)
+                .onSuccess {
+                    _passwordResetState.value = _passwordResetState.value.copy(
+                        isLoading = false,
+                        error = null
+                    )
+                }
+                .onFailure {
+                    _passwordResetState.value = _passwordResetState.value.copy(
+                        isLoading = false,
+                        error = it.message ?: "Failed to resend code"
+                    )
+                }
+        }
+    }
+
+    fun backToEmailStep() {
+        _passwordResetState.value = PasswordResetState(
+            step = ResetPasswordStep.ENTER_EMAIL,
+            email = _passwordResetState.value.email
+        )
+    }
+
+    fun backToCodeStep() {
+        _passwordResetState.value = _passwordResetState.value.copy(
+            step = ResetPasswordStep.ENTER_CODE,
+            error = null
+        )
+    }
+
+    fun clearPasswordResetState() {
+        _passwordResetState.value = PasswordResetState()
     }
 }
