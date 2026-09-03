@@ -1,6 +1,6 @@
 # AGENT.md — DATAra
 
-Guidance for AI coding agents (Claude Code, Cursor, etc.) working in this repository. Read this before making changes.
+Guidance for AI coding agents (Antigravity, Claude Code, Cursor, etc.) working in this repository. Read this before making changes.
 
 ---
 
