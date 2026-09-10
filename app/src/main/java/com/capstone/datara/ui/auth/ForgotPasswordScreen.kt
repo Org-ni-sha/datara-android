@@ -1,4 +1,4 @@
-﻿package com.capstone.datara.ui.auth
+package com.capstone.datara.ui.auth
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -182,7 +182,10 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     DataraTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = {
+                            email = it
+                            viewModel.clearResetError()
+                        },
                         placeholder = "Email",
                         leadingIcon = DataraIcons.Email,
                         keyboardOptions = KeyboardOptions(
@@ -322,7 +325,10 @@ fun ForgotPasswordScreen(
 
                     SixDigitCodeInput(
                         code = code,
-                        onCodeChange = { code = it },
+                        onCodeChange = {
+                            code = it
+                            viewModel.clearResetError()
+                        },
                         isError = state.error != null,
                         onDone = {
                             focusManager.clearFocus()
@@ -438,7 +444,10 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     DataraTextField(
                         value = newPassword,
-                        onValueChange = { newPassword = it },
+                        onValueChange = {
+                            newPassword = it
+                            viewModel.clearResetError()
+                        },
                         placeholder = "Min. 6 characters",
                         leadingIcon = DataraIcons.Lock,
                         isPassword = true,
@@ -458,7 +467,10 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     DataraTextField(
                         value = confirmPassword,
-                        onValueChange = { confirmPassword = it },
+                        onValueChange = {
+                            confirmPassword = it
+                            viewModel.clearResetError()
+                        },
                         placeholder = "Re-enter new password",
                         leadingIcon = DataraIcons.Lock,
                         isPassword = true,
