@@ -1,11 +1,13 @@
 package com.capstone.datara.ui.auth
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -19,12 +21,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -53,9 +59,11 @@ import com.capstone.datara.ui.auth.components.DataraLogo
 import com.capstone.datara.ui.auth.components.DataraPrimaryButton
 import com.capstone.datara.ui.auth.components.DataraTextField
 import com.capstone.datara.ui.theme.DATAraTheme
+import com.capstone.datara.ui.theme.DataraCardBg
 import com.capstone.datara.ui.theme.DataraDarkBg
 import com.capstone.datara.ui.theme.DataraError
 import com.capstone.datara.ui.theme.DataraErrorBg
+import com.capstone.datara.ui.theme.DataraInputBorder
 import com.capstone.datara.ui.theme.DataraNeonBlue
 import com.capstone.datara.ui.theme.DataraTextPrimary
 import com.capstone.datara.ui.theme.DataraTextSecondary
@@ -84,7 +92,12 @@ fun RegisterScreen(
         }
     }
 
-    Box(
+    BackHandler {
+        viewModel.clearError()
+        onNavigateToLogin()
+    }
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(DataraDarkBg)
@@ -92,11 +105,42 @@ fun RegisterScreen(
             .navigationBarsPadding()
             .imePadding()
     ) {
+        // Back Navigation Button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(DataraCardBg)
+                    .border(width = 1.dp, color = DataraInputBorder, shape = CircleShape)
+                    .clickable(
+                        onClick = {
+                            viewModel.clearError()
+                            onNavigateToLogin()
+                        }
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = DataraIcons.ArrowBack,
+                    contentDescription = "Back",
+                    tint = DataraTextPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 28.dp, vertical = 20.dp),
+                .padding(horizontal = 28.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
