@@ -1,5 +1,6 @@
 package com.capstone.datara.ui.auth
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -96,7 +97,15 @@ fun ForgotPasswordScreen(
         }
     }
 
-    Box(
+    BackHandler {
+        when (state.step) {
+            ResetPasswordStep.SET_NEW_PASSWORD -> viewModel.backToCodeStep()
+            ResetPasswordStep.ENTER_CODE -> viewModel.backToEmailStep()
+            else -> onNavigateBack()
+        }
+    }
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(DataraDarkBg)
@@ -104,11 +113,11 @@ fun ForgotPasswordScreen(
             .navigationBarsPadding()
             .imePadding()
     ) {
-        // Back Navigation Button
+        // Back Navigation Button (Pinned at top, guaranteed unobstructed click targets)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp),
+                .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -118,8 +127,6 @@ fun ForgotPasswordScreen(
                     .background(DataraCardBg)
                     .border(width = 1.dp, color = DataraInputBorder, shape = CircleShape)
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
                         onClick = {
                             when (state.step) {
                                 ResetPasswordStep.SET_NEW_PASSWORD -> viewModel.backToCodeStep()
@@ -141,9 +148,10 @@ fun ForgotPasswordScreen(
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 20.dp),
+                .padding(horizontal = 24.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
