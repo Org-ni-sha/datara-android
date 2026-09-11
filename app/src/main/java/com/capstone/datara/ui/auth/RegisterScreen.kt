@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -77,6 +78,12 @@ fun RegisterScreen(
         }
     }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.clearError()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -118,7 +125,10 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(8.dp))
             DataraTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = {
+                    email = it
+                    viewModel.clearError()
+                },
                 placeholder = "Email",
                 leadingIcon = DataraIcons.Email,
                 keyboardOptions = KeyboardOptions(
@@ -137,7 +147,10 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(8.dp))
             DataraTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = {
+                    password = it
+                    viewModel.clearError()
+                },
                 placeholder = "*********",
                 leadingIcon = DataraIcons.Lock,
                 isPassword = true,
@@ -157,7 +170,10 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(8.dp))
             DataraTextField(
                 value = confirmPassword,
-                onValueChange = { confirmPassword = it },
+                onValueChange = {
+                    confirmPassword = it
+                    viewModel.clearError()
+                },
                 placeholder = "*********",
                 leadingIcon = DataraIcons.Lock,
                 isPassword = true,
@@ -168,9 +184,7 @@ fun RegisterScreen(
                 keyboardActions = KeyboardActions(
                     onDone = {
                         focusManager.clearFocus()
-                        if (email.isNotBlank() && password.isNotBlank() && confirmPassword.isNotBlank()) {
-                            viewModel.register(email.trim(), password, confirmPassword)
-                        }
+                        viewModel.register(email, password, confirmPassword)
                     }
                 )
             )
@@ -212,7 +226,7 @@ fun RegisterScreen(
                 text = "Sign Up",
                 onClick = {
                     focusManager.clearFocus()
-                    viewModel.register(email.trim(), password, confirmPassword)
+                    viewModel.register(email, password, confirmPassword)
                 },
                 enabled = email.isNotBlank() && password.isNotBlank() && confirmPassword.isNotBlank(),
                 isLoading = uiState is AuthUiState.Loading
@@ -241,7 +255,10 @@ fun RegisterScreen(
                     modifier = Modifier.clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                        onClick = onNavigateToLogin
+                        onClick = {
+                            viewModel.clearError()
+                            onNavigateToLogin()
+                        }
                     )
                 )
             }

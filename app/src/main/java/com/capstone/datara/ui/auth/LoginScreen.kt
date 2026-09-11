@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -77,6 +78,12 @@ fun LoginScreen(
         }
     }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.clearError()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -117,7 +124,10 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(8.dp))
             DataraTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = {
+                    email = it
+                    viewModel.clearError()
+                },
                 placeholder = "Email",
                 leadingIcon = DataraIcons.Email,
                 keyboardOptions = KeyboardOptions(
@@ -143,7 +153,10 @@ fun LoginScreen(
                         modifier = Modifier.clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = onForgotPasswordClick
+                            onClick = {
+                                viewModel.clearError()
+                                onForgotPasswordClick()
+                            }
                         )
                     )
                 }
@@ -151,7 +164,10 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(8.dp))
             DataraTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = {
+                    password = it
+                    viewModel.clearError()
+                },
                 placeholder = "*********",
                 leadingIcon = DataraIcons.Lock,
                 isPassword = true,
@@ -162,9 +178,7 @@ fun LoginScreen(
                 keyboardActions = KeyboardActions(
                     onDone = {
                         focusManager.clearFocus()
-                        if (email.isNotBlank() && password.isNotBlank()) {
-                            viewModel.login(email.trim(), password)
-                        }
+                        viewModel.login(email, password)
                     }
                 )
             )
@@ -206,7 +220,7 @@ fun LoginScreen(
                 text = "Login",
                 onClick = {
                     focusManager.clearFocus()
-                    viewModel.login(email.trim(), password)
+                    viewModel.login(email, password)
                 },
                 enabled = email.isNotBlank() && password.isNotBlank(),
                 isLoading = uiState is AuthUiState.Loading
@@ -235,7 +249,10 @@ fun LoginScreen(
                     modifier = Modifier.clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                        onClick = onNavigateToRegister
+                        onClick = {
+                            viewModel.clearError()
+                            onNavigateToRegister()
+                        }
                     )
                 )
             }

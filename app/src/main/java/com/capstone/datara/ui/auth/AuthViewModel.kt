@@ -42,25 +42,59 @@ class AuthViewModel @Inject constructor(
     private val _passwordResetState = MutableStateFlow(PasswordResetState())
     val passwordResetState: StateFlow<PasswordResetState> = _passwordResetState.asStateFlow()
 
+    fun clearError() {
+        if (_uiState.value is AuthUiState.Error) {
+            _uiState.value = AuthUiState.Idle
+        }
+    }
+
+    fun clearResetError() {
+        if (_passwordResetState.value.error != null) {
+            _passwordResetState.value = _passwordResetState.value.copy(error = null)
+        }
+    }
+
     fun register(email: String, password: String, confirmPassword: String) {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isBlank() || password.isBlank() || confirmPassword.isBlank()) {
+            _uiState.value = AuthUiState.Error("Please fill in all required fields.")
+            return
+        }
+        if (!AuthValidator.isValidEmail(trimmedEmail)) {
+            _uiState.value = AuthUiState.Error("Please enter a valid email address.")
+            return
+        }
+        if (!AuthValidator.isPasswordValid(password)) {
+            _uiState.value = AuthUiState.Error("Password must be at least 6 characters long.")
+            return
+        }
         if (password != confirmPassword) {
-            _uiState.value = AuthUiState.Error("Passwords don't match")
+            _uiState.value = AuthUiState.Error("Passwords do not match. Please make sure they are identical.")
             return
         }
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            repository.signUp(email, password)
+            repository.signUp(trimmedEmail, password)
                 .onSuccess { _uiState.value = AuthUiState.Success }
-                .onFailure { _uiState.value = AuthUiState.Error(it.message ?: "Registration failed") }
+                .onFailure { _uiState.value = AuthUiState.Error(AuthErrorParser.parse(it, AuthAction.REGISTER)) }
         }
     }
 
     fun login(email: String, password: String) {
+        val trimmedEmail = email.trim()
+        if (trimmedEmail.isBlank() || password.isBlank()) {
+            _uiState.value = AuthUiState.Error("Please enter both your email and password.")
+            return
+        }
+        if (!AuthValidator.isValidEmail(trimmedEmail)) {
+            _uiState.value = AuthUiState.Error("Please enter a valid email address.")
+            return
+        }
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            repository.signIn(email, password)
+            repository.signIn(trimmedEmail, password)
                 .onSuccess { _uiState.value = AuthUiState.Success }
-                .onFailure { _uiState.value = AuthUiState.Error(it.message ?: "Login failed") }
+                .onFailure { _uiState.value = AuthUiState.Error(AuthErrorParser.parse(it, AuthAction.LOGIN)) }
         }
     }
 
@@ -68,7 +102,13 @@ class AuthViewModel @Inject constructor(
         val trimmedEmail = email.trim()
         if (trimmedEmail.isBlank()) {
             _passwordResetState.value = _passwordResetState.value.copy(
-                error = "Please enter your email address"
+                error = "Please enter your email address."
+            )
+            return
+        }
+        if (!AuthValidator.isValidEmail(trimmedEmail)) {
+            _passwordResetState.value = _passwordResetState.value.copy(
+                error = "Please enter a valid email address."
             )
             return
         }
@@ -86,7 +126,7 @@ class AuthViewModel @Inject constructor(
                 .onFailure {
                     _passwordResetState.value = _passwordResetState.value.copy(
                         isLoading = false,
-                        error = it.message ?: "Failed to send reset code. Please try again."
+                        error = AuthErrorParser.parse(it, AuthAction.SEND_RESET_CODE)
                     )
                 }
         }
@@ -96,7 +136,7 @@ class AuthViewModel @Inject constructor(
         val trimmedCode = code.trim()
         if (trimmedCode.length != 6) {
             _passwordResetState.value = _passwordResetState.value.copy(
-                error = "Please enter the complete 6-digit verification code"
+                error = "Please enter the complete 6-digit verification code."
             )
             return
         }
@@ -117,22 +157,22 @@ class AuthViewModel @Inject constructor(
                 .onFailure {
                     _passwordResetState.value = _passwordResetState.value.copy(
                         isLoading = false,
-                        error = it.message ?: "Invalid or expired code. Please try again."
+                        error = AuthErrorParser.parse(it, AuthAction.VERIFY_CODE)
                     )
                 }
         }
     }
 
     fun updateNewPassword(newPassword: String, confirmPassword: String) {
-        if (newPassword.length < 6) {
+        if (!AuthValidator.isPasswordValid(newPassword)) {
             _passwordResetState.value = _passwordResetState.value.copy(
-                error = "Password must be at least 6 characters"
+                error = "Password must be at least 6 characters long."
             )
             return
         }
         if (newPassword != confirmPassword) {
             _passwordResetState.value = _passwordResetState.value.copy(
-                error = "Passwords don't match"
+                error = "Passwords do not match. Please make sure they are identical."
             )
             return
         }
@@ -151,7 +191,7 @@ class AuthViewModel @Inject constructor(
                 .onFailure {
                     _passwordResetState.value = _passwordResetState.value.copy(
                         isLoading = false,
-                        error = it.message ?: "Failed to update password. Please try again."
+                        error = AuthErrorParser.parse(it, AuthAction.UPDATE_PASSWORD)
                     )
                 }
         }
@@ -172,7 +212,7 @@ class AuthViewModel @Inject constructor(
                 .onFailure {
                     _passwordResetState.value = _passwordResetState.value.copy(
                         isLoading = false,
-                        error = it.message ?: "Failed to resend code"
+                        error = AuthErrorParser.parse(it, AuthAction.RESEND_CODE)
                     )
                 }
         }
