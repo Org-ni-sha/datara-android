@@ -14,3 +14,8 @@
 .cxx
 local.properties
 screen-reference/
+# Android Studio / IntelliJ IDEA
+.idea/
+!.idea/compiler.xml
+!.idea/jarRepositories.xml
+!.idea/vcs.xml
