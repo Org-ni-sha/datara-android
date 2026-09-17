@@ -4,6 +4,8 @@ import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import javax.inject.Inject
 
 import io.github.jan.supabase.auth.OtpType
@@ -13,10 +15,22 @@ class AuthRepository @Inject constructor(
 ) {
     val sessionStatus: StateFlow<SessionStatus> = auth.sessionStatus
 
-    suspend fun signUp(email: String, password: String): Result<Unit> = runCatching {
+    /**
+     * Signs the user up and passes [name] as auth metadata.
+     *
+     * The profile row in `public.users` is created by the `on_auth_user_created` trigger
+     * (see supabase/migrations/20260917000003_handle_new_user.sql), which reads
+     * `raw_user_meta_data ->> 'name'`. Sending the name here means the row is complete the
+     * moment it is created, with no follow-up insert that could be lost to a crash or a
+     * dropped connection between sign-up and write.
+     */
+    suspend fun signUp(email: String, password: String, name: String): Result<Unit> = runCatching {
         auth.signUpWith(Email) {
             this.email = email
             this.password = password
+            this.data = buildJsonObject {
+                put("name", name)
+            }
         }
     }
 

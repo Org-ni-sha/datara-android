@@ -20,8 +20,8 @@ This repo is the Android client only. The GitHub repo is `Org-ni-sha/datara-andr
 
 As of this writing:
 
-- **Done:** D1 — Auth & app shell (Supabase email/password, dark navy Login/Register/Forgot Password, `AuthRepository`, `AuthViewModel`, Hilt wiring).
-- **Open in D1:** session auto-login persistence on launch; initial user record creation in Supabase on sign-up.
+- **Done:** D1 — Auth & app shell, complete. Supabase email/password, dark navy Login/Register/Forgot Password, `AuthRepository`, `AuthViewModel`, Hilt wiring, session auto-login with a splash gate, and profile-row creation on sign-up.
+- **Done (SQL written):** C2 — the Postgres schema, RLS policies, and `on_auth_user_created` trigger live in [`supabase/`](supabase/). Tick the roadmap box only once they are applied to the live project and RLS is verified with two accounts.
 - **Not started:** D2 (Room + `TelephonyManager` detection) onward — which is most of the app.
 
 Everything below marked *planned* does not exist in the codebase yet. Do not assume it compiles.
@@ -77,7 +77,7 @@ Package root: `com.capstone.datara`
 ```
 app/src/main/java/com/capstone/datara/
 ├── DataraApplication.kt              # @HiltAndroidApp
-├── MainActivity.kt                   # @AndroidEntryPoint, calls DataraNavGraph()
+├── MainActivity.kt                   # @AndroidEntryPoint, session gate + DataraNavGraph()
 ├── data/
 │   ├── remote/SupabaseClientProvider.kt
 │   └── repository/AuthRepository.kt
@@ -85,23 +85,25 @@ app/src/main/java/com/capstone/datara/
 └── ui/
     ├── auth/
     │   ├── AuthViewModel.kt          # @HiltViewModel
-    │   ├── AuthErrorParser.kt        # maps Supabase errors to user-facing text
+    │   ├── AuthErrorParser.kt        # error text + AuthValidator (pure form rules)
     │   ├── LoginScreen.kt
     │   ├── RegisterScreen.kt
     │   ├── ForgotPasswordScreen.kt
     │   └── components/               # DataraAuthComponents, DataraIcons, DataraLogo
-    ├── navigation/NavGraph.kt
+    ├── session/                      # SessionState (pure mapper) + SessionViewModel
+    ├── splash/SplashScreen.kt        # shown while the session is restored
+    ├── dashboard/                    # D1 placeholder only — D5 replaces it
+    ├── navigation/NavGraph.kt        # DataraRoute constants + start destination
     └── theme/                        # Color.kt, Theme.kt, Type.kt
 ```
 
-Tests: `app/src/test/.../AuthErrorParserTest.kt`, plus the generated `ExampleUnitTest` / `ExampleInstrumentedTest`.
+Tests: `AuthErrorParserTest.kt` and `AuthValidatorTest.kt` under `app/src/test/`, plus the generated `ExampleUnitTest` / `ExampleInstrumentedTest`.
 
 ### Planned packages (create as their phase comes up)
 
 ```
 data/local/          # Room entities, DAOs, DataraDatabase            (D2)
 ui/promos/           # carrier promo catalog + manual entry           (D3)
-ui/dashboard/        # PET hero card, balance gauge, network strip    (D5)
 ui/history/          # Vico charts                                    (D7)
 ui/profile/, ui/settings/                                             (D9)
 ```
@@ -203,9 +205,10 @@ The short version: branch off `main` as `<type>/<short-description>` (`feature/`
 
 ## Known current state / traps
 
-- `NavGraph.kt` declares a `"dashboard"` route whose composable body is **empty**. Successful login and register both navigate there, so the app currently lands on a blank screen after auth. That's expected until D5 — not a bug to chase.
-- `MainActivity` does not yet check `sessionStatus`, so there is no auto-login on launch (open D1 item).
-- Sign-up creates the Supabase Auth user but does not yet write a row to the `users` table (open D1 item).
+- The `"dashboard"` route renders `DashboardPlaceholderScreen` — a D1 stub showing the signed-in email and a sign-out button, built only so auto-login is verifiable. It is not a partial dashboard: D5 deletes the file and builds the real one. Don't extend it.
+- Routes are constants on `DataraRoute`, not string literals. Login and register clear the whole back stack on success (`popUpTo(0)`), so back from the dashboard exits the app rather than returning to a login screen with a live session.
+- Auto-login is live: `MainActivity` gates on `SessionViewModel.sessionState` and shows `SplashScreen` while Supabase restores a persisted session. `SessionStatus.RefreshFailure` is deliberately treated as unauthenticated — a stale refresh token means signing in again, not landing on a dashboard whose requests all 401.
+- The `public.users` row is created by the `on_auth_user_created` Postgres trigger, not by a client insert. `AuthRepository.signUp` passes the name as auth metadata (`raw_user_meta_data`) so the trigger can populate it — if you change the sign-up call, keep that metadata key or `users.name` silently becomes null.
 
 ---
 

@@ -171,8 +171,8 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 - [x] Supabase Auth (`auth-kt`) with Ktor client.
 - [x] Dark navy UI (`#0C101A` / `#141B2B`) for `LoginScreen` and `RegisterScreen`.
 - [x] `AuthRepository`, `AuthViewModel`, and Hilt injection.
-- [ ] Session auto-login persistence on launch (`sessionStatus` check in `MainActivity`).
-- [ ] Initial user record creation in Supabase on sign-up. *(Handled server-side by the `on_auth_user_created` trigger in C2 — the client only needs to write `name` after sign-up.)*
+- [x] Session auto-login persistence on launch — `SessionViewModel` maps `sessionStatus` to `SessionState`, `MainActivity` shows `SplashScreen` until it resolves, then picks the start destination.
+- [x] Initial user record creation in Supabase on sign-up — created server-side by the `on_auth_user_created` trigger (C2); registration now collects a full name and sends it as auth metadata so the trigger populates `users.name` on insert.
 
 #### Phase D2: Room Local Database & Hardware Detection
 - [ ] Add Room dependencies and KSP compiler (`ksp`, never `kapt` — matches the existing Hilt setup).
@@ -211,7 +211,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 
 #### Phase D5: Core Dashboard & Floating Navigation
 - [ ] Fixed floating pill bottom nav (`Home`, `History`, `Settings`).
-- [ ] Replace the currently-empty `"dashboard"` composable in `NavGraph.kt` — post-login navigation lands on a blank screen until this phase ships.
+- [ ] Replace `ui/dashboard/DashboardPlaceholderScreen.kt` — a D1 stub that only proves auto-login works (shows the signed-in email and a sign-out button). Delete the whole file; it implements none of the content below.
 - [ ] **PET Hero Card (Centerpiece):** Prominent hours/days remaining countdown and predicted exhaustion timestamp.
   - Define the pre-prediction state: what the card shows before D6 exists, and before a new user has enough history for any prediction at all.
 - [ ] **Data Balance Gauge:** Remaining vs. consumed progress bar with status colors (`DataraNeonGreen`, `DataraPrimaryBlue`, `DataraError`).
