@@ -120,7 +120,10 @@ ui/profile/, ui/settings/                                             (D9)
 
 ## Data model (Room / Postgres — keep both in sync)
 
-Neither side exists yet: Room entities are phase D2, the Supabase schema is phase C2. When they are built, these are the seven entities, mirrored between local Room tables and the Supabase Postgres schema:
+The Supabase schema (C2) is written as SQL migrations in [`supabase/`](supabase/) — read
+[`supabase/README.md`](supabase/README.md) for the Postgres↔Kotlin type mapping before writing
+the Room entities. The Room side (D2) does not exist yet. These are the seven entities,
+mirrored between local Room tables and the Supabase Postgres schema:
 
 - **User** — id, email, name, created_at (no address field, no raw ID exposed in UI — see Scope Boundaries)
 - **Device** — device_id, device_name, device_model, android_version
@@ -132,7 +135,9 @@ Neither side exists yet: Room entities are phase D2, the Supabase schema is phas
 
 Rules:
 - When adding a field, update both the Room entity and the Supabase table/migration — they must not drift.
-- Every Supabase table carries **Row Level Security scoped to `user_id`**. Don't create a table without its RLS policy.
+- Every Supabase table carries **Row Level Security scoped to `user_id`**. Don't create a table without its RLS policy. (`providers` is the one documented exception — shared reference data, read-only to the client.)
+- Timestamps are `timestamptz` in Postgres and `Long` epoch millis in Room, converted in the sync mapper.
+- Row primary keys are UUIDs generated client-side so sync retries upsert instead of duplicating.
 
 ---
 
