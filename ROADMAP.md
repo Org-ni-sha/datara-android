@@ -77,6 +77,23 @@ Keep this distinction explicit in all documentation: **on-device _inference_ is 
 
 D6 below is written against **(a)**. E3's comparison is valid under any option.
 
+#### Alternatives evaluated and rejected
+
+Documented so the panel question "why not just train on-device?" has a researched answer rather than an improvised one.
+
+| Alternative | Why rejected |
+|---|---|
+| **Treelite / Hummingbird** | Inference-optimization libraries, not training. They are alternatives to ONNX Runtime, not to on-device training, and would still need NDK cross-compilation to run on Android at all. |
+| **TensorFlow Decision Forests / TFLite** | TFLite's on-device training API covers neural networks via signature-based transfer learning; it does not cover decision forests. TF-DF models train in Python via Yggdrasil Decision Forests. Would abandon XGBoost without delivering on-device training. |
+| **Native XGBoost / LightGBM C API via Android NDK** | Technically possible — XGBoost does expose a C API — but there are no official Android builds or prebuilt AARs. Requires cross-compiling a large C++ library per ABI, a JNI bridge, and several MB of native libs in the APK. Multi-week build-engineering risk against a defense deadline, and it does not address the data problem below. |
+| **River (online/incremental ML)** | Python-only, targeted at Linux edge nodes; there is no Kotlin/Android runtime. Shipping a Python runtime via Chaquopy to obtain it is disproportionate. **However, its underlying paradigm — incremental updates from streaming samples — is precisely what option (a) implements in ~50–80 lines of Kotlin with no dependency.** |
+
+**The deeper reason none of these change the decision:** all four try to preserve the premise that the local layer must be XGBoost. But at 15-minute polling, 7 days of a single user's data is **~672 rows**. Fitting a gradient-boosted ensemble on 672 rows with ~10 features overfits regardless of which runtime executes it. The constraint is statistical as well as technical, so a better runtime does not solve it.
+
+The claim the thesis actually defends is *"per-user personalization improves PET accuracy over a global baseline"* — not *"the local model is specifically XGBoost."* Options (a) and (c) deliver that claim without the engineering risk.
+
+**Check before finalizing:** if Chapter 3 commits in defended text to a *local XGBoost model* specifically, then option **(b)** is the honest route — it keeps real per-user XGBoost at the cost of offline-only retraining. What Chapter 3 already says is the deciding fact here, not the engineering.
+
 ---
 
 ## 3. Cross-Ecosystem Roadmap (By Track & Phase)

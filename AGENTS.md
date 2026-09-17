@@ -8,7 +8,7 @@ Guidance for AI coding agents (Antigravity, Claude Code, Cursor, etc.) working i
 
 DATAra is an Android app that predicts when a prepaid mobile user's data will run out (Probable Exhaustion Time / PET), based on usage behavior, time-based patterns, and network conditions (signal strength, internet speed). It's a BSIT capstone project for USTP Cagayan de Oro City. The prediction is powered by a dual-layer model: a pre-trained **Global XGBoost model** (baseline, trained on aggregated usage data) and a **Local personalization layer** that adapts the prediction to each user's own usage over time. The exact form of that local layer is an open decision — see [ROADMAP.md §2](ROADMAP.md) before building it.
 
-This repo is the Android client only (referred to as `datara-android` in planning docs; the folder and GitHub repo are named `DATAra`). Related repos in the same GitHub org:
+This repo is the Android client only. The GitHub repo is `Org-ni-sha/datara-android`; the local working folder is named `DATAra`. Related repos in the same GitHub org:
 - `data-harvester` — the standalone dataset-collection app used during research (do not modify unless explicitly asked; it's a separate deliverable)
 - `datara-ml` — Python training pipeline (cleaning, XGBoost training, ONNX export)
 
