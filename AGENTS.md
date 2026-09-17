@@ -21,7 +21,7 @@ This repo is the Android client only. The GitHub repo is `Org-ni-sha/datara-andr
 As of this writing:
 
 - **Done:** D1 — Auth & app shell, complete. Supabase email/password, dark navy Login/Register/Forgot Password, `AuthRepository`, `AuthViewModel`, Hilt wiring, session auto-login with a splash gate, and profile-row creation on sign-up.
-- **Done (SQL written):** C2 — the Postgres schema, RLS policies, and `on_auth_user_created` trigger live in [`supabase/`](supabase/). Tick the roadmap box only once they are applied to the live project and RLS is verified with two accounts.
+- **Done:** C2 — the Postgres schema, RLS policies, and `on_auth_user_created` trigger in [`supabase/`](supabase/) are applied to the live project and verified against two accounts. The live schema is the one the migrations describe; treat `supabase/` as its source of truth and add changes as new migrations, never by editing an applied file.
 - **Not started:** D2 (Room + `TelephonyManager` detection) onward — which is most of the app.
 
 Everything below marked *planned* does not exist in the codebase yet. Do not assume it compiles.

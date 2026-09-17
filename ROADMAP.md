@@ -153,7 +153,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 *Goal: Centralized authentication, synced Postgres schema, and backup logging.*
 
 - [x] **Phase C1 — Auth Setup:** Supabase Auth with Email/Password.
-- [ ] **Phase C2 — Database Schema Definition:** *(SQL written in [`supabase/`](supabase/); tick this once it is applied to the live project and RLS is verified with two accounts.)*
+- [x] **Phase C2 — Database Schema Definition:** *(Applied to the live project — `supabase db push --dry-run` reports up to date — and RLS verified against two live accounts on 2026-09-17. See "RLS verification" in [`supabase/README.md`](supabase/README.md) to re-run it.)*
   - Tables: `users`, `devices`, `providers`, `promos`, `data_usage`, `notifications`, `associations`.
   - Enforce Row Level Security (RLS) policies per `user_id`. No table ships without its policy.
   - Align schema types 1:1 with Android Room entities. Convention: Postgres is `snake_case` plural (`data_usage`), Room entities are `PascalCase` singular (`DataUsage`) — the mapping is naming-only, types must match exactly.

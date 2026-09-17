@@ -69,6 +69,37 @@ required by the CLI and its `[auth]` / `[api]` sections describe a local stack t
 not run — they are not the live project's settings, so do not treat that file as a record
 of production configuration.
 
+## RLS verification
+
+Policies that *look* right are not evidence. This is the check that closes C2, run against the
+live project through PostgREST — the same path the Android client uses, so it tests what the app
+actually experiences rather than what the SQL appears to say.
+
+Last run **2026-09-17**, all seven checks passing:
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| 1 | B selects A's `data_usage` row by id | 0 rows | `[]` |
+| 2 | B updates A's row | 0 rows changed | `[]` |
+| 3 | B deletes A's row | 0 rows deleted | `[]` |
+| 4 | B inserts a row with `user_id` = A | `42501` policy violation | violation raised |
+| 5 | A re-reads the row afterwards | unchanged | `1.5` unchanged |
+| 6 | B selects A's `public.users` row | 0 rows | `[]` |
+| 7 | B selects `providers` | 3 carriers | Smart, Globe, DITO |
+
+Checks 2 and 3 are the ones worth keeping: PostgREST returns HTTP 200 with an empty array when
+RLS filters every candidate row, so a naive "did it 200?" test would call a *blocked* write a
+success. Assert on the returned representation being empty, not on the status code.
+
+Also confirmed in the same run: the `on_auth_user_created` trigger creates the `public.users` row
+on sign-up and populates `name` from `raw_user_meta_data`, which is what `AuthRepository.signUp`
+sends.
+
+To re-run: sign up two accounts (`mailer_autoconfirm` is on, so the sign-up response carries a
+usable `access_token`), have A insert a `devices` row and then a `data_usage` row, and drive
+checks 1–7 with each account's bearer token. Delete the test rows afterwards; the test *accounts*
+need a service_role key or Dashboard → Authentication → Users to remove.
+
 ## Type mapping (keep this table current — it is what D2 builds against)
 
 | Postgres table | Room entity | Postgres type | Kotlin type |
