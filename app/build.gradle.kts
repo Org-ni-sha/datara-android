@@ -24,8 +24,12 @@ android {
         applicationId = "com.capstone.datara"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        // versionCode is internal and must only ever increase — bump it on every build
+        // handed to someone else. versionName is the string shown in Android's App info,
+        // and is what D9's hidden diagnostics screen counts taps on.
+        // 0.x while pre-defense; 1.0.0 is reserved for the defense build.
+        versionCode = 2
+        versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
