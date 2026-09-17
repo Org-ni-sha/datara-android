@@ -153,7 +153,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 *Goal: Centralized authentication, synced Postgres schema, and backup logging.*
 
 - [x] **Phase C1 — Auth Setup:** Supabase Auth with Email/Password.
-- [ ] **Phase C2 — Database Schema Definition:** *(SQL written in [`supabase/`](supabase/); tick this once it is applied to the live project and RLS is verified with two accounts.)*
+- [x] **Phase C2 — Database Schema Definition:** *(Applied to the live project — `supabase db push --dry-run` reports up to date — and RLS verified against two live accounts on 2026-09-17. See "RLS verification" in [`supabase/README.md`](supabase/README.md) to re-run it.)*
   - Tables: `users`, `devices`, `providers`, `promos`, `data_usage`, `notifications`, `associations`.
   - Enforce Row Level Security (RLS) policies per `user_id`. No table ships without its policy.
   - Align schema types 1:1 with Android Room entities. Convention: Postgres is `snake_case` plural (`data_usage`), Room entities are `PascalCase` singular (`DataUsage`) — the mapping is naming-only, types must match exactly.
@@ -171,8 +171,8 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 - [x] Supabase Auth (`auth-kt`) with Ktor client.
 - [x] Dark navy UI (`#0C101A` / `#141B2B`) for `LoginScreen` and `RegisterScreen`.
 - [x] `AuthRepository`, `AuthViewModel`, and Hilt injection.
-- [ ] Session auto-login persistence on launch (`sessionStatus` check in `MainActivity`).
-- [ ] Initial user record creation in Supabase on sign-up. *(Handled server-side by the `on_auth_user_created` trigger in C2 — the client only needs to write `name` after sign-up.)*
+- [x] Session auto-login persistence on launch — `SessionViewModel` maps `sessionStatus` to `SessionState`, `MainActivity` shows `SplashScreen` until it resolves, then picks the start destination.
+- [x] Initial user record creation in Supabase on sign-up — created server-side by the `on_auth_user_created` trigger (C2); registration now collects a full name and sends it as auth metadata so the trigger populates `users.name` on insert.
 
 #### Phase D2: Room Local Database & Hardware Detection
 - [ ] Add Room dependencies and KSP compiler (`ksp`, never `kapt` — matches the existing Hilt setup).
@@ -211,7 +211,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 
 #### Phase D5: Core Dashboard & Floating Navigation
 - [ ] Fixed floating pill bottom nav (`Home`, `History`, `Settings`).
-- [ ] Replace the currently-empty `"dashboard"` composable in `NavGraph.kt` — post-login navigation lands on a blank screen until this phase ships.
+- [ ] Replace `ui/dashboard/DashboardPlaceholderScreen.kt` — a D1 stub that only proves auto-login works (shows the signed-in email and a sign-out button). Delete the whole file; it implements none of the content below.
 - [ ] **PET Hero Card (Centerpiece):** Prominent hours/days remaining countdown and predicted exhaustion timestamp.
   - Define the pre-prediction state: what the card shows before D6 exists, and before a new user has enough history for any prediction at all.
 - [ ] **Data Balance Gauge:** Remaining vs. consumed progress bar with status colors (`DataraNeonGreen`, `DataraPrimaryBlue`, `DataraError`).

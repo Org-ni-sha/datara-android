@@ -42,6 +42,10 @@ class AuthViewModel @Inject constructor(
     private val _passwordResetState = MutableStateFlow(PasswordResetState())
     val passwordResetState: StateFlow<PasswordResetState> = _passwordResetState.asStateFlow()
 
+    /** Email of the signed-in user, or null when there is no session. */
+    val currentUserEmail: String?
+        get() = repository.currentUserEmail()
+
     fun clearError() {
         if (_uiState.value is AuthUiState.Error) {
             _uiState.value = AuthUiState.Idle
@@ -54,29 +58,33 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun register(email: String, password: String, confirmPassword: String) {
+    fun register(name: String, email: String, password: String, confirmPassword: String) {
+        val trimmedName = name.trim()
         val trimmedEmail = email.trim()
-        if (trimmedEmail.isBlank() || password.isBlank() || confirmPassword.isBlank()) {
-            _uiState.value = AuthUiState.Error("Please fill in all required fields.")
-            return
-        }
-        if (!AuthValidator.isValidEmail(trimmedEmail)) {
-            _uiState.value = AuthUiState.Error("Please enter a valid email address.")
-            return
-        }
-        if (!AuthValidator.isPasswordValid(password)) {
-            _uiState.value = AuthUiState.Error("Password must be at least 6 characters long.")
-            return
-        }
-        if (password != confirmPassword) {
-            _uiState.value = AuthUiState.Error("Passwords do not match. Please make sure they are identical.")
-            return
-        }
+
+        AuthValidator.validateRegistration(trimmedName, trimmedEmail, password, confirmPassword)
+            ?.let { error ->
+                _uiState.value = AuthUiState.Error(error)
+                return
+            }
+
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            repository.signUp(trimmedEmail, password)
+            repository.signUp(trimmedEmail, password, trimmedName)
                 .onSuccess { _uiState.value = AuthUiState.Success }
                 .onFailure { _uiState.value = AuthUiState.Error(AuthErrorParser.parse(it, AuthAction.REGISTER)) }
+        }
+    }
+
+    /**
+     * Signs out and invokes [onComplete] once Supabase has cleared the persisted session, so the
+     * caller navigates only after auto-login can no longer pick the session back up on relaunch.
+     */
+    fun signOut(onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.signOut()
+            _uiState.value = AuthUiState.Idle
+            onComplete()
         }
     }
 

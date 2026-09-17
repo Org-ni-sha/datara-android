@@ -205,4 +205,37 @@ object AuthValidator {
     fun isPasswordValid(password: String): Boolean {
         return password.length >= 6
     }
+
+    fun isValidName(name: String): Boolean {
+        return name.trim().length >= 2
+    }
+
+    /**
+     * Validates the whole registration form and returns the first error message, or null when
+     * the form is valid. Kept pure and free of coroutines so it can be unit tested directly;
+     * [AuthViewModel.register] delegates to it rather than duplicating the rules.
+     */
+    fun validateRegistration(
+        name: String,
+        email: String,
+        password: String,
+        confirmPassword: String
+    ): String? = when {
+        name.isBlank() || email.isBlank() || password.isBlank() || confirmPassword.isBlank() ->
+            "Please fill in all required fields."
+
+        !isValidName(name) ->
+            "Please enter your full name."
+
+        !isValidEmail(email) ->
+            "Please enter a valid email address."
+
+        !isPasswordValid(password) ->
+            "Password must be at least 6 characters long."
+
+        password != confirmPassword ->
+            "Passwords do not match. Please make sure they are identical."
+
+        else -> null
+    }
 }

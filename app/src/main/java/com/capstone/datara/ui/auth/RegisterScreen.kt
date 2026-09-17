@@ -74,6 +74,7 @@ fun RegisterScreen(
     onNavigateToLogin: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
+    var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
@@ -164,6 +165,29 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
+            // Full Name Field — sent as auth metadata so the on_auth_user_created trigger
+            // can populate public.users.name when it creates the profile row.
+            DataraFieldLabel(label = "Full Name")
+            Spacer(modifier = Modifier.height(8.dp))
+            DataraTextField(
+                value = name,
+                onValueChange = {
+                    name = it
+                    viewModel.clearError()
+                },
+                placeholder = "Full Name",
+                leadingIcon = DataraIcons.Person,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                )
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Email Field
             DataraFieldLabel(label = "Email Address")
             Spacer(modifier = Modifier.height(8.dp))
@@ -228,7 +252,7 @@ fun RegisterScreen(
                 keyboardActions = KeyboardActions(
                     onDone = {
                         focusManager.clearFocus()
-                        viewModel.register(email, password, confirmPassword)
+                        viewModel.register(name, email, password, confirmPassword)
                     }
                 )
             )
@@ -270,7 +294,7 @@ fun RegisterScreen(
                 text = "Sign Up",
                 onClick = {
                     focusManager.clearFocus()
-                    viewModel.register(email, password, confirmPassword)
+                    viewModel.register(name, email, password, confirmPassword)
                 },
                 enabled = email.isNotBlank() && password.isNotBlank() && confirmPassword.isNotBlank(),
                 isLoading = uiState is AuthUiState.Loading
