@@ -136,7 +136,7 @@ D6 below is written against **(a)**. E3's comparison is valid under any option.
 *Goal: Centralized authentication, synced Postgres schema, and backup logging.*
 
 - [x] **Phase C1 — Auth Setup:** Supabase Auth with Email/Password.
-- [ ] **Phase C2 — Database Schema Definition:**
+- [ ] **Phase C2 — Database Schema Definition:** *(SQL written in [`supabase/`](supabase/); tick this once it is applied to the live project and RLS is verified with two accounts.)*
   - Tables: `users`, `devices`, `providers`, `promos`, `data_usage`, `notifications`, `associations`.
   - Enforce Row Level Security (RLS) policies per `user_id`. No table ships without its policy.
   - Align schema types 1:1 with Android Room entities. Convention: Postgres is `snake_case` plural (`data_usage`), Room entities are `PascalCase` singular (`DataUsage`) — the mapping is naming-only, types must match exactly.
@@ -155,7 +155,7 @@ D6 below is written against **(a)**. E3's comparison is valid under any option.
 - [x] Dark navy UI (`#0C101A` / `#141B2B`) for `LoginScreen` and `RegisterScreen`.
 - [x] `AuthRepository`, `AuthViewModel`, and Hilt injection.
 - [ ] Session auto-login persistence on launch (`sessionStatus` check in `MainActivity`).
-- [ ] Initial user record creation in Supabase on sign-up. *(Blocked by: C2.)*
+- [ ] Initial user record creation in Supabase on sign-up. *(Handled server-side by the `on_auth_user_created` trigger in C2 — the client only needs to write `name` after sign-up.)*
 
 #### Phase D2: Room Local Database & Hardware Detection
 - [ ] Add Room dependencies and KSP compiler (`ksp`, never `kapt` — matches the existing Hilt setup).
