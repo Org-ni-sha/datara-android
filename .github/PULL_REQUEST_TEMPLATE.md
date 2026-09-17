@@ -1,44 +1,28 @@
 <!--
-Keep this short. If a section doesn't apply, delete it rather than leaving it blank.
-See CONTRIBUTING.md for branch/commit conventions.
+Keep this short. Delete any section that doesn't apply.
+Branch and commit conventions live in CONTRIBUTING.md.
 -->
 
 ## What changed
 
-<!-- 1-3 sentences. What did you build/fix, and why. -->
+<!-- 1-3 sentences: what you built or fixed, and why. -->
 
-## Related issue
-
-Closes #
+Closes #<!-- issue number, or delete this line -->
 
 ## How to test
 
-<!-- Exact steps a reviewer should follow to verify this works.
-Example:
-1. Run the app on a device (not emulator, if this touches TelephonyManager/SIM data)
+<!-- Exact steps for the reviewer. Example:
+1. Run on a physical device (required if this touches TelephonyManager/SIM data)
 2. Log in with a test account
 3. Confirm the Dashboard shows a PET value, not just Total Used
 -->
 
-## Type of change
-
-- [ ] `feat` — new feature
-- [ ] `fix` — bug fix
-- [ ] `style` — UI / styling change
-- [ ] `refactor` — code change, no behavior change
-- [ ] `test` — adding or updating tests
-- [ ] `chore` — build/deps/tooling
-- [ ] `docs` — documentation only
-
 ## Checklist
 
-- [ ] Branch is named per `CONTRIBUTING.md` (`feature/...`, `fix/...`, etc.)
-- [ ] Commit messages follow Conventional Commits
-- [ ] No hardcoded secrets, keys, or credentials introduced
-- [ ] `local.properties` is not part of this diff
-- [ ] Builds successfully and existing tests still pass
-- [ ] Doesn't reintroduce anything listed under "Scope boundaries" in `AGENT.md` (SMS reading, address field, budget enforcement, etc.) without team discussion first
+- [ ] Builds, and existing tests still pass
+- [ ] No secrets, keys, or `local.properties` in the diff
+- [ ] Nothing under "Scope boundaries" in `AGENTS.md` reintroduced (SMS reading, address field, budget enforcement)
 
-## Screenshots (if UI change)
+## Screenshots
 
-<!-- Before/after, if applicable -->
+<!-- Before/after, for UI changes. Delete otherwise. -->
