@@ -14,6 +14,7 @@
 .cxx
 local.properties
 screen-reference/
+design_references/
 # Android Studio / IntelliJ IDEA
 .idea/
 !.idea/compiler.xml

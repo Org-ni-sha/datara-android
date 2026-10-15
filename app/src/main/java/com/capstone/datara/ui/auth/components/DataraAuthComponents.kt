@@ -28,13 +28,16 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -43,12 +46,19 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.capstone.datara.R
 import com.capstone.datara.ui.theme.DataraError
 import com.capstone.datara.ui.theme.DataraFontFamily
 import com.capstone.datara.ui.theme.DataraIconTint
@@ -91,15 +101,18 @@ fun DataraTextField(
     onValueChange: (String) -> Unit,
     placeholder: String,
     modifier: Modifier = Modifier,
+    label: String = placeholder,
     leadingIcon: ImageVector? = null,
     isPassword: Boolean = false,
     isError: Boolean = false,
+    errorMessage: String? = null,
+    autofillContentType: ContentType? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     singleLine: Boolean = true
 ) {
     var isFocused by remember { mutableStateOf(false) }
-    var passwordVisible by remember { mutableStateOf(false) }
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
 
     val targetBorderColor = when {
         isError -> DataraError
@@ -124,6 +137,11 @@ fun DataraTextField(
     } else {
         VisualTransformation.None
     }
+    val showPasswordLabel = stringResource(R.string.auth_show_password)
+    val hidePasswordLabel = stringResource(R.string.auth_hide_password)
+    val passwordVisibilityState = stringResource(
+        if (passwordVisible) R.string.auth_password_visible else R.string.auth_password_hidden
+    )
 
     Box(
         modifier = modifier
@@ -136,6 +154,11 @@ fun DataraTextField(
                 color = animatedBorderColor,
                 shape = RoundedCornerShape(percent = 50)
             )
+            .semantics {
+                contentDescription = label
+                if (isError) error(errorMessage ?: label)
+                autofillContentType?.let { contentType = it }
+            }
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -190,23 +213,24 @@ fun DataraTextField(
             }
 
             if (isPassword && value.isNotEmpty()) {
-                Text(
-                    text = if (passwordVisible) "Hide" else "Show",
-                    style = TextStyle(
-                        fontFamily = DataraFontFamily,
-                        color = DataraNeonBlue,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    modifier = Modifier
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) {
-                            passwordVisible = !passwordVisible
-                        }
-                        .padding(start = 8.dp, end = 4.dp, top = 4.dp, bottom = 4.dp)
-                )
+                TextButton(
+                    onClick = { passwordVisible = !passwordVisible },
+                    modifier = Modifier.semantics { stateDescription = passwordVisibilityState }
+                ) {
+                    Text(
+                        text = if (passwordVisible) {
+                            hidePasswordLabel
+                        } else {
+                            showPasswordLabel
+                        },
+                        style = TextStyle(
+                            fontFamily = DataraFontFamily,
+                            color = DataraNeonBlue,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
             }
         }
     }
@@ -236,7 +260,15 @@ fun DataraPrimaryButton(
         }
     )
 
-    Box(
+    Button(
+        onClick = onClick,
+        enabled = enabled && !isLoading,
+        interactionSource = interactionSource,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent
+        ),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
         modifier = modifier
             .scale(scale)
             .fillMaxWidth()
@@ -248,13 +280,6 @@ fun DataraPrimaryButton(
             )
             .clip(RoundedCornerShape(percent = 50))
             .background(buttonGradient)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                enabled = enabled && !isLoading,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
     ) {
         if (isLoading) {
             CircularProgressIndicator(

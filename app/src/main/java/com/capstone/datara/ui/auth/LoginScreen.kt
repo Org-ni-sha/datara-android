@@ -6,8 +6,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,18 +25,24 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -47,6 +51,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.capstone.datara.R
 import com.capstone.datara.ui.auth.components.DataraFieldLabel
 import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.auth.components.DataraLogo
@@ -67,8 +72,8 @@ fun LoginScreen(
     onForgotPasswordClick: () -> Unit = {},
     viewModel: AuthViewModel = hiltViewModel()
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
 
@@ -109,7 +114,7 @@ fun LoginScreen(
 
             // Headline
             Text(
-                text = "LOGIN",
+                text = stringResource(R.string.auth_login_title),
                 style = MaterialTheme.typography.headlineMedium.copy(
                     color = DataraTextPrimary,
                     fontWeight = FontWeight.ExtraBold,
@@ -120,7 +125,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             // Email Field
-            DataraFieldLabel(label = "Email Address")
+            DataraFieldLabel(label = stringResource(R.string.auth_email_label))
             Spacer(modifier = Modifier.height(8.dp))
             DataraTextField(
                 value = email,
@@ -128,7 +133,9 @@ fun LoginScreen(
                     email = it
                     viewModel.clearError()
                 },
-                placeholder = "Email",
+                placeholder = stringResource(R.string.auth_email_placeholder),
+                label = stringResource(R.string.auth_email_label),
+                autofillContentType = ContentType.EmailAddress,
                 leadingIcon = DataraIcons.Email,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
@@ -143,22 +150,19 @@ fun LoginScreen(
 
             // Password Field
             DataraFieldLabel(
-                label = "Password",
+                label = stringResource(R.string.auth_password_label),
                 trailingContent = {
-                    Text(
-                        text = "Forget Password",
-                        color = DataraNeonBlue,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = {
-                                viewModel.clearError()
-                                onForgotPasswordClick()
-                            }
+                    TextButton(onClick = {
+                        viewModel.clearError()
+                        onForgotPasswordClick()
+                    }) {
+                        Text(
+                            text = stringResource(R.string.auth_forgot_password),
+                            color = DataraNeonBlue,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
-                    )
+                    }
                 }
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -168,9 +172,11 @@ fun LoginScreen(
                     password = it
                     viewModel.clearError()
                 },
-                placeholder = "*********",
+                placeholder = stringResource(R.string.auth_password_placeholder),
+                label = stringResource(R.string.auth_password_label),
                 leadingIcon = DataraIcons.Lock,
                 isPassword = true,
+                autofillContentType = ContentType.Password,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Done
@@ -199,6 +205,7 @@ fun LoginScreen(
                                 shape = RoundedCornerShape(14.dp)
                             )
                             .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .semantics { liveRegion = LiveRegionMode.Polite }
                     ) {
                         Text(
                             text = (uiState as? AuthUiState.Error)?.message.orEmpty(),
@@ -217,7 +224,7 @@ fun LoginScreen(
 
             // Login Button
             DataraPrimaryButton(
-                text = "Login",
+                text = stringResource(R.string.auth_login_action),
                 onClick = {
                     focusManager.clearFocus()
                     viewModel.login(email, password)
@@ -234,27 +241,24 @@ fun LoginScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Don't have an account? ",
+                    text = stringResource(R.string.auth_no_account),
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = DataraTextSecondary
                     )
                 )
-                Text(
-                    text = "Sign up",
-                    color = DataraNeonBlue,
-                    style = MaterialTheme.typography.bodyMedium.copy(
+                TextButton(onClick = {
+                    viewModel.clearError()
+                    onNavigateToRegister()
+                }) {
+                    Text(
+                        text = stringResource(R.string.auth_sign_up_action),
                         color = DataraNeonBlue,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    modifier = Modifier.clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {
-                            viewModel.clearError()
-                            onNavigateToRegister()
-                        }
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = DataraNeonBlue,
+                            fontWeight = FontWeight.Bold
+                        )
                     )
-                )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))

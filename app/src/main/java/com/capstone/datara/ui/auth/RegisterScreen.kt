@@ -9,7 +9,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,19 +31,25 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -53,6 +58,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.capstone.datara.R
 import com.capstone.datara.ui.auth.components.DataraFieldLabel
 import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.auth.components.DataraLogo
@@ -74,10 +80,10 @@ fun RegisterScreen(
     onNavigateToLogin: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
-    var name by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var confirmPassword by rememberSaveable { mutableStateOf("") }
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
 
@@ -115,7 +121,7 @@ fun RegisterScreen(
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .background(DataraCardBg)
                     .border(width = 1.dp, color = DataraInputBorder, shape = CircleShape)
@@ -129,7 +135,7 @@ fun RegisterScreen(
             ) {
                 Icon(
                     imageVector = DataraIcons.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.action_back),
                     tint = DataraTextPrimary,
                     modifier = Modifier.size(20.dp)
                 )
@@ -154,7 +160,7 @@ fun RegisterScreen(
 
             // Headline
             Text(
-                text = "CREATE ACCOUNT",
+                text = stringResource(R.string.auth_register_title),
                 style = MaterialTheme.typography.headlineMedium.copy(
                     color = DataraTextPrimary,
                     fontWeight = FontWeight.ExtraBold,
@@ -167,7 +173,7 @@ fun RegisterScreen(
 
             // Full Name Field — sent as auth metadata so the on_auth_user_created trigger
             // can populate public.users.name when it creates the profile row.
-            DataraFieldLabel(label = "Full Name")
+            DataraFieldLabel(label = stringResource(R.string.auth_name_label))
             Spacer(modifier = Modifier.height(8.dp))
             DataraTextField(
                 value = name,
@@ -175,8 +181,10 @@ fun RegisterScreen(
                     name = it
                     viewModel.clearError()
                 },
-                placeholder = "Full Name",
+                placeholder = stringResource(R.string.auth_name_placeholder),
+                label = stringResource(R.string.auth_name_label),
                 leadingIcon = DataraIcons.Person,
+                autofillContentType = ContentType.PersonFullName,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.Next
@@ -189,7 +197,7 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Email Field
-            DataraFieldLabel(label = "Email Address")
+            DataraFieldLabel(label = stringResource(R.string.auth_email_label))
             Spacer(modifier = Modifier.height(8.dp))
             DataraTextField(
                 value = email,
@@ -197,8 +205,10 @@ fun RegisterScreen(
                     email = it
                     viewModel.clearError()
                 },
-                placeholder = "Email",
+                placeholder = stringResource(R.string.auth_email_placeholder),
+                label = stringResource(R.string.auth_email_label),
                 leadingIcon = DataraIcons.Email,
+                autofillContentType = ContentType.EmailAddress,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Next
@@ -211,7 +221,7 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Password Field
-            DataraFieldLabel(label = "Password")
+            DataraFieldLabel(label = stringResource(R.string.auth_password_label))
             Spacer(modifier = Modifier.height(8.dp))
             DataraTextField(
                 value = password,
@@ -219,9 +229,11 @@ fun RegisterScreen(
                     password = it
                     viewModel.clearError()
                 },
-                placeholder = "*********",
+                placeholder = stringResource(R.string.auth_password_placeholder),
+                label = stringResource(R.string.auth_password_label),
                 leadingIcon = DataraIcons.Lock,
                 isPassword = true,
+                autofillContentType = ContentType.NewPassword,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Next
@@ -234,7 +246,7 @@ fun RegisterScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Confirm Password Field
-            DataraFieldLabel(label = "Confirm Password")
+            DataraFieldLabel(label = stringResource(R.string.auth_confirm_password_label))
             Spacer(modifier = Modifier.height(8.dp))
             DataraTextField(
                 value = confirmPassword,
@@ -242,9 +254,11 @@ fun RegisterScreen(
                     confirmPassword = it
                     viewModel.clearError()
                 },
-                placeholder = "*********",
+                placeholder = stringResource(R.string.auth_password_placeholder),
+                label = stringResource(R.string.auth_confirm_password_label),
                 leadingIcon = DataraIcons.Lock,
                 isPassword = true,
+                autofillContentType = ContentType.NewPassword,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Done
@@ -273,6 +287,7 @@ fun RegisterScreen(
                                 shape = RoundedCornerShape(14.dp)
                             )
                             .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .semantics { liveRegion = LiveRegionMode.Polite }
                     ) {
                         Text(
                             text = (uiState as? AuthUiState.Error)?.message.orEmpty(),
@@ -291,12 +306,12 @@ fun RegisterScreen(
 
             // Sign Up Button
             DataraPrimaryButton(
-                text = "Sign Up",
+                text = stringResource(R.string.auth_sign_up_action),
                 onClick = {
                     focusManager.clearFocus()
                     viewModel.register(name, email, password, confirmPassword)
                 },
-                enabled = email.isNotBlank() && password.isNotBlank() && confirmPassword.isNotBlank(),
+                enabled = name.isNotBlank() && email.isNotBlank() && password.isNotBlank() && confirmPassword.isNotBlank(),
                 isLoading = uiState is AuthUiState.Loading
             )
 
@@ -308,27 +323,24 @@ fun RegisterScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Already have an account? ",
+                    text = stringResource(R.string.auth_existing_account),
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = DataraTextSecondary
                     )
                 )
-                Text(
-                    text = "Log in",
-                    color = DataraNeonBlue,
-                    style = MaterialTheme.typography.bodyMedium.copy(
+                TextButton(onClick = {
+                    viewModel.clearError()
+                    onNavigateToLogin()
+                }) {
+                    Text(
+                        text = stringResource(R.string.auth_login_action),
                         color = DataraNeonBlue,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    modifier = Modifier.clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {
-                            viewModel.clearError()
-                            onNavigateToLogin()
-                        }
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = DataraNeonBlue,
+                            fontWeight = FontWeight.Bold
+                        )
                     )
-                )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))

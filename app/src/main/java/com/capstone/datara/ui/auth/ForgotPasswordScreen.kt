@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,15 +42,22 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -59,6 +67,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.capstone.datara.R
 import com.capstone.datara.ui.auth.components.DataraFieldLabel
 import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.auth.components.DataraLogo
@@ -85,10 +94,10 @@ fun ForgotPasswordScreen(
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val state by viewModel.passwordResetState.collectAsState()
-    var email by remember { mutableStateOf("") }
-    var code by remember { mutableStateOf("") }
-    var newPassword by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var code by rememberSaveable { mutableStateOf("") }
+    var newPassword by rememberSaveable { mutableStateOf("") }
+    var confirmPassword by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
 
     DisposableEffect(Unit) {
@@ -122,7 +131,7 @@ fun ForgotPasswordScreen(
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .background(DataraCardBg)
                     .border(width = 1.dp, color = DataraInputBorder, shape = CircleShape)
@@ -139,7 +148,7 @@ fun ForgotPasswordScreen(
             ) {
                 Icon(
                     imageVector = DataraIcons.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.action_back),
                     tint = DataraTextPrimary,
                     modifier = Modifier.size(20.dp)
                 )
@@ -163,7 +172,7 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Text(
-                        text = "RESET PASSWORD",
+                        text = stringResource(R.string.auth_reset_title),
                         style = MaterialTheme.typography.headlineMedium.copy(
                             color = DataraTextPrimary,
                             fontWeight = FontWeight.ExtraBold,
@@ -175,7 +184,7 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Enter your registered email and we'll send you a 6-digit verification code to reset your password.",
+                        text = stringResource(R.string.auth_reset_intro),
                         style = MaterialTheme.typography.bodyMedium.copy(
                             color = DataraTextSecondary,
                             textAlign = TextAlign.Center,
@@ -186,7 +195,7 @@ fun ForgotPasswordScreen(
 
                     Spacer(modifier = Modifier.height(28.dp))
 
-                    DataraFieldLabel(label = "Email Address")
+                    DataraFieldLabel(label = stringResource(R.string.auth_email_label))
                     Spacer(modifier = Modifier.height(8.dp))
                     DataraTextField(
                         value = email,
@@ -194,8 +203,10 @@ fun ForgotPasswordScreen(
                             email = it
                             viewModel.clearResetError()
                         },
-                        placeholder = "Email",
+                        placeholder = stringResource(R.string.auth_email_placeholder),
+                        label = stringResource(R.string.auth_email_label),
                         leadingIcon = DataraIcons.Email,
+                        autofillContentType = ContentType.EmailAddress,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Email,
                             imeAction = ImeAction.Done
@@ -223,6 +234,7 @@ fun ForgotPasswordScreen(
                                         shape = RoundedCornerShape(14.dp)
                                     )
                                     .padding(horizontal = 16.dp, vertical = 12.dp)
+                                    .semantics { liveRegion = LiveRegionMode.Polite }
                             ) {
                                 Text(
                                     text = state.error.orEmpty(),
@@ -240,7 +252,7 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(28.dp))
 
                     DataraPrimaryButton(
-                        text = "Send 6-Digit Code",
+                        text = stringResource(R.string.auth_send_code),
                         onClick = {
                             focusManager.clearFocus()
                             viewModel.sendResetCode(email)
@@ -256,13 +268,13 @@ fun ForgotPasswordScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Remember your password? ",
+                            text = stringResource(R.string.auth_remember_password),
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = DataraTextSecondary
                             )
                         )
                         Text(
-                            text = "Log in",
+                            text = stringResource(R.string.auth_login_action),
                             color = DataraNeonBlue,
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = DataraNeonBlue,
@@ -284,7 +296,7 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(18.dp))
 
                     Text(
-                        text = "VERIFY CODE",
+                        text = stringResource(R.string.auth_verify_title),
                         style = MaterialTheme.typography.headlineMedium.copy(
                             color = DataraTextPrimary,
                             fontWeight = FontWeight.ExtraBold,
@@ -296,7 +308,7 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Enter the 6-digit code sent to\n${state.email}",
+                        text = stringResource(R.string.auth_verify_intro, state.email),
                         style = MaterialTheme.typography.bodyMedium.copy(
                             color = DataraTextSecondary,
                             textAlign = TextAlign.Center,
@@ -307,7 +319,7 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = "Wrong email? Change",
+                        text = stringResource(R.string.auth_change_email),
                         color = DataraNeonBlue,
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontWeight = FontWeight.SemiBold
@@ -326,7 +338,7 @@ fun ForgotPasswordScreen(
 
                     // 6 Small Digit Boxes Input
                     DataraFieldLabel(
-                        label = "6-Digit Code",
+                        label = stringResource(R.string.auth_code_label),
                         modifier = Modifier.padding(horizontal = 4.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -361,6 +373,7 @@ fun ForgotPasswordScreen(
                                         shape = RoundedCornerShape(14.dp)
                                     )
                                     .padding(horizontal = 16.dp, vertical = 12.dp)
+                                    .semantics { liveRegion = LiveRegionMode.Polite }
                             ) {
                                 Text(
                                     text = state.error.orEmpty(),
@@ -378,7 +391,7 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(28.dp))
 
                     DataraPrimaryButton(
-                        text = "Verify Code",
+                        text = stringResource(R.string.auth_verify_action),
                         onClick = {
                             focusManager.clearFocus()
                             viewModel.verifyResetCode(code)
@@ -394,13 +407,13 @@ fun ForgotPasswordScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Didn't receive the code? ",
+                            text = stringResource(R.string.auth_code_not_received),
                             style = MaterialTheme.typography.bodySmall.copy(
                                 color = DataraTextPlaceholder
                             )
                         )
                         Text(
-                            text = "Resend",
+                            text = stringResource(R.string.auth_resend),
                             color = DataraNeonBlue,
                             style = MaterialTheme.typography.bodySmall.copy(
                                 color = DataraNeonBlue,
@@ -425,7 +438,7 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(18.dp))
 
                     Text(
-                        text = "NEW PASSWORD",
+                        text = stringResource(R.string.auth_new_password_title),
                         style = MaterialTheme.typography.headlineMedium.copy(
                             color = DataraTextPrimary,
                             fontWeight = FontWeight.ExtraBold,
@@ -437,7 +450,7 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Code verified! Please create a new password for your account.",
+                        text = stringResource(R.string.auth_new_password_intro),
                         style = MaterialTheme.typography.bodyMedium.copy(
                             color = DataraTextSecondary,
                             textAlign = TextAlign.Center,
@@ -448,7 +461,7 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(28.dp))
 
                     // New Password Field
-                    DataraFieldLabel(label = "New Password")
+                    DataraFieldLabel(label = stringResource(R.string.auth_new_password_label))
                     Spacer(modifier = Modifier.height(8.dp))
                     DataraTextField(
                         value = newPassword,
@@ -456,9 +469,11 @@ fun ForgotPasswordScreen(
                             newPassword = it
                             viewModel.clearResetError()
                         },
-                        placeholder = "Min. 6 characters",
+                        placeholder = stringResource(R.string.auth_new_password_placeholder),
+                        label = stringResource(R.string.auth_new_password_label),
                         leadingIcon = DataraIcons.Lock,
                         isPassword = true,
+                        autofillContentType = ContentType.NewPassword,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
                             imeAction = ImeAction.Next
@@ -471,7 +486,7 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Confirm Password Field
-                    DataraFieldLabel(label = "Confirm New Password")
+                    DataraFieldLabel(label = stringResource(R.string.auth_confirm_new_password_label))
                     Spacer(modifier = Modifier.height(8.dp))
                     DataraTextField(
                         value = confirmPassword,
@@ -479,9 +494,11 @@ fun ForgotPasswordScreen(
                             confirmPassword = it
                             viewModel.clearResetError()
                         },
-                        placeholder = "Re-enter new password",
+                        placeholder = stringResource(R.string.auth_confirm_new_password_placeholder),
+                        label = stringResource(R.string.auth_confirm_new_password_label),
                         leadingIcon = DataraIcons.Lock,
                         isPassword = true,
+                        autofillContentType = ContentType.NewPassword,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
                             imeAction = ImeAction.Done
@@ -509,6 +526,7 @@ fun ForgotPasswordScreen(
                                         shape = RoundedCornerShape(14.dp)
                                     )
                                     .padding(horizontal = 16.dp, vertical = 12.dp)
+                                    .semantics { liveRegion = LiveRegionMode.Polite }
                             ) {
                                 Text(
                                     text = state.error.orEmpty(),
@@ -526,7 +544,7 @@ fun ForgotPasswordScreen(
                     Spacer(modifier = Modifier.height(28.dp))
 
                     DataraPrimaryButton(
-                        text = "Save New Password",
+                        text = stringResource(R.string.auth_save_new_password),
                         onClick = {
                             focusManager.clearFocus()
                             viewModel.updateNewPassword(newPassword, confirmPassword)
@@ -565,7 +583,7 @@ fun ForgotPasswordScreen(
                             ) {
                                 Icon(
                                     imageVector = DataraIcons.CheckCircle,
-                                    contentDescription = "Success",
+                                    contentDescription = stringResource(R.string.auth_success_description),
                                     tint = DataraNeonGreen,
                                     modifier = Modifier.size(36.dp)
                                 )
@@ -574,7 +592,7 @@ fun ForgotPasswordScreen(
                             Spacer(modifier = Modifier.height(18.dp))
 
                             Text(
-                                text = "Password Reset Complete!",
+                                text = stringResource(R.string.auth_reset_complete),
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     color = DataraTextPrimary,
                                     fontWeight = FontWeight.Bold,
@@ -585,7 +603,7 @@ fun ForgotPasswordScreen(
                             Spacer(modifier = Modifier.height(10.dp))
 
                             Text(
-                                text = "Your password has been successfully updated. You can now log in to DATAra with your new password.",
+                                text = stringResource(R.string.auth_reset_complete_body),
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     color = DataraTextSecondary,
                                     textAlign = TextAlign.Center,
@@ -596,7 +614,7 @@ fun ForgotPasswordScreen(
                             Spacer(modifier = Modifier.height(26.dp))
 
                             DataraPrimaryButton(
-                                text = "Log In Now",
+                                text = stringResource(R.string.auth_login_now),
                                 onClick = onNavigateToLogin
                             )
                         }
@@ -623,6 +641,7 @@ fun SixDigitCodeInput(
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
+    val codeContentDescription = stringResource(R.string.auth_code_label)
 
     LaunchedEffect(Unit) {
         // Automatically request focus when entering the code screen
@@ -641,7 +660,8 @@ fun SixDigitCodeInput(
         modifier = modifier
             .fillMaxWidth()
             .focusRequester(focusRequester)
-            .onFocusChanged { isFocused = it.isFocused },
+            .onFocusChanged { isFocused = it.isFocused }
+            .semantics { contentDescription = codeContentDescription },
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Number,
             imeAction = ImeAction.Done
@@ -652,7 +672,7 @@ fun SixDigitCodeInput(
         decorationBox = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 for (index in 0 until 6) {
@@ -669,7 +689,8 @@ fun SixDigitCodeInput(
 
                     Box(
                         modifier = Modifier
-                            .width(44.dp)
+                            .weight(1f, fill = false)
+                            .widthIn(max = 44.dp)
                             .height(54.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(DataraCardBg)

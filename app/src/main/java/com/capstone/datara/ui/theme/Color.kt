@@ -20,3 +20,13 @@ val DataraTextPlaceholder = Color(0xFF4A5872)
 val DataraIconTint = Color(0xFF50617F)
 val DataraError = Color(0xFFEF4444)
 val DataraErrorBg = Color(0x1AEF4444)
+
+// Dashboard surfaces and status accents
+val DataraCardElevated = Color(0xFF182235)
+val DataraCardHighlight = Color(0xFF1D2B45)
+val DataraBlueSoft = Color(0xFF8CB3FF)
+val DataraGreenSoft = Color(0xFF9BE15D)
+val DataraWarning = Color(0xFFFFC857)
+val DataraDivider = Color(0xFF253149)
+val DataraHeroStart = Color(0xFF16284A)
+val DataraHeroMiddle = Color(0xFF101B31)

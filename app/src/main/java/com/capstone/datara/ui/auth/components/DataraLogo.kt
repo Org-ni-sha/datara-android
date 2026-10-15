@@ -14,6 +14,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -49,7 +50,7 @@ fun DataraLogo(
         // Official High-Resolution DATAra Logo Asset
         Image(
             painter = painterResource(id = R.drawable.datara_logo),
-            contentDescription = "DATAra Logo",
+            contentDescription = stringResource(R.string.auth_logo_description),
             modifier = Modifier
                 .size(size)
                 .shadow(

@@ -1,0 +1,278 @@
+You are the frontend implementation agent for the DATAra Android application.
+
+PROJECT
+- Repository: datara-android
+- UI framework: Android Jetpack Compose with Material 3
+- Product: DATAra, a mobile-data monitoring and Predicted Exhaustion Time (PET) application
+- Current visual identity: dark-only, blue/neon-green accents, data-focused cards, PET-first hierarchy
+- Existing screens: Splash, Login, Register, Forgot Password, Dashboard, History and Settings
+
+PRIMARY GOAL
+Complete and polish the DATAra frontend through recommended frontend sequence items 1–4.
+
+This is a FRONTEND-ONLY task. Do not implement sequence number 5 or connect the new screens to databases, Room, telemetry, WorkManager, Supabase tables, ONNX models, notification services or real Android permission APIs.
+
+READ BEFORE IMPLEMENTING
+1. Read ROADMAP.md.
+2. Read AGENTS.md.
+3. Inspect the existing Dashboard, History, Settings, Authentication and Navigation code.
+4. Inspect design_references only for inspiration. Do not copy the references exactly.
+5. Preserve existing user changes and the established DATAra visual identity.
+
+NON-NEGOTIABLE SCOPE
+- Use local, in-memory or preview mock state only.
+- Do not create repositories, database entities, network requests or fake backend services.
+- Do not display mock information as if it were real device data.
+- Clearly show “Not connected,” “Unavailable,” “Design preview,” or similar honest states when appropriate.
+- Preserve the currently working authentication, session restoration and sign-out behavior.
+- Keep the application dark-only. Do not add a theme switch.
+- Do not add SMS reading, manual carrier entry, data throttling, address fields or raw device identifiers.
+- The secondary phone number remains optional.
+- Developer diagnostics must remain hidden behind five taps on the app-version row.
+- Prefer existing dependencies and avoid adding libraries solely for visual decoration.
+
+IMPLEMENTATION SEQUENCE
+
+1. FIRST-RUN AND PROMO SETUP SCREENS
+
+Create a Usage Access onboarding flow containing:
+
+- Clear explanation of why DATAra needs usage access.
+- Explanation that usage access is special Android access rather than an ordinary permission dialog.
+- Short privacy explanation describing what DATAra measures.
+- Visible current state such as Not granted, Needs review or Unavailable.
+- Primary Continue/Review access action.
+- Secondary Not now action.
+- Recovery UI for a denied or unavailable state.
+- Do not invoke the real Android permission API yet.
+
+Create a Notification Permission introduction screen containing:
+
+- Explanation of PET warnings, consumption milestones and the persistent tracking notification.
+- Continue and Not now actions.
+- Honest “Not connected in this frontend build” status.
+- No real runtime permission request.
+
+Create the Promo Setup flow containing:
+
+- Detected-carrier presentation for Smart, Globe or DITO.
+- Carrier-filtered promo catalog using sample data.
+- Search or category filtering if it improves usability.
+- Selected promo summary.
+- Manual promo entry dialog or screen with:
+  - Promo name
+  - Data allowance in GB
+  - Validity in days
+  - Expiry date
+  - Starting or remaining balance
+- Field validation and clear supporting errors.
+- A baseline-correction control that lets the user enter the carrier-reported remaining balance.
+- A visible disclaimer that DATAra’s balance is an estimate and may differ from the carrier.
+- Empty, loading-placeholder, detected-carrier, unavailable-carrier and validation-error designs.
+- Do not allow manual carrier entry.
+
+Navigation behavior:
+
+- Successful registration should enter the presentation-only onboarding flow.
+- Returning login and restored sessions may continue to Dashboard because real first-run persistence is not available.
+- Settings → Usage Access should open the onboarding/review screen.
+- Dashboard → Add Promo should open Promo Setup.
+- Completing the mock promo flow may update an in-memory UI state, but it must not imply permanent storage.
+
+2. SUPPORTING SCREENS
+
+Create an in-app Notification Center with:
+
+- Header and unread count.
+- Empty state.
+- Populated sample state.
+- Warning categories for PET, 50%/80%/90% consumption and promo expiry.
+- Timestamp, title, supporting message and read/unread appearance.
+- Local-only Mark as read and Mark all as read interactions.
+- Clear distinction between high-priority and informational alerts.
+- Dashboard notification bell must open this screen.
+- The bell’s unread dot must be state-driven, not always visible.
+
+Create Profile Management with:
+
+- Current name.
+- Email displayed as read-only.
+- Optional secondary phone number.
+- Edit, cancel and local-only save interactions.
+- Validation and success feedback.
+- No address or device-ID fields.
+- Settings → Manage Profile must open this screen.
+
+Create Privacy and Terms screens with:
+
+- Readable sections and headings.
+- DATAra-specific explanation of device usage measurement.
+- Explanation that device measurements can differ from carrier accounting.
+- Explanation of local processing and future synchronization without claiming those systems are currently active.
+- Working back navigation.
+- Settings links must open the correct screen.
+
+Create a complete hidden Developer Diagnostics screen with:
+
+- Five taps on the Settings app-version row to unlock it.
+- Active model mode.
+- MAE.
+- RMSE.
+- R².
+- Input tensor summary.
+- Inference latency.
+- Last prediction time.
+- Runtime status.
+- Values should show Unavailable in the runtime frontend build.
+- Sample values may be used only in Compose previews.
+- Do not expose this screen in bottom navigation or normal menus.
+
+3. NAVIGATION AND INTERACTION WIRING
+
+Extend the existing navigation graph for all new destinations.
+
+At minimum, connect:
+
+- Registration success → onboarding.
+- Dashboard Add Promo → Promo Setup.
+- Dashboard notification bell → Notification Center.
+- Settings Manage Profile → Profile.
+- Settings Usage Access → Usage Access onboarding.
+- Settings System Notification Access → Notification introduction.
+- Settings Privacy → Privacy screen.
+- Settings Terms → Terms screen.
+- Five version taps → Developer Diagnostics.
+- Every back button → the expected previous destination.
+
+Top-level navigation must:
+
+- Avoid accumulating duplicate Dashboard, History and Settings destinations.
+- Use launchSingleTop, popUpTo, saveState and restoreState appropriately.
+- Preserve each top-level destination’s state where practical.
+- Keep authenticated screens out of the back stack after sign-out.
+
+No production-visible button should use an unexplained empty callback. If a feature cannot work in this frontend phase, disable it or provide an honest informational message.
+
+4. UI MODERNIZATION, ACCESSIBILITY AND LOCALIZATION
+
+Preserve:
+
+- DATAra’s dark color palette.
+- PET-first Dashboard hierarchy.
+- Existing brand accents.
+- Rounded but restrained cards.
+- Floating navigation personality.
+
+Improve:
+
+- Use Scaffold for top-level layouts and navigation instead of repeated fixed bottom padding.
+- Use Material 3 components where appropriate:
+  - IconButton
+  - Button/TextButton
+  - NavigationBarItem
+  - Switch
+  - FilterChip or segmented controls
+  - ListItem
+  - AlertDialog
+- Keep a minimum 48dp touch target.
+- Add ripple and pressed feedback.
+- Add selected and Role.Tab semantics to navigation.
+- Add toggleable Role.Switch semantics to settings rows.
+- Add progress semantics to balance and history progress indicators.
+- Do not communicate state using color alone.
+- Add concise content descriptions to non-decorative icons.
+- Avoid duplicate screen-reader announcements.
+- Announce important error and success messages using appropriate live-region semantics.
+- Ensure layouts remain usable at large font sizes.
+- Avoid fixed-width layouts that overflow on narrow phones.
+- Make metric layouts responsive:
+  - Single-column on compact widths.
+  - Two-column or constrained content on expanded widths.
+  - Use a navigation rail or suitable adaptive navigation on larger screens if it can be done without unnecessary dependencies.
+- Retain edge-to-edge behavior and correctly handle status, navigation and IME insets.
+- Use restrained, purposeful animation for state changes; do not add excessive glow or decorative motion.
+- Reserve the strongest visual emphasis for PET and primary actions.
+- Ensure chart information also has a readable textual summary.
+
+Authentication improvements:
+
+- Change “Forget Password” to “Forgot password?”
+- Preserve form values across configuration changes.
+- Add Autofill ContentType semantics for name, email, current password and new password.
+- Ensure password visibility controls have a proper role, state description and touch target.
+- Correct registration button eligibility so the required name field is included.
+- Keep field-level validation clear and accessible.
+
+Localization:
+
+- Move all user-visible text from navigable screens into strings.xml.
+- Use string resources for labels, errors, descriptions and accessibility text.
+- Use formatted strings or plurals for dynamic values.
+- Do not concatenate sentences in a way that prevents translation.
+
+STATE REQUIREMENTS
+
+Use explicit UI-state models for all significant screens. Include relevant combinations of:
+
+- Loading
+- Empty
+- Ready
+- Error
+- Permission required
+- Not connected
+- No active promo
+- Carrier unavailable
+- Tracking stopped
+- Offline or stale information
+- Read and unread notifications
+- View and edit profile modes
+
+Runtime routes should use honest empty/unavailable mock states. Rich sample data should primarily appear in Compose previews.
+
+CONSISTENCY REQUIREMENTS
+
+- Use the same sign-out confirmation behavior everywhere.
+- Derive Dashboard insight text from UI state instead of hardcoding “Usage is steady.”
+- Derive History trend direction and color from its trend state.
+- Derive notification badges from unread state.
+- Use consistent headings, spacing, card shapes and button hierarchy.
+- Settings toggles may remain local-only, but the UI must not claim they are permanently saved or controlling real alerts.
+- Keep cloud sync visibly unavailable until backend integration exists.
+
+DEFINITION OF DONE
+
+The frontend phase is complete when:
+
+- Every required new screen exists and follows DATAra’s visual identity.
+- Every visible action navigates, updates local UI state, is disabled, or explains why it is unavailable.
+- Dashboard, History and Settings remain operational.
+- Authentication and session handling are not broken.
+- All new routes have correct back behavior.
+- Important empty, loading, ready and unavailable states have previews.
+- The layout is usable on compact and expanded widths.
+- Core accessibility semantics and touch targets are present.
+- User-facing text is stored in resources.
+- No database, telemetry, real permission, notification-service, ML or cloud-sync implementation has been introduced.
+
+VERIFICATION CONSTRAINTS
+
+The development computer is resource-limited.
+
+- Do not run clean builds.
+- Do not repeatedly run Gradle tasks.
+- Do not launch an emulator.
+- Do not run ADB installation.
+- Do not run full test suites.
+- Use Compose previews and careful code inspection first.
+- Run at most one lightweight compile check if dependencies are already cached.
+- If compilation would require large downloads, stop and report it instead.
+
+FINAL HANDOFF
+
+After implementation, provide:
+
+1. A concise summary of the screens and improvements completed.
+2. A list of the principal files created or changed.
+3. A clear list of everything that remains mocked or unavailable.
+4. Any lightweight verification performed.
+5. Do not claim backend or device functionality is working.
