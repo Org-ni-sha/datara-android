@@ -15,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.res.stringResource
+import com.capstone.datara.R
 import com.capstone.datara.ui.auth.components.DataraLogo
 import com.capstone.datara.ui.theme.DATAraTheme
 import com.capstone.datara.ui.theme.DataraDarkBg
@@ -47,7 +49,7 @@ fun SplashScreen(modifier: Modifier = Modifier) {
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "Restoring your session…",
+            text = stringResource(R.string.splash_restoring_session),
             style = MaterialTheme.typography.bodyMedium,
             color = DataraTextSecondary
         )
