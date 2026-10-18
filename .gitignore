@@ -20,3 +20,21 @@ design_references/
 !.idea/compiler.xml
 !.idea/jarRepositories.xml
 !.idea/vcs.xml
+
+# Local prompts and AI working files
+/Prompt *
+/prompt-*.md
+/*.prompt.md
+/.agents/
+/.codex/
+
+# Temporary build and editor files
+/.kotlin/
+/.cache/
+/tmp/
+/temp/
+*.tmp
+*.temp
+*.bak
+*.log
+*~
