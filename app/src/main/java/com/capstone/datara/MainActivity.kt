@@ -6,7 +6,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.capstone.datara.ui.navigation.DataraNavGraph
 import com.capstone.datara.ui.navigation.DataraRoute
@@ -21,8 +23,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val preferences = getSharedPreferences("datara_ui_preferences", MODE_PRIVATE)
         setContent {
-            DATAraTheme {
+            var darkTheme by rememberSaveable {
+                mutableStateOf(preferences.getBoolean("dark_theme", false))
+            }
+            DATAraTheme(darkTheme = darkTheme) {
                 val sessionViewModel: SessionViewModel = hiltViewModel()
                 val sessionState by sessionViewModel.sessionState.collectAsState()
 
@@ -39,7 +45,14 @@ class MainActivity : ComponentActivity() {
                             DataraRoute.LOGIN
                         }
                     }
-                    DataraNavGraph(startDestination = startDestination)
+                    DataraNavGraph(
+                        startDestination = startDestination,
+                        darkTheme = darkTheme,
+                        onDarkThemeChange = { enabled ->
+                            darkTheme = enabled
+                            preferences.edit().putBoolean("dark_theme", enabled).apply()
+                        }
+                    )
                 }
             }
         }

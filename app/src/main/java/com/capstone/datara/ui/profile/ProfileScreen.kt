@@ -43,10 +43,8 @@ import com.capstone.datara.ui.components.DataraStatusBadge
 import com.capstone.datara.ui.components.DataraSurfaceCard
 import com.capstone.datara.ui.theme.DATAraTheme
 import com.capstone.datara.ui.theme.DataraBlueSoft
-import com.capstone.datara.ui.theme.DataraDarkBg
 import com.capstone.datara.ui.theme.DataraInputBorder
 import com.capstone.datara.ui.theme.DataraNeonBlue
-import com.capstone.datara.ui.theme.DataraTextSecondary
 import java.util.Locale
 
 enum class ProfileMode {
@@ -97,7 +95,7 @@ private fun ProfileContent(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = DataraDarkBg
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -210,7 +208,7 @@ private fun ProfileContent(
                                 modeName = ProfileMode.EDIT.name
                             },
                             modifier = Modifier.fillMaxWidth().height(52.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = DataraNeonBlue)
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
                             Text(stringResource(R.string.action_edit))
                         }
@@ -224,9 +222,9 @@ private fun ProfileContent(
                                     modeName = ProfileMode.VIEW.name
                                 },
                                 modifier = Modifier.weight(1f).height(52.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, DataraInputBorder)
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                             ) {
-                                Text(stringResource(R.string.action_cancel), color = DataraBlueSoft)
+                                Text(stringResource(R.string.action_cancel), color = MaterialTheme.colorScheme.primary)
                             }
                             Button(
                                 onClick = {
@@ -239,7 +237,7 @@ private fun ProfileContent(
                                     }
                                 },
                                 modifier = Modifier.weight(1f).height(52.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = DataraNeonBlue)
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) {
                                 Text(stringResource(R.string.action_save))
                             }

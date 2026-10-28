@@ -6,12 +6,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,10 +26,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,7 +37,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -52,6 +49,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -63,32 +61,20 @@ import com.capstone.datara.ui.components.DataraSignOutDialog
 import com.capstone.datara.ui.navigation.DataraTopLevelDestination
 import com.capstone.datara.ui.navigation.DataraTopLevelScaffold
 import com.capstone.datara.ui.theme.DATAraTheme
-import com.capstone.datara.ui.theme.DataraBlueSoft
-import com.capstone.datara.ui.theme.DataraCardBg
-import com.capstone.datara.ui.theme.DataraCardElevated
-import com.capstone.datara.ui.theme.DataraDarkBg
-import com.capstone.datara.ui.theme.DataraDivider
 import com.capstone.datara.ui.theme.DataraError
-import com.capstone.datara.ui.theme.DataraGreenSoft
-import com.capstone.datara.ui.theme.DataraHeroMiddle
-import com.capstone.datara.ui.theme.DataraHeroStart
-import com.capstone.datara.ui.theme.DataraInputBorder
-import com.capstone.datara.ui.theme.DataraNeonBlue
-import com.capstone.datara.ui.theme.DataraNeonGreen
+import com.capstone.datara.ui.theme.DataraInsightBorder
+import com.capstone.datara.ui.theme.DataraInsightChip
+import com.capstone.datara.ui.theme.DataraInsightSurface
+import com.capstone.datara.ui.theme.DataraProgressFrame
+import com.capstone.datara.ui.theme.DataraProgressStart
 import com.capstone.datara.ui.theme.DataraPrimaryBlue
-import com.capstone.datara.ui.theme.DataraTextPrimary
-import com.capstone.datara.ui.theme.DataraTextSecondary
-import com.capstone.datara.ui.theme.DataraWarning
+import com.capstone.datara.ui.theme.DataraSuccess
 import java.util.Locale
 
 sealed interface PetUiState {
     data object NoPromo : PetUiState
     data class Collecting(val daysCollected: Int, val daysRequired: Int = 7) : PetUiState
-    data class Available(
-        val timeRemaining: String,
-        val exhaustionTime: String,
-        val modelLabel: String
-    ) : PetUiState
+    data class Available(val timeRemaining: String, val exhaustionTime: String, val modelLabel: String) : PetUiState
     data object Loading : PetUiState
     data class Error(val message: String) : PetUiState
 }
@@ -108,18 +94,10 @@ data class NetworkUiModel(
     val isMobileDataActive: Boolean = false
 )
 
-data class ActivePromoUiModel(
-    val name: String,
-    val carrier: String,
-    val expiresIn: String,
-    val expiresOn: String
-)
+data class ActivePromoUiModel(val name: String, val carrier: String, val expiresIn: String, val expiresOn: String)
+data class DashboardInsightUiModel(val title: String, val message: String, val isPositive: Boolean = true)
 
-data class DashboardInsightUiModel(
-    val title: String,
-    val message: String,
-    val isPositive: Boolean = true
-)
+private enum class DashboardGlyph { SIM, SIGNAL, SPEED }
 
 data class DashboardUiState(
     val pet: PetUiState = PetUiState.NoPromo,
@@ -129,7 +107,8 @@ data class DashboardUiState(
     val insight: DashboardInsightUiModel? = null,
     val unreadNotificationCount: Int = 0,
     val lastUpdated: String? = null,
-    val previewNotice: String? = null
+    val previewNotice: String? = null,
+    val dailyAverageGb: Double? = null
 )
 
 @Composable
@@ -144,7 +123,8 @@ fun DashboardScreen(
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     DashboardContent(
-        userLabel = viewModel.currentUserEmail?.substringBefore("@")?.toDisplayName() ?: stringResource(R.string.profile_default_name),
+        userLabel = viewModel.currentUserEmail?.substringBefore("@")?.toDisplayName()
+            ?: stringResource(R.string.profile_default_name),
         state = state,
         onAddPromoClick = onAddPromoClick,
         onNotificationsClick = onNotificationsClick,
@@ -173,41 +153,32 @@ private fun DashboardContent(
         onHomeClick = {},
         onHistoryClick = onHistoryClick,
         onSettingsClick = onSettingsClick,
-        modifier = modifier
-    ) { innerPadding, expanded ->
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxSize().padding(innerPadding)
+        modifier = modifier.fillMaxSize(),
+    ) { innerPadding, _ ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 14.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .widthIn(max = if (expanded) 940.dp else maxWidth)
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = 20.dp,
-                    end = 20.dp,
-                    top = 18.dp,
-                    bottom = 24.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                item {
-                    DashboardHeader(
-                        userLabel = userLabel,
-                        unreadCount = state.unreadNotificationCount,
-                        onNotificationsClick = onNotificationsClick,
-                        onSignOutClick = { showSignOutDialog = true }
-                    )
-                }
-                if (state.previewNotice != null) {
-                    item { PreviewNotice(state.previewNotice) }
-                }
-                item { PetHeroCard(state.pet, state.lastUpdated, onAddPromoClick) }
-                item { DataBalanceCard(state.balance, onAddPromoClick) }
-                item { LiveNetworkSection(state.network) }
-                item { ActivePromoCard(state.promo, onAddPromoClick) }
-                state.insight?.let { insight -> item { UsageInsightCard(insight) } }
+            item {
+                DashboardHeader(
+                    userLabel = userLabel,
+                    lastUpdated = state.lastUpdated,
+                    unreadCount = state.unreadNotificationCount,
+                    onNotificationsClick = onNotificationsClick,
+                    onSignOutClick = { showSignOutDialog = true }
+                )
+            }
+            item { DashboardHero(state = state, onAddPromoClick = onAddPromoClick) }
+            item { LiveNetworkHub(state.network) }
+            item { PredictionStatusCard(state.pet) }
+            item {
+                PromoGreetingCard(
+                    userLabel = userLabel,
+                    promo = state.promo,
+                    onAddPromoClick = onAddPromoClick
+                )
             }
         }
     }
@@ -230,78 +201,77 @@ private fun DashboardContent(
 @Composable
 private fun DashboardHeader(
     userLabel: String,
+    lastUpdated: String?,
     unreadCount: Int,
     onNotificationsClick: () -> Unit,
     onSignOutClick: () -> Unit
 ) {
     var profileMenuExpanded by remember { mutableStateOf(false) }
-
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.dashboard_brand),
-                style = MaterialTheme.typography.labelLarge,
-                color = DataraBlueSoft,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            )
-            Spacer(Modifier.height(3.dp))
-            Text(
-                text = stringResource(R.string.dashboard_greeting, userLabel),
-                style = MaterialTheme.typography.headlineMedium,
-                color = DataraTextPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = stringResource(R.string.dashboard_outlook),
-                style = MaterialTheme.typography.bodyMedium,
-                color = DataraTextSecondary
-            )
-        }
-
-        IconButton(
-            onClick = onNotificationsClick,
-            modifier = Modifier.size(48.dp),
-            colors = IconButtonDefaults.iconButtonColors(
-                containerColor = DataraCardElevated,
-                contentColor = DataraTextPrimary
-            )
+    Row(
+        modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            shape = RoundedCornerShape(11.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, DataraPrimaryBlue)
         ) {
-            BellGlyph(
-                showUnread = unreadCount > 0,
-                contentDescription = if (unreadCount > 0) {
-                    stringResource(R.string.dashboard_notifications_unread, unreadCount)
-                } else {
-                    stringResource(R.string.dashboard_notifications)
-                }
+            Text(
+                text = userLabel.take(2).uppercase(),
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 10.sp,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp)
             )
         }
         Spacer(Modifier.width(8.dp))
-        Box {
-            IconButton(
-                onClick = { profileMenuExpanded = true },
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        Brush.linearGradient(listOf(DataraPrimaryBlue, DataraNeonBlue)),
-                        CircleShape
-                    )
-            ) {
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = userLabel.firstOrNull()?.uppercaseChar()?.toString() ?: "D",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
+                    userLabel,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                Spacer(Modifier.width(4.dp))
+                Box(Modifier.size(5.dp).background(DataraSuccess, CircleShape))
+            }
+            Text(
+                lastUpdated ?: stringResource(R.string.status_local_preview),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 10.sp
+            )
+        }
+        IconButton(
+            onClick = onNotificationsClick,
+            modifier = Modifier
+                .size(40.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+        ) {
+            BellGlyph(unreadCount > 0, stringResource(R.string.dashboard_notifications))
+        }
+        Spacer(Modifier.width(8.dp))
+        Box {
+            Surface(
+                modifier = Modifier.size(40.dp).clickable { profileMenuExpanded = true },
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                border = androidx.compose.foundation.BorderStroke(1.dp, DataraPrimaryBlue)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(userLabel.take(1).uppercase(), color = DataraPrimaryBlue, fontWeight = FontWeight.Black)
+                    Box(
+                        Modifier.align(Alignment.BottomEnd).padding(3.dp).size(5.dp).background(DataraSuccess, CircleShape)
+                    )
+                }
             }
             DropdownMenu(
                 expanded = profileMenuExpanded,
                 onDismissRequest = { profileMenuExpanded = false },
-                containerColor = DataraCardElevated
+                containerColor = MaterialTheme.colorScheme.surface
             ) {
                 DropdownMenuItem(
-                    text = { Text(stringResource(R.string.dashboard_sign_out), color = DataraTextPrimary) },
+                    text = { Text(stringResource(R.string.dashboard_sign_out), color = MaterialTheme.colorScheme.onSurface) },
                     onClick = {
                         profileMenuExpanded = false
                         onSignOutClick()
@@ -313,518 +283,418 @@ private fun DashboardHeader(
 }
 
 @Composable
-private fun PreviewNotice(message: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(DataraBlueSoft.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
-            .border(1.dp, DataraBlueSoft.copy(alpha = 0.22f), RoundedCornerShape(16.dp))
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        StatusDot(stringResource(R.string.status_design_preview), DataraBlueSoft)
-        Spacer(Modifier.width(10.dp))
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
+private fun DashboardHero(state: DashboardUiState, onAddPromoClick: () -> Unit) {
+    val balance = state.balance
+    val used = balance?.consumedGb
+    val total = balance?.totalGb
+    val progress = if (balance != null && balance.totalGb > 0) {
+        (balance.consumedGb / balance.totalGb).toFloat().coerceIn(0f, 1f)
+    } else 0f
+    val percentage = (progress * 100).toInt()
+    val prediction = when (val pet = state.pet) {
+        is PetUiState.Available -> pet.timeRemaining
+        is PetUiState.Collecting -> "${pet.daysCollected}/${pet.daysRequired}d"
+        PetUiState.Loading -> "..."
+        is PetUiState.Error, PetUiState.NoPromo -> "--"
+    }
+    val healthyPace = state.insight?.isPositive != false
+    val predictionFooter = when (val pet = state.pet) {
+        is PetUiState.Available -> stringResource(R.string.dashboard_left_until, pet.exhaustionTime)
+        else -> stringResource(R.string.dashboard_left)
+    }
+    val statusLabel = when (state.pet) {
+        is PetUiState.Available -> if (balance?.isEstimated == true) {
+            stringResource(R.string.dashboard_estimated)
+        } else {
+            stringResource(R.string.dashboard_optimal)
+        }
+        is PetUiState.Collecting -> stringResource(R.string.dashboard_status_learning)
+        PetUiState.Loading -> stringResource(R.string.dashboard_status_updating)
+        is PetUiState.Error -> stringResource(R.string.status_unavailable)
+        PetUiState.NoPromo -> stringResource(R.string.dashboard_status_setup)
+    }
+
+    ReferenceCard(modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp), corner = 20.dp) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            HeroMetric(
+                label = stringResource(R.string.dashboard_total_used),
+                value = used?.let { "${it.clean()} GB" } ?: "--",
+                footer = total?.let { stringResource(R.string.dashboard_out_of_format, it.clean()) }
+                    ?: stringResource(R.string.dashboard_no_promo_short),
+                modifier = Modifier.weight(1f)
+            )
+            HeroMetric(
+                label = stringResource(R.string.dashboard_predicted),
+                value = prediction,
+                footer = predictionFooter,
+                modifier = Modifier.weight(1f)
+            )
+            HeroMetric(
+                label = stringResource(R.string.dashboard_daily_average),
+                value = state.dailyAverageGb?.let { "${it.clean()} GB" } ?: "--",
+                footer = stringResource(R.string.dashboard_per_day),
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(Modifier.height(19.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.dashboard_consumption_rate, percentage),
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Black,
+                fontSize = 16.sp
+            )
+            Spacer(Modifier.width(14.dp))
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
+                Text(statusLabel, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 13.dp, vertical = 2.dp))
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        HeroProgress(progress)
+        Spacer(Modifier.height(18.dp))
+        if (balance == null) {
+            Button(
+                onClick = onAddPromoClick,
+                modifier = Modifier.align(Alignment.CenterHorizontally).height(42.dp),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 22.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = DataraPrimaryBlue, contentColor = Color.White)
+            ) {
+                Text(stringResource(R.string.dashboard_add_active_promo), fontWeight = FontWeight.Black, fontSize = 14.sp)
+            }
+        } else {
+            Surface(
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                shape = RoundedCornerShape(12.dp),
+                color = if (healthyPace) DataraSuccess else DataraError
+            ) {
+                Text(
+                    if (healthyPace) stringResource(R.string.dashboard_usage_pace_normal)
+                    else stringResource(R.string.dashboard_usage_pace_high),
+                    color = Color.White,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp)
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun PetHeroCard(
-    pet: PetUiState,
-    lastUpdated: String?,
-    onAddPromoClick: () -> Unit
-) {
+private fun HeroMetric(label: String, value: String, footer: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.height(76.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 7.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp, maxLines = 1)
+            Text(value, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Black, fontSize = 20.sp, maxLines = 1)
+            Text(footer, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium, fontSize = 8.sp, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun HeroProgress(progress: Float) {
     Box(
+        Modifier
+            .fillMaxWidth()
+            .height(30.dp)
+            .background(MaterialTheme.colorScheme.background, CircleShape)
+            .border(2.dp, DataraProgressFrame, CircleShape)
+            .padding(5.dp)
+            .semantics { progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f) }
+    ) {
+        if (progress > 0f) {
+            Box(
+                Modifier
+                    .fillMaxWidth(progress)
+                    .height(18.dp)
+                    .background(
+                        Brush.horizontalGradient(listOf(DataraProgressStart, DataraSuccess)),
+                        CircleShape
+                    )
+            )
+        }
+        Row(Modifier.fillMaxSize().padding(horizontal = 10.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            repeat(6) { Box(Modifier.width(1.dp).height(9.dp).background(Color.White.copy(alpha = .9f))) }
+        }
+    }
+}
+
+@Composable
+private fun LiveNetworkHub(network: NetworkUiModel) {
+    ReferenceCard(modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp), corner = 20.dp) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.dashboard_live_network).uppercase(), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Black, fontSize = 13.sp)
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
+                Text(
+                    if (network.isMobileDataActive) stringResource(R.string.dashboard_mobile_active) else stringResource(R.string.dashboard_detecting),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 8.sp,
+                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            NetworkTile(DashboardGlyph.SIM, stringResource(R.string.dashboard_detected_carrier), network.carrier ?: "--")
+            NetworkTile(DashboardGlyph.SIGNAL, stringResource(R.string.dashboard_carrier_signal), network.signalLabel ?: "--", network.signalLevel)
+            NetworkTile(DashboardGlyph.SPEED, stringResource(R.string.dashboard_live_speed), network.speed ?: "--")
+        }
+    }
+}
+
+@Composable
+private fun NetworkTile(glyph: DashboardGlyph, label: String, value: String, signalLevel: Int = 0) {
+    Column(
+        modifier = Modifier
+            .width(78.dp)
+            .height(78.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(14.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(14.dp))
+            .padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surface, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
+            Box(Modifier.size(width = 28.dp, height = 25.dp), contentAlignment = Alignment.Center) {
+                if (glyph == DashboardGlyph.SIM) {
+                    Text("SIM", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Black, fontSize = 8.sp)
+                } else {
+                    DashboardGlyphIcon(glyph = glyph, color = MaterialTheme.colorScheme.onSurface, signalLevel = signalLevel)
+                }
+            }
+        }
+        Text(label, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 8.sp, textAlign = TextAlign.Center, maxLines = 1)
+        Text(
+            value,
+            color = DataraPrimaryBlue,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 8.sp,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun PredictionStatusCard(pet: PetUiState) {
+    val title: String
+    val message: String
+    when (pet) {
+        is PetUiState.Available -> {
+            title = stringResource(R.string.dashboard_prediction_ready)
+            message = stringResource(
+                R.string.dashboard_prediction_ready_body,
+                pet.exhaustionTime,
+                pet.modelLabel
+            )
+        }
+        is PetUiState.Collecting -> {
+            title = stringResource(R.string.dashboard_pet_collecting_title)
+            message = stringResource(
+                R.string.dashboard_pet_collecting_body,
+                pet.daysCollected.coerceAtMost(pet.daysRequired),
+                pet.daysRequired
+            )
+        }
+        PetUiState.Loading -> {
+            title = stringResource(R.string.dashboard_pet_loading_title)
+            message = stringResource(R.string.dashboard_pet_loading_body)
+        }
+        is PetUiState.Error -> {
+            title = stringResource(R.string.dashboard_pet_error_title)
+            message = pet.message
+        }
+        PetUiState.NoPromo -> {
+            title = stringResource(R.string.dashboard_pet_no_promo_title)
+            message = stringResource(R.string.dashboard_pet_no_promo_body)
+        }
+    }
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                Brush.linearGradient(listOf(DataraHeroStart, DataraHeroMiddle, DataraCardBg)),
-                RoundedCornerShape(24.dp)
-            )
-            .border(1.dp, DataraNeonBlue.copy(alpha = 0.28f), RoundedCornerShape(24.dp))
-            .padding(22.dp)
+            .widthIn(max = 560.dp)
+            .background(DataraInsightSurface, RoundedCornerShape(20.dp))
+            .border(1.dp, DataraInsightBorder, RoundedCornerShape(20.dp))
+            .padding(14.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        Column {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, DataraInsightBorder)
+        ) {
+            Text(
+                "i",
+                color = DataraPrimaryBlue,
+                fontWeight = FontWeight.Black,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(36.dp).padding(vertical = 8.dp)
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = stringResource(R.string.dashboard_pet_label),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = DataraBlueSoft,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.7.sp,
+                    stringResource(R.string.dashboard_prediction_status),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 12.sp,
                     modifier = Modifier.weight(1f)
                 )
-                StatusDot(text = pet.statusLabel(), color = pet.statusColor())
+                Surface(shape = CircleShape, color = DataraInsightChip) {
+                    Text(
+                        title,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 8.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
             }
+            Spacer(Modifier.height(4.dp))
+            Text(message, color = MaterialTheme.colorScheme.onSurface, fontSize = 10.sp, lineHeight = 14.sp)
+        }
+    }
+}
 
-            Spacer(Modifier.height(22.dp))
-
-            when (pet) {
-                is PetUiState.Available -> {
-                    Text(
-                        text = pet.timeRemaining,
-                        color = DataraTextPrimary,
-                        fontSize = 42.sp,
-                        lineHeight = 48.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-1).sp
-                    )
-                    Text(
-                        text = stringResource(R.string.dashboard_pet_remaining, pet.exhaustionTime),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = DataraTextSecondary
-                    )
+@Composable
+private fun PromoGreetingCard(userLabel: String, promo: ActivePromoUiModel?, onAddPromoClick: () -> Unit) {
+    ReferenceCard(modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp), corner = 20.dp) {
+        Text(stringResource(R.string.dashboard_greeting_evening, userLabel), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Black, fontSize = 15.sp)
+        Text(stringResource(R.string.dashboard_promo_support), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
+        Spacer(Modifier.height(10.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onAddPromoClick),
+            shape = RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        ) {
+            if (promo == null) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.dashboard_no_active_promo), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.dashboard_add), color = DataraPrimaryBlue, fontWeight = FontWeight.Bold)
                 }
-                is PetUiState.Collecting -> {
-                    Text(stringResource(R.string.dashboard_pet_collecting_title), style = MaterialTheme.typography.headlineMedium, color = DataraTextPrimary)
-                    Text(
-                        stringResource(
-                            R.string.dashboard_pet_collecting_body,
-                            pet.daysCollected.coerceAtMost(pet.daysRequired),
-                            pet.daysRequired
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = DataraTextSecondary
-                    )
-                }
-                PetUiState.Loading -> {
-                    Text(stringResource(R.string.dashboard_pet_loading_title), style = MaterialTheme.typography.headlineMedium, color = DataraTextPrimary)
-                    Text(stringResource(R.string.dashboard_pet_loading_body), style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
-                }
-                is PetUiState.Error -> {
-                    Text(stringResource(R.string.dashboard_pet_error_title), style = MaterialTheme.typography.headlineMedium, color = DataraTextPrimary)
-                    Text(pet.message, style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
-                }
-                PetUiState.NoPromo -> {
-                    Text(stringResource(R.string.dashboard_pet_no_promo_title), style = MaterialTheme.typography.headlineMedium, color = DataraTextPrimary)
-                    Text(stringResource(R.string.dashboard_pet_no_promo_body), style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
-                    Spacer(Modifier.height(18.dp))
-                    Button(
-                        onClick = onAddPromoClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = DataraPrimaryBlue)
-                    ) {
-                        Text(stringResource(R.string.dashboard_add_active_promo))
+            } else {
+                Column(Modifier.padding(10.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(stringResource(R.string.dashboard_current_active_promo), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 8.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(5.dp).background(DataraSuccess, CircleShape))
+                            Spacer(Modifier.width(4.dp))
+                            Text(stringResource(R.string.dashboard_active_status), color = DataraSuccess, fontSize = 8.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                            Column(Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(promo.carrier.take(2).uppercase(), color = DataraPrimaryBlue, fontWeight = FontWeight.Black)
+                                Text(promo.name, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 7.sp)
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(promo.name, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Black, fontSize = 15.sp)
+                            Text(stringResource(R.string.dashboard_expires, promo.expiresOn), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp)
+                        }
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface, border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)) {
+                            Text(stringResource(R.string.dashboard_view_details), color = DataraPrimaryBlue, fontWeight = FontWeight.Bold, fontSize = 8.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp))
+                        }
                     }
                 }
             }
-
-            if (lastUpdated != null) {
-                Spacer(Modifier.height(18.dp))
-                Text(
-                    text = stringResource(R.string.dashboard_updated, lastUpdated),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = DataraTextSecondary
-                )
-            }
         }
     }
 }
 
 @Composable
-private fun DataBalanceCard(balance: DataBalanceUiModel?, onAddPromoClick: () -> Unit) {
-    DashboardCard {
-        SectionHeading(
-            title = stringResource(R.string.dashboard_balance_title),
-            trailing = if (balance?.isEstimated == true) stringResource(R.string.dashboard_estimated) else null
-        )
-        Spacer(Modifier.height(18.dp))
-
-        if (balance == null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                EmptyMetricGlyph(stringResource(R.string.dashboard_no_balance_description))
-                Spacer(Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.dashboard_balance_unavailable), style = MaterialTheme.typography.titleMedium, color = DataraTextPrimary)
-                    Text(stringResource(R.string.dashboard_balance_setup_body), style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
-                }
-                TextButton(onClick = onAddPromoClick) {
-                    Text(stringResource(R.string.dashboard_setup), color = DataraBlueSoft)
-                }
-            }
-        } else {
-            val consumedFraction = if (balance.totalGb > 0) {
-                (balance.consumedGb / balance.totalGb).toFloat().coerceIn(0f, 1f)
-            } else 0f
-            val remaining = formatGb(balance.remainingGb)
-            val consumed = formatGb(balance.consumedGb)
-            val total = formatGb(balance.totalGb)
-
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(remaining, style = MaterialTheme.typography.displayLarge, color = DataraTextPrimary)
-                Text(
-                    stringResource(R.string.dashboard_remaining_suffix),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = DataraTextSecondary,
-                    modifier = Modifier.padding(bottom = 5.dp)
-                )
-            }
-            Spacer(Modifier.height(14.dp))
-            BalanceProgress(progress = consumedFraction)
-            Spacer(Modifier.height(10.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(stringResource(R.string.dashboard_used_format, consumed), style = MaterialTheme.typography.labelSmall, color = DataraTextSecondary)
-                Text(stringResource(R.string.dashboard_total_format, total), style = MaterialTheme.typography.labelSmall, color = DataraTextSecondary)
-            }
-        }
-    }
-}
-
-@Composable
-private fun LiveNetworkSection(network: NetworkUiModel) {
-    Column {
-        SectionHeading(stringResource(R.string.dashboard_live_network))
-        Spacer(Modifier.height(10.dp))
-        BoxWithConstraints {
-            if (maxWidth < 500.dp) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    NetworkSignalCard(network, Modifier.fillMaxWidth())
-                    NetworkSpeedCard(network, Modifier.fillMaxWidth())
-                }
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    NetworkSignalCard(network, Modifier.weight(1f))
-                    NetworkSpeedCard(network, Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun NetworkSignalCard(network: NetworkUiModel, modifier: Modifier) {
-    NetworkMetricCard(
-        label = stringResource(R.string.dashboard_carrier_signal),
-        value = network.carrier ?: stringResource(R.string.dashboard_detecting),
-        supporting = network.signalLabel ?: stringResource(R.string.dashboard_waiting_signal),
+private fun ReferenceCard(modifier: Modifier = Modifier, corner: androidx.compose.ui.unit.Dp, content: @Composable ColumnScope.() -> Unit) {
+    Surface(
         modifier = modifier,
-        glyph = {
-            SignalGlyph(
-                level = network.signalLevel,
-                description = stringResource(R.string.dashboard_signal_description, network.signalLevel)
-            )
-        }
-    )
+        shape = RoundedCornerShape(corner),
+        color = MaterialTheme.colorScheme.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shadowElevation = 5.dp
+    ) {
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 20.dp), content = content)
+    }
 }
 
 @Composable
-private fun NetworkSpeedCard(network: NetworkUiModel, modifier: Modifier) {
-    NetworkMetricCard(
-        label = stringResource(R.string.dashboard_live_speed),
-        value = network.speed ?: "—",
-        supporting = if (network.isMobileDataActive) {
-            stringResource(R.string.dashboard_mobile_active)
-        } else {
-            stringResource(R.string.dashboard_no_reading)
-        },
-        modifier = modifier,
-        glyph = { SpeedGlyph(stringResource(R.string.dashboard_speed_description)) }
-    )
-}
-
-@Composable
-private fun NetworkMetricCard(
-    label: String,
-    value: String,
-    supporting: String,
-    modifier: Modifier,
-    glyph: @Composable () -> Unit
+private fun DashboardGlyphIcon(
+    glyph: DashboardGlyph,
+    color: Color,
+    modifier: Modifier = Modifier.size(18.dp),
+    signalLevel: Int = 0
 ) {
-    Column(
-        modifier = modifier
-            .background(DataraCardBg, RoundedCornerShape(18.dp))
-            .border(1.dp, DataraInputBorder, RoundedCornerShape(18.dp))
-            .padding(16.dp)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = DataraTextSecondary, fontSize = 10.sp)
-            glyph()
-        }
-        Spacer(Modifier.height(14.dp))
-        Text(value, style = MaterialTheme.typography.titleMedium, color = DataraTextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(supporting, style = MaterialTheme.typography.labelSmall, color = DataraTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun ActivePromoCard(promo: ActivePromoUiModel?, onAddPromoClick: () -> Unit) {
-    DashboardCard {
-        SectionHeading(stringResource(R.string.dashboard_active_promo), trailing = promo?.carrier)
-        Spacer(Modifier.height(16.dp))
-        if (promo == null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(DataraNeonBlue.copy(alpha = 0.12f), RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("+", color = DataraBlueSoft, fontSize = 26.sp, fontWeight = FontWeight.Light)
-                }
-                Spacer(Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.dashboard_no_active_promo), style = MaterialTheme.typography.titleMedium, color = DataraTextPrimary)
-                    Text(stringResource(R.string.dashboard_choose_promo), style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
-                }
-                TextButton(onClick = onAddPromoClick) {
-                    Text(stringResource(R.string.dashboard_add), color = DataraBlueSoft)
-                }
+    val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Canvas(modifier) {
+        val line = 1.8.dp.toPx()
+        val stroke = Stroke(width = line, cap = StrokeCap.Round)
+        when (glyph) {
+            DashboardGlyph.SIGNAL -> repeat(4) { index ->
+                val barWidth = size.width * .12f
+                val gap = size.width * .1f
+                val height = size.height * (.22f + index * .18f)
+                drawRoundRect(
+                    color = if (index < signalLevel.coerceIn(0, 4)) DataraSuccess else inactiveColor,
+                    topLeft = Offset(size.width * .13f + index * (barWidth + gap), size.height - height - size.height * .12f),
+                    size = Size(barWidth, height),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2)
+                )
             }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(50.dp)
-                        .background(DataraNeonBlue.copy(alpha = 0.14f), RoundedCornerShape(15.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(promo.carrier.take(2).uppercase(), color = DataraBlueSoft, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(promo.name, style = MaterialTheme.typography.titleMedium, color = DataraTextPrimary)
-                    Text(stringResource(R.string.dashboard_expires, promo.expiresOn), style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(promo.expiresIn, style = MaterialTheme.typography.labelLarge, color = DataraWarning)
-                    Text(stringResource(R.string.dashboard_validity_remaining), style = MaterialTheme.typography.labelSmall, color = DataraTextSecondary)
-                }
+            DashboardGlyph.SPEED -> {
+                drawArc(color, 190f, 160f, false, style = stroke)
+                drawLine(color, center, Offset(size.width * .72f, size.height * .32f), line, StrokeCap.Round)
+                drawCircle(color, line, center)
             }
+            DashboardGlyph.SIM -> Unit
         }
     }
 }
 
 @Composable
-private fun UsageInsightCard(insight: DashboardInsightUiModel) {
-    val accent = if (insight.isPositive) DataraNeonGreen else DataraWarning
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(accent.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
-            .border(1.dp, accent.copy(alpha = 0.22f), RoundedCornerShape(18.dp))
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier.size(36.dp).background(accent.copy(alpha = 0.14f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("i", color = accent, fontWeight = FontWeight.Bold)
-        }
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text(insight.title, style = MaterialTheme.typography.titleMedium, color = DataraTextPrimary)
-            Text(insight.message, style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
-        }
+private fun BellGlyph(showUnread: Boolean, description: String) {
+    val iconColor = MaterialTheme.colorScheme.onSurface
+    Canvas(Modifier.size(21.dp).semantics { contentDescription = description }) {
+        val line = 1.7.dp.toPx()
+        drawArc(iconColor, 195f, 150f, false, Offset(size.width * .22f, size.height * .2f), Size(size.width * .56f, size.height * .62f), style = Stroke(line, cap = StrokeCap.Round))
+        drawLine(iconColor, Offset(size.width * .22f, size.height * .72f), Offset(size.width * .78f, size.height * .72f), line, StrokeCap.Round)
+        drawCircle(iconColor, size.width * .06f, Offset(size.width * .5f, size.height * .84f))
+        if (showUnread) drawCircle(Color(0xFF0CAF3B), size.width * .11f, Offset(size.width * .82f, size.height * .18f))
     }
 }
 
-@Composable
-private fun DashboardCard(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(DataraCardBg, RoundedCornerShape(20.dp))
-            .border(1.dp, DataraInputBorder, RoundedCornerShape(20.dp))
-            .padding(18.dp),
-        content = content
-    )
+private fun Double.clean(): String = if (this % 1.0 == 0.0) String.format(Locale.US, "%.0f", this) else String.format(Locale.US, "%.1f", this)
+
+private fun String.toDisplayName(): String = split('.', '_', '-').filter(String::isNotBlank).joinToString(" ") {
+    it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase(Locale.getDefault()) else char.toString() }
 }
 
 @Composable
-private fun SectionHeading(title: String, trailing: String? = null) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = DataraTextPrimary, modifier = Modifier.weight(1f))
-        if (trailing != null) {
-            Text(
-                trailing,
-                style = MaterialTheme.typography.labelSmall,
-                color = DataraBlueSoft,
-                modifier = Modifier
-                    .background(DataraNeonBlue.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 9.dp, vertical = 4.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun BalanceProgress(progress: Float) {
-    val safeProgress = progress.coerceIn(0f, 1f)
-    val progressColor = when {
-        safeProgress >= .9f -> DataraError
-        safeProgress >= .75f -> DataraWarning
-        else -> DataraNeonGreen
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(9.dp)
-            .background(DataraDivider, CircleShape)
-            .semantics { progressBarRangeInfo = ProgressBarRangeInfo(safeProgress, 0f..1f) }
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(safeProgress)
-                .height(9.dp)
-                .background(Brush.horizontalGradient(listOf(DataraPrimaryBlue, progressColor)), CircleShape)
-        )
-    }
-}
-
-@Composable
-private fun StatusDot(text: String, color: Color) {
-    Row(
-        modifier = Modifier
-            .background(color.copy(alpha = .1f), RoundedCornerShape(20.dp))
-            .padding(horizontal = 8.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(Modifier.size(6.dp).background(color, CircleShape))
-        Spacer(Modifier.width(5.dp))
-        Text(text, style = MaterialTheme.typography.labelSmall, color = color, fontSize = 10.sp)
-    }
-}
-
-@Composable
-private fun BellGlyph(showUnread: Boolean, contentDescription: String) {
-    Canvas(Modifier.size(22.dp).semantics { this.contentDescription = contentDescription }) {
-        val strokeWidth = 1.8.dp.toPx()
-        drawArc(
-            color = DataraTextPrimary,
-            startAngle = 195f,
-            sweepAngle = 150f,
-            useCenter = false,
-            topLeft = Offset(size.width * .22f, size.height * .2f),
-            size = Size(size.width * .56f, size.height * .62f),
-            style = Stroke(strokeWidth, cap = StrokeCap.Round)
-        )
-        drawLine(DataraTextPrimary, Offset(size.width * .22f, size.height * .72f), Offset(size.width * .78f, size.height * .72f), strokeWidth, StrokeCap.Round)
-        drawCircle(DataraTextPrimary, radius = size.width * .07f, center = Offset(size.width * .5f, size.height * .84f))
-        if (showUnread) {
-            drawCircle(DataraNeonGreen, radius = size.width * .12f, center = Offset(size.width * .8f, size.height * .2f))
-        }
-    }
-}
-
-@Composable
-private fun SignalGlyph(level: Int, description: String) {
-    Canvas(Modifier.size(22.dp).semantics { contentDescription = description }) {
-        val barWidth = size.width * .12f
-        val gap = size.width * .09f
-        repeat(4) { index ->
-            val height = size.height * (.25f + index * .18f)
-            drawRoundRect(
-                color = if (index < level) DataraNeonGreen else DataraDivider,
-                topLeft = Offset(index * (barWidth + gap), size.height - height),
-                size = Size(barWidth, height),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2)
-            )
-        }
-    }
-}
-
-@Composable
-private fun SpeedGlyph(description: String) {
-    Canvas(Modifier.size(22.dp).semantics { contentDescription = description }) {
-        drawArc(DataraBlueSoft, 190f, 160f, false, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
-        drawLine(DataraBlueSoft, center, Offset(size.width * .72f, size.height * .34f), 2.dp.toPx(), StrokeCap.Round)
-        drawCircle(DataraBlueSoft, radius = 2.dp.toPx(), center = center)
-    }
-}
-
-@Composable
-private fun EmptyMetricGlyph(description: String) {
-    Canvas(Modifier.size(38.dp).semantics { contentDescription = description }) {
-        drawCircle(DataraDivider, radius = size.minDimension / 2, style = Stroke(3.dp.toPx()))
-        drawArc(DataraNeonBlue, -90f, 70f, false, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
-    }
-}
-
-@Composable
-private fun PetUiState.statusLabel(): String = when (this) {
-    is PetUiState.Available -> modelLabel
-    is PetUiState.Collecting -> stringResource(R.string.dashboard_status_learning)
-    PetUiState.Loading -> stringResource(R.string.dashboard_status_updating)
-    is PetUiState.Error -> stringResource(R.string.status_unavailable)
-    PetUiState.NoPromo -> stringResource(R.string.dashboard_status_setup)
-}
-
-private fun PetUiState.statusColor(): Color = when (this) {
-    is PetUiState.Available -> DataraGreenSoft
-    is PetUiState.Collecting, PetUiState.Loading -> DataraWarning
-    is PetUiState.Error -> DataraError
-    PetUiState.NoPromo -> DataraBlueSoft
-}
-
-private fun String.toDisplayName(): String =
-    split('.', '_', '-').filter { it.isNotBlank() }.joinToString(" ") {
-        it.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase(Locale.getDefault()) else char.toString() }
-    }
-
-@Composable
-private fun formatGb(value: Double): String = stringResource(
-    R.string.data_amount_gb,
-    String.format(Locale.US, "%.1f", value)
+private fun previewDashboardState() = DashboardUiState(
+    pet = PetUiState.Available("8hrs", "Tonight", "Global model"),
+    balance = DataBalanceUiModel(4.2, 14.0, 9.8),
+    promo = ActivePromoUiModel("EasySurf 99", "TM", "3 days", "July 7, 2026"),
+    insight = DashboardInsightUiModel("Smart tip", "Your current streaming pattern suggests you’ll hit your daily cap by an hour; use only one app at a time to extend data!"),
+    unreadNotificationCount = 1,
+    lastUpdated = "04/08/2026 • 11:59AM",
+    dailyAverageGb = 1.5
 )
 
+@Preview(showBackground = true, backgroundColor = 0xFFFAFAFA, heightDp = 920)
 @Composable
-private fun previewDashboardState(): DashboardUiState = DashboardUiState(
-    pet = PetUiState.Available(
-        timeRemaining = stringResource(R.string.dashboard_preview_time_remaining),
-        exhaustionTime = stringResource(R.string.dashboard_preview_exhaustion),
-        modelLabel = stringResource(R.string.dashboard_preview_global_model)
-    ),
-    balance = DataBalanceUiModel(remainingGb = 4.2, totalGb = 8.0, consumedGb = 3.8),
-    network = NetworkUiModel(
-        carrier = "Globe",
-        signalLabel = stringResource(R.string.dashboard_preview_signal),
-        signalLevel = 4,
-        speed = stringResource(R.string.dashboard_preview_speed),
-        isMobileDataActive = true
-    ),
-    promo = ActivePromoUiModel(
-        name = "Go+99",
-        carrier = "Globe",
-        expiresIn = stringResource(R.string.dashboard_preview_expiry_remaining),
-        expiresOn = stringResource(R.string.dashboard_preview_expiry_date)
-    ),
-    insight = DashboardInsightUiModel(
-        title = stringResource(R.string.dashboard_insight_preview_title),
-        message = stringResource(R.string.dashboard_insight_preview_body)
-    ),
-    unreadNotificationCount = 2,
-    lastUpdated = stringResource(R.string.dashboard_preview_updated)
-)
-
-@Preview(showBackground = true, backgroundColor = 0xFF0C101A, heightDp = 920)
-@Composable
-private fun DashboardReadyPreview() {
+private fun DashboardReferencePreview() {
     DATAraTheme {
-        DashboardContent(
-            userLabel = "Charlie",
-            state = previewDashboardState(),
-            onAddPromoClick = {},
-            onNotificationsClick = {},
-            onHistoryClick = {},
-            onSettingsClick = {},
-            onSignOutClick = {}
-        )
+        DashboardContent("Charlie", previewDashboardState(), {}, {}, {}, {}, {})
     }
 }
-
-@Preview(showBackground = true, backgroundColor = 0xFF0C101A, heightDp = 920)
-@Composable
-private fun DashboardEmptyPreview() {
-    DATAraTheme {
-        DashboardContent(
-            userLabel = "Alex",
-            state = DashboardUiState(),
-            onAddPromoClick = {},
-            onNotificationsClick = {},
-            onHistoryClick = {},
-            onSettingsClick = {},
-            onSignOutClick = {}
-        )
-    }
-}
-

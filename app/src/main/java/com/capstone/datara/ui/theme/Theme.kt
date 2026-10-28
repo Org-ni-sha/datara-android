@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Build
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
@@ -33,9 +34,29 @@ private val DarkColorScheme = darkColorScheme(
     onError = Color.White
 )
 
+private val LightColorScheme = lightColorScheme(
+    primary = DataraPrimaryBlue,
+    onPrimary = Color.White,
+    primaryContainer = DataraLightAccentSurface,
+    onPrimaryContainer = DataraLightTextPrimary,
+    secondary = DataraNeonBlue,
+    onSecondary = Color.White,
+    tertiary = DataraSuccess,
+    onTertiary = Color.White,
+    background = DataraLightBackground,
+    onBackground = DataraLightTextPrimary,
+    surface = DataraLightSurface,
+    onSurface = DataraLightTextPrimary,
+    surfaceVariant = DataraLightMutedSurface,
+    onSurfaceVariant = DataraLightTextSecondary,
+    outline = DataraLightBorder,
+    error = DataraError,
+    onError = Color.White
+)
+
 @Composable
 fun DATAraTheme(
-    darkTheme: Boolean = true,
+    darkTheme: Boolean = false,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
@@ -44,7 +65,8 @@ fun DATAraTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        else -> DarkColorScheme
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
     }
 
     val view = LocalView.current
@@ -53,8 +75,8 @@ fun DATAraTheme(
             val window = (view.context as? Activity)?.window
             if (window != null) {
                 val insetsController = WindowCompat.getInsetsController(window, view)
-                insetsController.isAppearanceLightStatusBars = false
-                insetsController.isAppearanceLightNavigationBars = false
+                insetsController.isAppearanceLightStatusBars = !darkTheme
+                insetsController.isAppearanceLightNavigationBars = !darkTheme
             }
         }
     }

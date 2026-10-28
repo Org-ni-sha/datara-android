@@ -107,6 +107,25 @@
     <string name="promo_save_manual">Use manual promo</string>
     <string name="promo_change_selection">Change</string>
     <string name="promo_preview_only_footer">Frontend preview only. Promo information is not downloaded from or saved to a carrier.</string>
+    <string name="promo_page_title">My Data Promo</string>
+    <string name="promo_page_subtitle">Manage and track your active carrier data packages</string>
+    <string name="promo_add_manual_button">＋ ADD PROMO MANUALLY</string>
+    <string name="promo_catalog_source">carrier catalog</string>
+    <string name="promo_catalog_total_format">%1$s GB TOTAL</string>
+    <string name="promo_catalog_validity_short">VALID %1$d DAYS</string>
+    <string name="promo_see_more">SEE MORE</string>
+    <string name="promo_show_less">SHOW LESS</string>
+    <string name="promo_manual_page_title">Add Promo Manually</string>
+    <string name="promo_manual_page_subtitle">Enter the details shown in your carrier app or confirmation message.</string>
+    <string name="promo_adjust_page_title">Set Remaining Data</string>
+    <string name="promo_adjust_page_subtitle">Update the balance if you have already used part of this promo.</string>
+    <string name="promo_price_label">Price (PHP, optional)</string>
+    <string name="promo_catalog_expiry_label">Expiry date</string>
+    <string name="promo_catalog_expiry_support">Use the expiry date shown by your carrier.</string>
+    <string name="promo_save_button">SAVE PROMO</string>
+    <string name="promo_apply_button">USE THIS PROMO</string>
+    <string name="promo_balance_note">The remaining balance is your starting point. You can enter any value from 0 to %1$s GB.</string>
+    <string name="promo_catalog_empty">No promos are available for this carrier yet.</string>
 
     <!-- Notification center -->
     <string name="notifications_eyebrow">NOTIFICATIONS</string>
@@ -259,6 +278,7 @@
     <string name="dashboard_used_format">%1$s used</string>
     <string name="dashboard_total_format">%1$s total</string>
     <string name="dashboard_live_network">Live network</string>
+    <string name="dashboard_detected_carrier">Carrier</string>
     <string name="dashboard_carrier_signal">CARRIER &amp; SIGNAL</string>
     <string name="dashboard_detecting">Detecting</string>
     <string name="dashboard_waiting_signal">Waiting for mobile signal</string>
@@ -289,6 +309,26 @@
     <string name="dashboard_preview_updated">just now</string>
     <string name="dashboard_insight_preview_title">Usage is steady</string>
     <string name="dashboard_insight_preview_body">Your recent pace is within the expected range.</string>
+    <string name="dashboard_total_used">Total Used</string>
+    <string name="dashboard_out_of_format">OUT OF %1$s GB</string>
+    <string name="dashboard_predicted">Predicted</string>
+    <string name="dashboard_left">LEFT</string>
+    <string name="dashboard_left_until">LEFT • %1$s</string>
+    <string name="dashboard_no_promo_short">NO PROMO</string>
+    <string name="dashboard_daily_average">Daily Avg</string>
+    <string name="dashboard_per_day">PER DAY</string>
+    <string name="dashboard_consumption_rate">%1$d%% Consumption Rate</string>
+    <string name="dashboard_optimal">Optimal</string>
+    <string name="dashboard_usage_pace_normal">● USAGE PACE: NORMAL</string>
+    <string name="dashboard_usage_pace_high">● USAGE PACE: HIGH</string>
+    <string name="dashboard_greeting_evening">Good evening %1$s 👋</string>
+    <string name="dashboard_promo_support">see your current promos here</string>
+    <string name="dashboard_prediction_status">PREDICTION STATUS</string>
+    <string name="dashboard_prediction_ready">Prediction ready</string>
+    <string name="dashboard_prediction_ready_body">Your estimated exhaustion time is %1$s using the %2$s.</string>
+    <string name="dashboard_current_active_promo">CURRENT ACTIVE PROMO</string>
+    <string name="dashboard_active_status">Active</string>
+    <string name="dashboard_view_details">View Details &gt;</string>
 
     <!-- History -->
     <string name="history_range_day">24h</string>
@@ -296,6 +336,8 @@
     <string name="history_range_promo">Promo cycle</string>
     <string name="history_eyebrow">USAGE HISTORY</string>
     <string name="history_title">Your data rhythm</string>
+    <string name="history_screen_heading">HISTORY</string>
+    <string name="history_detail_logs">DETAIL LOGS</string>
     <string name="history_subtitle">See when and how quickly you use data.</string>
     <string name="history_status_on_device">On-device</string>
     <string name="history_status_waiting">Waiting</string>
@@ -340,6 +382,9 @@
     <string name="settings_eyebrow">SETTINGS</string>
     <string name="settings_title">Make DATAra yours</string>
     <string name="settings_subtitle">Manage alerts, data access, and your account.</string>
+    <string name="settings_appearance_section">Display and appearance</string>
+    <string name="settings_dark_mode">Dark mode</string>
+    <string name="settings_dark_mode_body">Use dark surfaces throughout DATAra.</string>
     <string name="settings_account_title">Your account</string>
     <string name="settings_manage">Manage ›</string>
     <string name="settings_notifications_section">Notifications</string>

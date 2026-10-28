@@ -50,27 +50,18 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.capstone.datara.BuildConfig
 import com.capstone.datara.R
 import com.capstone.datara.ui.auth.AuthViewModel
-import com.capstone.datara.ui.components.DataraNoticeCard
 import com.capstone.datara.ui.components.DataraSignOutDialog
 import com.capstone.datara.ui.navigation.DataraTopLevelDestination
 import com.capstone.datara.ui.navigation.DataraTopLevelScaffold
 import com.capstone.datara.ui.theme.DATAraTheme
-import com.capstone.datara.ui.theme.DataraBlueSoft
-import com.capstone.datara.ui.theme.DataraCardBg
-import com.capstone.datara.ui.theme.DataraDarkBg
-import com.capstone.datara.ui.theme.DataraDivider
+import com.capstone.datara.ui.theme.DataraPrimaryBlue as DataraBlueSoft
 import com.capstone.datara.ui.theme.DataraError
-import com.capstone.datara.ui.theme.DataraHeroStart
-import com.capstone.datara.ui.theme.DataraInputBorder
-import com.capstone.datara.ui.theme.DataraNeonBlue
-import com.capstone.datara.ui.theme.DataraNeonGreen
-import com.capstone.datara.ui.theme.DataraPrimaryBlue
-import com.capstone.datara.ui.theme.DataraTextPrimary
-import com.capstone.datara.ui.theme.DataraTextSecondary
 import com.capstone.datara.ui.theme.DataraWarning
 
 @Composable
 fun SettingsScreen(
+    darkTheme: Boolean,
+    onDarkThemeChange: (Boolean) -> Unit,
     onHomeClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onSignedOut: () -> Unit,
@@ -86,6 +77,8 @@ fun SettingsScreen(
     SettingsContent(
         email = viewModel.currentUserEmail ?: stringResource(R.string.profile_default_name),
         versionName = BuildConfig.VERSION_NAME,
+        darkTheme = darkTheme,
+        onDarkThemeChange = onDarkThemeChange,
         onHomeClick = onHomeClick,
         onHistoryClick = onHistoryClick,
         onManageProfileClick = onManageProfileClick,
@@ -103,6 +96,8 @@ fun SettingsScreen(
 private fun SettingsContent(
     email: String,
     versionName: String,
+    darkTheme: Boolean,
+    onDarkThemeChange: (Boolean) -> Unit,
     onHomeClick: () -> Unit,
     onHistoryClick: () -> Unit,
     onManageProfileClick: () -> Unit,
@@ -131,20 +126,23 @@ private fun SettingsContent(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .widthIn(max = if (expanded) 900.dp else maxWidth)
+                    .widthIn(max = if (expanded) 680.dp else maxWidth)
                     .fillMaxWidth()
                     .align(Alignment.TopCenter),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item { SettingsHeader() }
                 item { AccountCard(email, onManageProfileClick) }
                 item {
-                    DataraNoticeCard(
-                        title = stringResource(R.string.status_local_preview),
-                        message = stringResource(R.string.settings_local_toggles_notice),
-                        accent = DataraBlueSoft
-                    )
+                    SettingsSection(title = stringResource(R.string.settings_appearance_section)) {
+                        ToggleSettingRow(
+                            title = stringResource(R.string.settings_dark_mode),
+                            description = stringResource(R.string.settings_dark_mode_body),
+                            checked = darkTheme,
+                            onCheckedChange = onDarkThemeChange
+                        )
+                    }
                 }
                 item {
                     SettingsSection(
@@ -190,14 +188,14 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_data_tracking),
                             description = stringResource(R.string.settings_data_tracking_body),
                             status = stringResource(R.string.settings_not_active),
-                            statusColor = DataraTextSecondary
+                            statusColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         SectionDivider()
                         ActionSettingRow(
                             title = stringResource(R.string.settings_usage_access),
                             description = stringResource(R.string.settings_usage_access_body),
                             status = stringResource(R.string.action_review),
-                            statusColor = DataraBlueSoft,
+                            statusColor = MaterialTheme.colorScheme.primary,
                             onClick = onUsageAccessClick
                         )
                         SectionDivider()
@@ -205,7 +203,7 @@ private fun SettingsContent(
                             title = stringResource(R.string.settings_carrier_detection),
                             description = stringResource(R.string.settings_carrier_detection_body),
                             status = stringResource(R.string.settings_waiting),
-                            statusColor = DataraTextSecondary
+                            statusColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -244,7 +242,7 @@ private fun SettingsContent(
                     Text(
                         stringResource(R.string.settings_measurement_disclaimer),
                         style = MaterialTheme.typography.labelSmall,
-                        color = DataraTextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 8.dp)
                     )
                 }
@@ -272,14 +270,11 @@ private fun SettingsHeader() {
     Column {
         Text(
             stringResource(R.string.settings_eyebrow),
-            style = MaterialTheme.typography.labelLarge,
-            color = DataraBlueSoft,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Black,
+            fontSize = 25.sp
         )
-        Spacer(Modifier.height(4.dp))
-        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineMedium, color = DataraTextPrimary)
-        Text(stringResource(R.string.settings_subtitle), style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
+        Text(stringResource(R.string.settings_subtitle), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
     }
 }
 
@@ -288,8 +283,11 @@ private fun AccountCard(email: String, onManageProfileClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Brush.linearGradient(listOf(DataraHeroStart, DataraCardBg)), RoundedCornerShape(22.dp))
-            .border(1.dp, DataraNeonBlue.copy(alpha = .25f), RoundedCornerShape(22.dp))
+            .background(
+                Brush.linearGradient(listOf(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.surface)),
+                RoundedCornerShape(18.dp)
+            )
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(18.dp))
             .clickable(role = Role.Button, onClick = onManageProfileClick)
             .semantics { role = Role.Button }
             .padding(18.dp),
@@ -298,7 +296,7 @@ private fun AccountCard(email: String, onManageProfileClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .size(52.dp)
-                .background(Brush.linearGradient(listOf(DataraPrimaryBlue, DataraNeonBlue)), CircleShape),
+                .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -310,10 +308,10 @@ private fun AccountCard(email: String, onManageProfileClick: () -> Unit) {
         }
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(stringResource(R.string.settings_account_title), style = MaterialTheme.typography.titleMedium, color = DataraTextPrimary)
-            Text(email, style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(stringResource(R.string.settings_account_title), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(email, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Text(stringResource(R.string.settings_manage), style = MaterialTheme.typography.labelLarge, color = DataraBlueSoft)
+        Text(stringResource(R.string.settings_manage), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -325,20 +323,21 @@ private fun SettingsSection(
 ) {
     Column {
         Text(
-            title,
-            style = MaterialTheme.typography.titleMedium,
-            color = DataraTextPrimary,
+            title.uppercase(),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
             modifier = Modifier.semantics { heading() }
         )
         if (supporting != null) {
-            Text(supporting, style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
+            Text(supporting, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(10.dp))
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(DataraCardBg, RoundedCornerShape(20.dp))
-                .border(1.dp, DataraInputBorder, RoundedCornerShape(20.dp))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(18.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(18.dp))
                 .padding(horizontal = 16.dp, vertical = 4.dp),
             content = content
         )
@@ -365,11 +364,11 @@ private fun ToggleSettingRow(
             checked = checked,
             onCheckedChange = null,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = DataraDarkBg,
-                checkedTrackColor = DataraNeonGreen,
-                uncheckedThumbColor = DataraTextSecondary,
-                uncheckedTrackColor = DataraDivider,
-                uncheckedBorderColor = DataraDivider
+                checkedThumbColor = MaterialTheme.colorScheme.surface,
+                checkedTrackColor = MaterialTheme.colorScheme.tertiary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                uncheckedBorderColor = MaterialTheme.colorScheme.outline
             )
         )
     }
@@ -406,15 +405,15 @@ private fun ActionSettingRow(
         SettingText(title, description, Modifier.weight(1f))
         Spacer(Modifier.width(12.dp))
         if (status != null) StatusBadge(status, statusColor)
-        else Text("›", color = DataraTextSecondary, fontSize = 26.sp, fontWeight = FontWeight.Light)
+        else Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 26.sp, fontWeight = FontWeight.Light)
     }
 }
 
 @Composable
 private fun SettingText(title: String, description: String, modifier: Modifier = Modifier) {
     Column(modifier) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = DataraTextPrimary)
-        Text(description, style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
+        Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+        Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -435,27 +434,27 @@ private fun CloudSyncCard() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(DataraCardBg, RoundedCornerShape(20.dp))
-            .border(1.dp, DataraInputBorder, RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))
             .padding(18.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.settings_cloud_sync), style = MaterialTheme.typography.titleMedium, color = DataraTextPrimary)
-                Text(stringResource(R.string.settings_cloud_sync_body), style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
+                Text(stringResource(R.string.settings_cloud_sync), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text(stringResource(R.string.settings_cloud_sync_body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            StatusBadge(stringResource(R.string.status_not_connected), DataraTextSecondary)
+            StatusBadge(stringResource(R.string.status_not_connected), MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(16.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(DataraDivider.copy(alpha = .55f), RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
                 .padding(13.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(stringResource(R.string.settings_pending_records), style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
-            Text("—", style = MaterialTheme.typography.labelLarge, color = DataraTextSecondary)
+            Text(stringResource(R.string.settings_pending_records), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("—", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -471,7 +470,7 @@ private fun VersionSettingRow(versionName: String, tapCount: Int, onClick: () ->
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(stringResource(R.string.settings_app_version), style = MaterialTheme.typography.titleMedium, color = DataraTextPrimary)
+            Text(stringResource(R.string.settings_app_version), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             Text(
                 if (tapCount == 0) {
                     stringResource(R.string.settings_pre_defense_build)
@@ -479,10 +478,10 @@ private fun VersionSettingRow(versionName: String, tapCount: Int, onClick: () ->
                     stringResource(R.string.settings_diagnostics_taps, 5 - tapCount)
                 },
                 style = MaterialTheme.typography.bodyMedium,
-                color = DataraTextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Text(versionName, style = MaterialTheme.typography.labelLarge, color = DataraBlueSoft)
+        Text(versionName, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -503,7 +502,7 @@ private fun SignOutButton(onClick: () -> Unit) {
 
 @Composable
 private fun SectionDivider() {
-    Box(Modifier.fillMaxWidth().height(1.dp).background(DataraDivider))
+    Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline))
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF0C101A, heightDp = 1000)
@@ -513,6 +512,8 @@ private fun SettingsPreview() {
         SettingsContent(
             email = "student@ustp.edu.ph",
             versionName = "0.1.0",
+            darkTheme = false,
+            onDarkThemeChange = {},
             onHomeClick = {},
             onHistoryClick = {},
             onManageProfileClick = {},
@@ -525,4 +526,3 @@ private fun SettingsPreview() {
         )
     }
 }
-

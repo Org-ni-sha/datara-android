@@ -1,5 +1,12 @@
 package com.capstone.datara.ui.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -7,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavHostController
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -57,7 +65,9 @@ object DataraRoute {
 @Composable
 fun DataraNavGraph(
     navController: NavHostController = rememberNavController(),
-    startDestination: String = DataraRoute.LOGIN
+    startDestination: String = DataraRoute.LOGIN,
+    darkTheme: Boolean = false,
+    onDarkThemeChange: (Boolean) -> Unit = {}
 ) {
     // Frontend-only promo state. Primitive fields survive configuration changes, but nothing is
     // written to a database or carrier service and the dashboard labels the result as a preview.
@@ -159,7 +169,13 @@ fun DataraNavGraph(
                 }
             )
         }
-        composable(DataraRoute.DASHBOARD) {
+        composable(
+            route = DataraRoute.DASHBOARD,
+            enterTransition = { topLevelEnterTransition() },
+            exitTransition = { topLevelExitTransition() },
+            popEnterTransition = { topLevelEnterTransition() },
+            popExitTransition = { topLevelExitTransition() }
+        ) {
             DashboardScreen(
                 state = dashboardState,
                 onHistoryClick = { navController.navigateToTopLevel(DataraRoute.HISTORY) },
@@ -169,15 +185,29 @@ fun DataraNavGraph(
                 onSignedOut = { navController.navigateToLogin() }
             )
         }
-        composable(DataraRoute.HISTORY) {
+        composable(
+            route = DataraRoute.HISTORY,
+            enterTransition = { topLevelEnterTransition() },
+            exitTransition = { topLevelExitTransition() },
+            popEnterTransition = { topLevelEnterTransition() },
+            popExitTransition = { topLevelExitTransition() }
+        ) {
             HistoryScreen(
                 onHomeClick = { navController.navigateToTopLevel(DataraRoute.DASHBOARD) },
                 onSettingsClick = { navController.navigateToTopLevel(DataraRoute.SETTINGS) },
                 onReviewAccessClick = { navController.navigate(DataraRoute.USAGE_ACCESS_REVIEW) }
             )
         }
-        composable(DataraRoute.SETTINGS) {
+        composable(
+            route = DataraRoute.SETTINGS,
+            enterTransition = { topLevelEnterTransition() },
+            exitTransition = { topLevelExitTransition() },
+            popEnterTransition = { topLevelEnterTransition() },
+            popExitTransition = { topLevelExitTransition() }
+        ) {
             SettingsScreen(
+                darkTheme = darkTheme,
+                onDarkThemeChange = onDarkThemeChange,
                 onHomeClick = { navController.navigateToTopLevel(DataraRoute.DASHBOARD) },
                 onHistoryClick = { navController.navigateToTopLevel(DataraRoute.HISTORY) },
                 onManageProfileClick = { navController.navigate(DataraRoute.PROFILE) },
@@ -261,4 +291,32 @@ private fun NavHostController.navigateToTopLevel(route: String) {
         launchSingleTop = true
         restoreState = true
     }
+}
+
+private val topLevelRouteOrder = listOf(
+    DataraRoute.DASHBOARD,
+    DataraRoute.HISTORY,
+    DataraRoute.SETTINGS
+)
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.topLevelDirection(): Int {
+    val from = topLevelRouteOrder.indexOf(initialState.destination.route).coerceAtLeast(0)
+    val to = topLevelRouteOrder.indexOf(targetState.destination.route).coerceAtLeast(0)
+    return if (to >= from) 1 else -1
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.topLevelEnterTransition(): EnterTransition {
+    val direction = topLevelDirection()
+    return slideInHorizontally(
+        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+        initialOffsetX = { fullWidth -> direction * fullWidth }
+    )
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.topLevelExitTransition(): ExitTransition {
+    val direction = topLevelDirection()
+    return slideOutHorizontally(
+        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+        targetOffsetX = { fullWidth -> -direction * fullWidth }
+    )
 }

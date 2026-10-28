@@ -32,13 +32,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.theme.DataraBlueSoft
-import com.capstone.datara.ui.theme.DataraCardBg
 import com.capstone.datara.ui.theme.DataraCardElevated
 import com.capstone.datara.ui.theme.DataraDivider
 import com.capstone.datara.ui.theme.DataraError
 import com.capstone.datara.ui.theme.DataraInputBorder
-import com.capstone.datara.ui.theme.DataraTextPrimary
-import com.capstone.datara.ui.theme.DataraTextSecondary
 
 @Composable
 fun DataraPageHeader(
@@ -62,8 +59,8 @@ fun DataraPageHeader(
                         onClick = onBack,
                         modifier = Modifier.size(48.dp),
                         colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = DataraCardElevated,
-                            contentColor = DataraTextPrimary
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurface
                         )
                     ) {
                         Icon(
@@ -84,7 +81,7 @@ fun DataraPageHeader(
             Text(
                 text = eyebrow,
                 style = MaterialTheme.typography.labelLarge,
-                color = DataraBlueSoft,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.height(4.dp))
@@ -93,14 +90,14 @@ fun DataraPageHeader(
         Text(
             text = title,
             style = MaterialTheme.typography.headlineMedium,
-            color = DataraTextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.semantics { heading() }
         )
         Spacer(Modifier.height(4.dp))
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodyMedium,
-            color = DataraTextSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -136,8 +133,8 @@ fun DataraSurfaceCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(DataraCardBg, RoundedCornerShape(20.dp))
-            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(20.dp))
             .padding(18.dp),
         content = content
     )
@@ -168,9 +165,9 @@ fun DataraNoticeCard(
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = DataraTextPrimary)
+            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
             Spacer(Modifier.height(3.dp))
-            Text(message, style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
+            Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -186,9 +183,9 @@ fun DataraSignOutDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = DataraCardElevated,
-        titleContentColor = DataraTextPrimary,
-        textContentColor = DataraTextSecondary,
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
@@ -198,7 +195,7 @@ fun DataraSignOutDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(dismissLabel, color = DataraBlueSoft)
+                Text(dismissLabel, color = MaterialTheme.colorScheme.primary)
             }
         }
     )
@@ -214,11 +211,11 @@ fun DataraSectionTitle(
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            color = DataraTextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.semantics { heading() }
         )
         if (supporting != null) {
-            Text(supporting, style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
+            Text(supporting, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

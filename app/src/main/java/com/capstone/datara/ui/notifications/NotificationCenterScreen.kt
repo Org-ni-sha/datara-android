@@ -47,13 +47,9 @@ import com.capstone.datara.ui.components.DataraStatusBadge
 import com.capstone.datara.ui.components.DataraSurfaceCard
 import com.capstone.datara.ui.theme.DATAraTheme
 import com.capstone.datara.ui.theme.DataraBlueSoft
-import com.capstone.datara.ui.theme.DataraCardBg
-import com.capstone.datara.ui.theme.DataraDarkBg
 import com.capstone.datara.ui.theme.DataraError
 import com.capstone.datara.ui.theme.DataraInputBorder
 import com.capstone.datara.ui.theme.DataraNeonBlue
-import com.capstone.datara.ui.theme.DataraTextPrimary
-import com.capstone.datara.ui.theme.DataraTextSecondary
 import com.capstone.datara.ui.theme.DataraWarning
 
 enum class NotificationCategory {
@@ -130,7 +126,7 @@ private fun NotificationCenterContent(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = DataraDarkBg
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
@@ -177,7 +173,7 @@ private fun NotificationCenterContent(
                         Text(
                             stringResource(R.string.notifications_loading_title),
                             style = MaterialTheme.typography.titleMedium,
-                            color = DataraTextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -226,9 +222,9 @@ private fun NotificationEmptyState() {
             Text("0", color = DataraBlueSoft, style = MaterialTheme.typography.titleLarge)
         }
         Spacer(Modifier.height(16.dp))
-        Text(stringResource(R.string.notifications_empty_title), style = MaterialTheme.typography.titleLarge, color = DataraTextPrimary)
+        Text(stringResource(R.string.notifications_empty_title), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(5.dp))
-        Text(stringResource(R.string.notifications_empty_body), style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
+        Text(stringResource(R.string.notifications_empty_body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -258,7 +254,7 @@ private fun NotificationCard(
             .fillMaxWidth()
             .widthIn(max = 760.dp)
             .background(
-                if (notification.isRead) DataraCardBg else accent.copy(alpha = 0.08f),
+                if (notification.isRead) MaterialTheme.colorScheme.surface else accent.copy(alpha = 0.08f),
                 RoundedCornerShape(20.dp)
             )
             .clickable(
@@ -272,14 +268,14 @@ private fun NotificationCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             DataraStatusBadge(priorityLabel, accent)
             Spacer(Modifier.width(8.dp))
-            Text(categoryLabel, style = MaterialTheme.typography.labelSmall, color = DataraTextSecondary)
+            Text(categoryLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
-            Text(notification.timestamp, style = MaterialTheme.typography.labelSmall, color = DataraTextSecondary)
+            Text(notification.timestamp, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(12.dp))
-        Text(notification.title, style = MaterialTheme.typography.titleMedium, color = DataraTextPrimary)
+        Text(notification.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(4.dp))
-        Text(notification.message, style = MaterialTheme.typography.bodyMedium, color = DataraTextSecondary)
+        Text(notification.message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (!notification.isRead) {
             Spacer(Modifier.height(10.dp))
             Text(
