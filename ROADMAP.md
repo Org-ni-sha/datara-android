@@ -234,8 +234,9 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 - [ ] Log each prediction with its inputs and the eventual actual exhaustion time — E3 cannot be done retroactively without this.
 
 #### Phase D7: Usage History & Analytics (Vico Charts)
-- [ ] Add Vico Compose charting library.
+- [x] Add Vico Compose charting library (3.3.1 via version catalog).
 - [ ] Build `HistoryScreen`:
+  - UI preview implemented for the provisional user-defined quota flow with sample data; real usage/history integration remains pending.
   - Time-series charts for hourly and daily data usage.
   - Peak usage hours breakdown.
   - Average daily consumption rate.
@@ -250,11 +251,13 @@ The claim the thesis actually defends is *"per-user personalization improves PET
   - Depletion milestones at **50%, 80%, and 90%** of promo data. (A 100% alert fires when the data is already gone — that is a post-mortem, not a warning.)
 - [ ] Rate-limit alerts so a fluctuating prediction cannot notify repeatedly for the same threshold.
 - [ ] In-app notification center and Room `NotificationEntity` history.
+  - In-app UI preview implemented: sample alerts, read/unread filters, mark-all-read, and read-only sample cycle links. OS notifications, triggers, Room persistence and real telemetry integration remain pending.
 
 #### Phase D9: Profile, Settings & Developer ML Diagnostics Screen
 - [ ] Profile management (name, optional secondary phone number).
 - [ ] Settings (notification toggles, manual cloud sync, sign out).
-  - The app is **dark-only** by decision (see [`AGENTS.md`](AGENTS.md)) — no theme toggle here unless that decision is revisited.
+  - UI preview implemented: Settings/Profile navigation, session-only name edits and notification switches, simulated sync/status, privacy/about and confirmed sign-out. Persistent account edits, real permission/status checks and cloud sync remain pending.
+  - The user-approved quota UI uses a light theme with dark navy accents (see [`AGENTS.md`](AGENTS.md)); authentication retains its dark navy theme. No theme toggle is planned.
 - [ ] **Developer ML Diagnostics Screen (Hidden):**
   - Gated behind secret gesture (e.g. 5 taps on app version text).
   - Displays: active model mode (Global vs. Local), MAE, RMSE, R², input tensors, inference latency.

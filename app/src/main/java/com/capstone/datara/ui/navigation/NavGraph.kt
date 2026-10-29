@@ -8,7 +8,7 @@ import androidx.navigation.compose.rememberNavController
 import com.capstone.datara.ui.auth.ForgotPasswordScreen
 import com.capstone.datara.ui.auth.LoginScreen
 import com.capstone.datara.ui.auth.RegisterScreen
-import com.capstone.datara.ui.dashboard.DashboardPlaceholderScreen
+import com.capstone.datara.ui.dashboard.DashboardScreen
 
 /** Route names, centralised so a typo is a compile error rather than a silent dead end. */
 object DataraRoute {
@@ -44,7 +44,7 @@ fun DataraNavGraph(
             )
         }
         composable(DataraRoute.DASHBOARD) {
-            DashboardPlaceholderScreen(
+            DashboardScreen(
                 onSignedOut = {
                     navController.navigate(DataraRoute.LOGIN) {
                         // Drop the whole authenticated back stack so the system back button

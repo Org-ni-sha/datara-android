@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -75,7 +77,7 @@ fun DataraFieldLabel(
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge.copy(
-                color = DataraTextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold
             )
         )
@@ -103,8 +105,8 @@ fun DataraTextField(
 
     val targetBorderColor = when {
         isError -> DataraError
-        isFocused -> DataraInputBorderFocused
-        else -> DataraInputBorder
+        isFocused -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.outline
     }
 
     val animatedBorderColor by animateColorAsState(
@@ -114,7 +116,7 @@ fun DataraTextField(
     )
 
     val animatedIconTint by animateColorAsState(
-        targetValue = if (isFocused) DataraNeonBlue else DataraIconTint,
+        targetValue = if (isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         animationSpec = tween(durationMillis = 200),
         label = "IconTintAnimation"
     )
@@ -128,15 +130,15 @@ fun DataraTextField(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(54.dp)
+            .heightIn(min = 54.dp)
             .clip(RoundedCornerShape(percent = 50))
-            .background(DataraInputBg)
+            .background(MaterialTheme.colorScheme.surface)
             .border(
                 width = if (isFocused || isError) 1.5.dp else 1.dp,
                 color = animatedBorderColor,
                 shape = RoundedCornerShape(percent = 50)
             )
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 20.dp, vertical = 12.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         Row(
@@ -162,7 +164,7 @@ fun DataraTextField(
                         text = placeholder,
                         style = TextStyle(
                             fontFamily = DataraFontFamily,
-                            color = DataraTextPlaceholder,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Normal
                         )
@@ -177,7 +179,7 @@ fun DataraTextField(
                         .onFocusChanged { isFocused = it.isFocused },
                     textStyle = TextStyle(
                         fontFamily = DataraFontFamily,
-                        color = DataraTextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium
                     ),
@@ -185,7 +187,7 @@ fun DataraTextField(
                     visualTransformation = visualTransformation,
                     keyboardOptions = keyboardOptions,
                     keyboardActions = keyboardActions,
-                    cursorBrush = SolidColor(DataraNeonBlue)
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
                 )
             }
 
@@ -230,9 +232,9 @@ fun DataraPrimaryButton(
 
     val buttonGradient = Brush.horizontalGradient(
         colors = if (enabled && !isLoading) {
-            listOf(DataraPrimaryBlue, DataraPrimaryBlueDark)
+            listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary)
         } else {
-            listOf(DataraPrimaryBlue.copy(alpha = 0.5f), DataraPrimaryBlueDark.copy(alpha = 0.5f))
+            listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
         }
     )
 
@@ -240,11 +242,11 @@ fun DataraPrimaryButton(
         modifier = modifier
             .scale(scale)
             .fillMaxWidth()
-            .height(54.dp)
+            .heightIn(min = 54.dp)
             .shadow(
                 elevation = if (enabled && !isLoading) 10.dp else 0.dp,
                 shape = RoundedCornerShape(percent = 50),
-                spotColor = DataraPrimaryBlue.copy(alpha = 0.45f)
+                spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
             )
             .clip(RoundedCornerShape(percent = 50))
             .background(buttonGradient)
@@ -252,8 +254,9 @@ fun DataraPrimaryButton(
                 interactionSource = interactionSource,
                 indication = null,
                 enabled = enabled && !isLoading,
+                role = Role.Button,
                 onClick = onClick
-            ),
+            ).padding(horizontal = 20.dp, vertical = 14.dp),
         contentAlignment = Alignment.Center
     ) {
         if (isLoading) {

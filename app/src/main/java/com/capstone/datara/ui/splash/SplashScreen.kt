@@ -15,6 +15,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import com.capstone.datara.ui.auth.components.DataraLogo
 import com.capstone.datara.ui.theme.DATAraTheme
 import com.capstone.datara.ui.theme.DataraDarkBg
@@ -30,11 +35,17 @@ fun SplashScreen(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(DataraDarkBg),
+            .background(DataraDarkBg)
+            .safeDrawingPadding()
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        DataraLogo(size = 96.dp)
+        DataraLogo(size = 112.dp, contentDescription = null)
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("DATAra", style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.onBackground)
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -49,7 +60,8 @@ fun SplashScreen(modifier: Modifier = Modifier) {
         Text(
             text = "Restoring your session…",
             style = MaterialTheme.typography.bodyMedium,
-            color = DataraTextSecondary
+            color = DataraTextSecondary,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
         )
     }
 }
