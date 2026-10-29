@@ -1,7 +1,8 @@
 # Supabase schema (Phase C2)
 
-The Postgres side of DATAra. These files are the source of truth for the backend schema —
-the Room entities in D2 mirror them, and the two must not drift.
+These files describe the **applied legacy promo-based schema**, not the final schema for the approved user-defined quota direction (confirmed 2026-10-29). Room entities do not exist yet. Future persistence and sync mappings must agree with the relevant migrations.
+
+Quota/cycle storage, usage relationships and notification links require a separately designed C2 follow-up migration with RLS and compatibility handling. Do not delete `promos` or repurpose `associations` silently, and never edit applied migrations. Current quota UI state is sample/session state with no database integration. Auth and its profile trigger remain in use. See [ROADMAP](../ROADMAP.md) for pending work.
 
 ## Migrations
 
@@ -100,9 +101,9 @@ usable `access_token`), have A insert a `devices` row and then a `data_usage` ro
 checks 1–7 with each account's bearer token. Delete the test rows afterwards; the test *accounts*
 need a service_role key or Dashboard → Authentication → Users to remove.
 
-## Type mapping (keep this table current — it is what D2 builds against)
+## Legacy type mapping (reference for future persistence design)
 
-| Postgres table | Room entity | Postgres type | Kotlin type |
+| Postgres table | Planned legacy entity name (not implemented) | Postgres type | Kotlin mapping |
 |---|---|---|---|
 | `users` | `User` | `uuid` | `String` |
 | `providers` | `Provider` | `text` | `String` |
@@ -115,14 +116,14 @@ need a service_role key or Dashboard → Authentication → Users to remove.
 | `associations` | `Association` | `uuid` (nullable FKs) | `String?` |
 
 **Timestamps are the one place the types do not match literally.** Postgres uses
-`timestamptz`; Room stores `Long` epoch millis (UTC). Convert in the sync mapper, not in
+`timestamptz`; the planned Room mapping uses `Long` epoch millis (UTC). Convert in the sync mapper, not in
 the entity — a `String` timestamp in Room makes D7's range queries and D6's feature
 extraction needlessly painful.
 
-**UUID primary keys are generated client-side** in Room and reused when syncing, so a
+**Planned sync convention:** generate UUID primary keys client-side in Room and reuse them when syncing, so a
 retried batch upsert (C3) updates the same row instead of duplicating it. `data_usage`
 additionally has a `(user_id, device_id, usage_date)` unique constraint for that reason —
-sync with `onConflict` set, not a plain insert.
+future sync must use appropriate conflict handling rather than assume repeated plain inserts are idempotent.
 
 ## RLS
 
@@ -132,8 +133,7 @@ Every table has RLS enabled and is scoped to `auth.uid()`.
 data with no owner, so it has a read-for-authenticated policy and **no** write policy.
 Writes go through the service role (dashboard/SQL editor), never the app.
 
-`promos` carries a nullable `user_id`: `null` means a shared catalog row (D3's carrier
-catalog, readable by everyone, not writable from the client), non-null means a promo the
+`promos` carries a nullable `user_id`: `null` means a shared catalog row (the former D3 design, readable under the authenticated catalog policy, not writable from the client), non-null means a promo the
 user entered manually, visible only to them.
 
 Because synced rows stay keyed to `user_id`, everything in this schema is
@@ -155,13 +155,11 @@ where schemaname = 'public' order by tablename;
 The real check is from the app with two different accounts: user A must not be able to
 read user B's `data_usage` rows.
 
-## Open decisions left for whoever builds D2/D3
+## Legacy design issues to account for in quota migration planning
 
-- `associations` is implemented exactly as specified in `AGENTS.md` — one row carrying
+- `associations` is implemented according to the original promo design — one row carrying
   `user_id`, `device_id`, `provider_id`, `promo_id`, `notification_id`, `data_usage_id`
   and `total_data_used_gb`. It behaves more like a per-user "active setup" record than a
-  true junction table. If D3 ends up wanting one row per active promo instead, that is a
-  schema change to make deliberately, not by accident.
+  true junction table. The approved quota direction needs explicit cycle relationships instead; define them before D2/D3 persistence and preserve existing data deliberately.
 - `promos.expiry_date` is per-activation, not per-catalog-row, which is why it is
-  nullable. If a user can hold several promos at once, expiry likely belongs on
-  `associations` instead.
+  nullable. This historical modeling issue does not introduce promo expiry into the new quota flow. Quota lifecycle fields must be designed separately.

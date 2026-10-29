@@ -48,14 +48,14 @@ Lowercase, hyphens, no spaces. Note: branches use `feature/...`, while commit me
 | `test` | Adding/fixing tests |
 | `style` | Formatting only, no logic change |
 
-**Scope** = the part of the app touched (`auth`, `harvester`, `dashboard`, `db`, `nav`, `promos`, `settings`, etc.).
+**Scope** = the part of the app touched (`auth`, `harvester`, `dashboard`, `db`, `nav`, `quota`, `settings`, etc.).
 
 ### Examples
 
 ```
 feat(auth): wire up register screen to Supabase signUp
 fix(nav): call DataraNavGraph from MainActivity setContent
-feat(harvester): add 10-minute NetworkStatsManager polling job
+feat(quota): add quota cycle details screen
 fix(db): correct foreign key on Association entity
 chore(gradle): add supabase-kt and ktor dependencies
 refactor(viewmodel): extract AuthUiState into sealed interface

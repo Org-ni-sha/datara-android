@@ -6,7 +6,9 @@ Guidance for AI coding agents (Antigravity, Claude Code, Cursor, etc.) working i
 
 ## What this project is
 
-DATAra is an Android app that predicts when a prepaid mobile user's data will run out (Probable Exhaustion Time / PET), based on usage behavior, time-based patterns, and network conditions (signal strength, internet speed). It's a BSIT capstone project for USTP Cagayan de Oro City. The prediction is powered by a dual-layer model: a pre-trained **Global XGBoost model** (baseline, trained on aggregated usage data) and a **Local personalization layer** that adapts the prediction to each user's own usage over time. The exact form of that local layer is an open decision — see [ROADMAP.md §2](ROADMAP.md) before building it.
+DATAra is an Android app for **user-defined usage-quota forecasting**, an approved direction confirmed on 2026-10-29. Users choose an amount in MB/GB; the planned forecast estimates when device-measured mobile usage reaches it. PET refers to that quota-reaching time, not carrier balance depletion or promo expiry. Freebie/zero-rated traffic counts when measured by the device. The app does not identify billing buckets, reconcile carrier balances, or enforce network caps.
+
+It is a BSIT capstone project for USTP Cagayan de Oro City. The planned prediction pipeline uses a pre-trained **Global XGBoost model** and a **Local personalization layer**. Its exact form remains open — see [ROADMAP.md §2](ROADMAP.md). The manuscript and research protocol still need alignment with the approved quota direction; do not invent a replacement thesis title.
 
 This repo is the Android client only. The GitHub repo is `Org-ni-sha/datara-android`; the local working folder is named `DATAra`. Related repos in the same GitHub org:
 - `data-harvester` — the standalone dataset-collection app used during research (do not modify unless explicitly asked; it's a separate deliverable)
@@ -18,13 +20,14 @@ This repo is the Android client only. The GitHub repo is `Org-ni-sha/datara-andr
 
 [`ROADMAP.md`](ROADMAP.md) is the build-order source of truth. It tracks five parallel tracks (A–E) and, for this repo, phases **D1–D9** with live checkboxes. **Check it before starting any task** to see which phase is current and what that phase actually requires.
 
-As of this writing:
+As of 2026-10-29:
 
-- **Done:** D1 — Auth & app shell, complete. Supabase email/password, dark navy Login/Register/Forgot Password, `AuthRepository`, `AuthViewModel`, Hilt wiring, session auto-login with a splash gate, and profile-row creation on sign-up.
-- **Done:** C2 — the Postgres schema, RLS policies, and `on_auth_user_created` trigger in [`supabase/`](supabase/) are applied to the live project and verified against two accounts. The live schema is the one the migrations describe; treat `supabase/` as its source of truth and add changes as new migrations, never by editing an applied file.
-- **Not started:** D2 (Room + `TelephonyManager` detection) onward — which is most of the app.
+- **Implemented:** D1 authentication, session routing, official logo/launcher icons and native splash plus session-loading UI.
+- **Implemented as previews:** Home, Create Quota, Quota Details, History, Notifications, Settings and Profile. Sample forecasts, usage, notification preferences, name edits and sync states are not production integrations. Sign-out uses real Supabase Auth.
+- **Historically applied:** C2 legacy promo-based Postgres schema, RLS and profile trigger. `supabase/` remains the schema source of truth; never edit applied migrations.
+- **Pending:** quota-schema design/new migrations, Room, telemetry, durable cycles/history, inference, OS alert delivery, persistent profile/preferences and sync. Do not mark D2–D9 complete just because their UI exists.
 
-Everything below marked *planned* does not exist in the codebase yet. Do not assume it compiles.
+The current implementation details and limitations are in [quota UI preview](docs/quota-ui-preview.md).
 
 ---
 
@@ -45,6 +48,7 @@ Everything below marked *planned* does not exist in the codebase yet. Do not ass
 | Navigation | `navigation-compose` + `hilt-navigation-compose` |
 | Testing | JUnit 4, Compose UI Test |
 | Charts | Vico Compose 3.3.1 — sample History UI; real telemetry integration pending |
+| Launch | AndroidX core-splashscreen 1.2.0, native launch theme and Compose session loading |
 
 ### Planned — not yet a dependency
 
@@ -92,21 +96,21 @@ app/src/main/java/com/capstone/datara/
     │   └── components/               # DataraAuthComponents, DataraIcons, DataraLogo
     ├── session/                      # SessionState (pure mapper) + SessionViewModel
     ├── splash/SplashScreen.kt        # shown while the session is restored
-    ├── dashboard/                    # D1 placeholder only — D5 replaces it
+    ├── dashboard/                    # Home, signed-in shell and sample usage bars
+    ├── quota/                        # Create/Details, sample state and navigation
+    ├── history/                      # Vico sample charts and cycle details
+    ├── notifications/                # Sample alerts and read state
+    ├── settings/, profile/           # Preview preferences/profile; real sign-out
+    ├── components/                   # Theme-aware shared Material 3 wrappers
     ├── navigation/NavGraph.kt        # DataraRoute constants + start destination
     └── theme/                        # Color.kt, Theme.kt, Type.kt
 ```
 
-Tests: `AuthErrorParserTest.kt` and `AuthValidatorTest.kt` under `app/src/test/`, plus the generated `ExampleUnitTest` / `ExampleInstrumentedTest`.
+Tests cover auth validation/errors, quota input and sample-state behavior, History fixtures, Notifications and Settings. Compose tests cover quota screens, History, Notifications, Settings/Profile and branded session loading, including enlarged-font checks. These do not validate production telemetry or ML.
 
-### Planned packages (create as their phase comes up)
+### Planned infrastructure
 
-```
-data/local/          # Room entities, DAOs, DataraDatabase            (D2)
-ui/promos/           # carrier promo catalog + manual entry           (D3)
-ui/history/          # Vico charts                                    (D7)
-ui/profile/, ui/settings/                                             (D9)
-```
+`data/local/` (Room), background telemetry, sync and inference are still pending. `ui/promos/` is no longer planned: quota setup replaces the former catalog flow.
 
 ---
 
@@ -120,12 +124,11 @@ ui/profile/, ui/settings/                                             (D9)
 
 ---
 
-## Data model (Room / Postgres — keep both in sync)
+## Data model (applied legacy schema; quota design pending)
 
 The Supabase schema (C2) is written as SQL migrations in [`supabase/`](supabase/) — read
 [`supabase/README.md`](supabase/README.md) for the Postgres↔Kotlin type mapping before writing
-the Room entities. The Room side (D2) does not exist yet. These are the seven entities,
-mirrored between local Room tables and the Supabase Postgres schema:
+the Room entities. The Room side (D2) does not exist yet. The following describes the seven legacy schema concepts, not existing Room entities or a finalized quota schema:
 
 - **User** — id, email, name, created_at (no address field, no raw ID exposed in UI — see Scope Boundaries)
 - **Device** — device_id, device_name, device_model, android_version
@@ -135,8 +138,10 @@ mirrored between local Room tables and the Supabase Postgres schema:
 - **Promo** — promo_id, promo_name, data_amount_gb, promo_price, validity_days, expiry_date, promo_description
 - **Association** — junction table linking user_id, device_id, provider_id, promo_id, notification_id, data_usage_id, total_data_used_gb
 
+Before D2/D3 persistence, design quota/cycle relationships and add new C2 migrations with RLS and compatibility handling. Keep deployed promo tables until an explicit migration handles them; do not create a Promo-based quota model merely to match this historical list.
+
 Rules:
-- When adding a field, update both the Room entity and the Supabase table/migration — they must not drift.
+- Once Room and sync exist, keep persisted fields and mappings aligned with their corresponding Supabase migrations. Do not invent Room entities as part of UI-only work.
 - Every Supabase table carries **Row Level Security scoped to `user_id`**. Don't create a table without its RLS policy. (`providers` is the one documented exception — shared reference data, read-only to the client.)
 - Timestamps are `timestamptz` in Postgres and `Long` epoch millis in Room, converted in the sync mapper.
 - Row primary keys are UUIDs generated client-side so sync retries upsert instead of duplicating.
@@ -145,11 +150,11 @@ Rules:
 
 ## Design system
 
-- **Dark navy** (`#0C101A` / `DataraDarkBg`) background, card/input surface (`#141B2B` / `DataraCardBg`).
+- **Authentication and launch:** dark navy (`#0C101A` / `DataraDarkBg`) background, card/input surface (`#141B2B` / `DataraCardBg`).
 - Authentication retains the dark navy `DATAraTheme`. The user-approved quota UI uses the scoped **light `QuotaTheme`**: off-white background, white surfaces, navy text and dark navy accents. Home, Create Quota, Quota Details, History, Notifications, Settings and Profile use this theme. No theme toggle is planned.
 - Always use the semantic brand tokens defined in `ui/theme/Color.kt` (`DataraDarkBg`, `DataraCardBg`, `DataraInputBg`, `DataraInputBorder`, `DataraTextSecondary`, etc.) — never a raw hex literal inside a screen.
 - In quota screens, use `MaterialTheme.colorScheme` roles mapped by `QuotaTheme` to the light brand tokens. Shared components must respect their enclosing theme.
-- Accent colors: vibrant/electric blue (`#1E64FA` / `DataraPrimaryBlue`, `#2F6BFF` / `DataraNeonBlue`), lime green (`#CEFF37` / `DataraNeonGreen`) for positive status, red (`#EF4444` / `DataraError`) for errors.
+- Authentication accent colors: vibrant/electric blue (`#1E64FA` / `DataraPrimaryBlue`, `#2F6BFF` / `DataraNeonBlue`), lime green (`#CEFF37` / `DataraNeonGreen`) for positive status, red (`#EF4444` / `DataraError`) for errors.
 - Typography: use `MaterialTheme.typography` styles backed by `DataraFontFamily` (currently `FontFamily.SansSerif`, chosen for offline/emulator reliability).
 - Authentication reuses `ui/auth/components/DataraAuthComponents.kt`. Signed-in quota screens use native Material 3 controls and shared wrappers in `ui/components/DataraUi.kt`. Outline icons remain in `DataraIcons.kt`.
 - Quota shapes use a hierarchy: 16dp controls and inset panels, 20dp cards, 24dp forecast hero; smaller icon and label containers use 8–14dp. Direction C refinement favors lighter white surfaces with soft blue grouping.
@@ -164,10 +169,11 @@ Rules:
 
 These were deliberately cut during design review because they fall outside the thesis objectives or conflict with the project's stated privacy compliance (RA 10173). Do not reintroduce them just because they seem like reasonable features:
 
-- ❌ **No SMS reading** for promo auto-detection. Promos are added manually or synced from the auto-detected carrier only. `READ_SMS`/`RECEIVE_SMS` permissions are off-limits.
+- ❌ **No SMS reading** or promo auto-detection. The approved flow uses a manually chosen tracking quota, not a promo catalog. `READ_SMS`/`RECEIVE_SMS` permissions are off-limits.
 - ❌ **No address field** or other unnecessary PII collection on the User entity.
 - ❌ **No raw user ID/UUID shown in the main UI.**
-- ❌ **No manual data-budget setting/enforcement feature** (`NetworkPolicyManager`-level restriction). The app predicts depletion; it does not throttle or cap other apps' data.
+- ✅ **User-defined tracking quotas are approved.** Users choose an amount to forecast against.
+- ❌ **No network enforcement** (`NetworkPolicyManager` restrictions), throttling or blocking other apps when the quota is reached.
 - ❌ **No standalone data-usage calculator** unrelated to prediction.
 - ⚠️ **ML diagnostics (MAE/RMSE/R² display) do not belong in the main Settings menu** — gate them behind the hidden dev-only screen (D9, secret gesture), since end users (prepaid students/professionals) aren't the audience for model metrics.
 - ✅ Phone number, if present at all, is an **optional secondary profile field** — email/password is the login identifier, not phone/SMS OTP.
@@ -178,10 +184,10 @@ If a task description conflicts with this list, ask before proceeding rather tha
 
 ## Prediction logic — do not oversimplify
 
-- **PET (Probable Exhaustion Time)** is the core output of the app and must always be prominently displayed on the Dashboard — do not bury it under other stats.
-- New users get predictions from the **Global model**. Once a user has enough local usage history (roughly 7 days of telemetry), the app switches to the **Local personalization layer**. Don't hardcode "always use global" or "always use local" — this is a conditional, reversible switch (see the thesis's Fig. 1 data flow and ROADMAP D6).
+- **PET** means predicted quota-reaching time in the approved direction. Make it prominent on Home when available; show collecting/unavailable states honestly. Current displayed forecasts are fixtures, not inference.
+- Planned D6 behavior: new users with sufficient valid inputs get predictions from the **Global model**. Once a user has enough local usage history (roughly 7 days of telemetry), the app switches to the **Local personalization layer**. Don't hardcode "always use global" or "always use local" — this is a conditional, reversible switch (see the thesis's Fig. 1 data flow and ROADMAP D6).
 - **On-device _inference_ is non-negotiable; on-device _training_ is not a given.** ONNX Runtime does inference only for tree ensembles — there is no on-device XGBoost retraining path. ROADMAP §2 (Decision 2) holds the options; don't write code that assumes local XGBoost training works.
-- Predictions run **on-device via ONNX Runtime**, not via a live network call to a prediction server. If a task asks you to add a `/predict` API call, confirm that's actually intended first — it would contradict the offline-first design already documented. (Downloading an updated *model file* from Supabase Storage is not a `/predict` call and doesn't violate this.)
+- Planned predictions run **on-device via ONNX Runtime**, not via a live network call to a prediction server. If a task asks you to add a `/predict` API call, confirm that's actually intended first — it would contradict the offline-first design already documented. (Downloading an updated *model file* from Supabase Storage is not a `/predict` call and doesn't violate this.)
 - Network factors (signal strength, internet speed) are model inputs, not just display metadata — don't drop them when refactoring the prediction pipeline.
 
 ---
@@ -209,7 +215,7 @@ The short version: branch off `main` as `<type>/<short-description>` (`feature/`
 
 ## Known current state / traps
 
-- The `"dashboard"` route renders `DashboardPlaceholderScreen` — a D1 stub showing the signed-in email and a sign-out button, built only so auto-login is verifiable. It is not a partial dashboard: D5 deletes the file and builds the real one. Don't extend it.
+- The `"dashboard"` route renders `DashboardScreen` in `ui/dashboard/HomeScreen.kt`, which hosts the signed-in quota flow. The old placeholder is gone. Preview state uses SavedStateHandle; it is not a durable quota database. History and alert fixtures are independent of Home actions.
 - Routes are constants on `DataraRoute`, not string literals. Login and register clear the whole back stack on success (`popUpTo(0)`), so back from the dashboard exits the app rather than returning to a login screen with a live session.
 - Auto-login is live: `MainActivity` gates on `SessionViewModel.sessionState` and shows `SplashScreen` while Supabase restores a persisted session. `SessionStatus.RefreshFailure` is deliberately treated as unauthenticated — a stale refresh token means signing in again, not landing on a dashboard whose requests all 401.
 - The `public.users` row is created by the `on_auth_user_created` Postgres trigger, not by a client insert. `AuthRepository.signUp` passes the name as auth metadata (`raw_user_meta_data`) so the trigger can populate it — if you change the sign-up call, keep that metadata key or `users.name` silently becomes null.
@@ -218,4 +224,4 @@ The short version: branch off `main` as `<type>/<short-description>` (`feature/`
 
 ## When in doubt
 
-This is a capstone thesis project with panel-approved scope (Chapters 1–3 are fixed reference documents, not aspirational). If a request would expand scope, add a new permission, or change something already defended to a panel (dataset structure, prediction approach, privacy claims), flag it explicitly rather than silently implementing it.
+This is a capstone thesis project. The approved quota direction supersedes older promo-based product instructions; Chapters 1–3 remain historical references until their documented alignment is completed. If a request would expand scope, add a new permission, or change something already defended to a panel (dataset structure, prediction approach, privacy claims), flag it explicitly rather than silently implementing it.

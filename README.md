@@ -2,12 +2,23 @@
 
 > Capstone Android app — `com.capstone.datara`
 
+## Product and current status
+
+DATAra forecasts when device-measured mobile usage will reach an amount the user chooses in MB or GB. This user-defined quota direction is approved (2026-10-29). PET refers to quota-reaching time, not carrier balance depletion, promo expiry or loss of connectivity. Measured traffic counts even when a carrier treats it as a freebie. Quotas never throttle or block traffic.
+
+Authentication, password recovery, session routing and branded launch are implemented. The signed-in screens—Home, Create Quota, Quota Details, History, Notifications, Settings and Profile—use sample/session state. Forecasts are fixtures; usage access and sync are simulated. Sign-out uses real Supabase Auth.
+
+Room, real telemetry, durable quotas/history, ML inference, OS notifications and cloud sync are pending. The deployed Supabase schema still uses the earlier promo model; quota migrations and manuscript/research alignment are separate pending work.
+
+See [ROADMAP](ROADMAP.md) for phases and open decisions, [quota UI behavior](docs/quota-ui-preview.md), [design system](docs/ui-redesign.md), [branding](docs/brand-assets.md), and [contribution rules](CONTRIBUTING.md).
+
 ## Tech Stack
 
 | Layer | Library / Version |
 |---|---|
 | Language | Kotlin 2.4.0 |
-| UI | Jetpack Compose (BOM 2026.02.01) |
+| UI | Jetpack Compose (BOM 2026.02.01), Material 3 |
+| Charts / Launch | Vico 3.3.1 / AndroidX core-splashscreen 1.2.0 |
 | DI | Hilt 2.60.1 + KSP 2.3.9 |
 | Backend | Supabase 3.8.0 (Auth, Postgrest, Storage) |
 | Network | Ktor Android 3.0.3 |
@@ -18,14 +29,14 @@
 ## Getting Started
 
 ### Prerequisites
-- Android Studio (latest stable — Ladybug or newer)
-- JDK 11+
-- Android SDK with API 26+
+- Android Studio compatible with the pinned AGP 9.3.2 and Gradle 9.5.0
+- Use Android Studio’s compatible bundled JBR as the Gradle JVM; Java source/target compatibility is 11, which is not the Gradle runtime requirement
+- Android SDK Platform 37 for compilation; emulator/device API 26+ to run
 
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/YOUR_ORG/DATAra.git
+git clone https://github.com/Org-ni-sha/datara-android.git DATAra
 cd DATAra
 ```
 
@@ -63,23 +74,32 @@ SUPABASE_ANON_KEY=your-anon-key-here
 
 ## Project Structure
 
-```
+```text
 app/src/main/java/com/capstone/datara/
-├── DataraApplication.kt          # @HiltAndroidApp
-├── MainActivity.kt               # @AndroidEntryPoint, hosts NavGraph
-├── data/
-│   ├── remote/SupabaseClientProvider.kt
-│   └── repository/AuthRepository.kt
-├── di/
-│   └── SupabaseModule.kt         # Hilt @Module
+├── DataraApplication.kt          # Hilt application
+├── MainActivity.kt               # Native splash and session gate
+├── data/remote/, repository/     # Supabase client and AuthRepository
+├── di/                          # Hilt wiring
 └── ui/
-    ├── auth/
-    │   ├── AuthViewModel.kt      # @HiltViewModel
-    │   ├── LoginScreen.kt
-    │   └── RegisterScreen.kt
-    ├── navigation/NavGraph.kt
-    └── theme/
+    ├── auth/, session/, splash/  # Authentication and session restoration
+    ├── dashboard/, quota/       # Home, Create Quota, Details and sample state
+    ├── history/, notifications/ # Independent sample usage and alerts
+    ├── settings/, profile/      # Preview settings/profile; real sign-out
+    ├── components/, navigation/ # Shared Material 3 UI and navigation
+    └── theme/                   # Dark auth theme and light QuotaTheme
 ```
+
+`supabase/` contains the applied legacy migrations. Room and inference packages do not exist yet. Authentication uses dark navy; signed-in screens use Direction C white surfaces, navy accents and teal progress. There is no theme toggle.
+
+## Verification
+
+On Windows, with a compatible Gradle JVM configured:
+
+```powershell
+./gradlew.bat test assembleDebug assembleDebugAndroidTest
+```
+
+Use `./gradlew` on macOS/Linux. Instrumentation APK compilation alone does not run device tests. See [UI review evidence](docs/ui-redesign.md) for historical emulator results and remaining device checks. Review sample scenarios through the Home **Preview options** menu.
 
 ---
 

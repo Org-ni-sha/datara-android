@@ -14,14 +14,14 @@ Closes #<!-- issue number, or delete this line -->
 <!-- Exact steps for the reviewer. Example:
 1. Run on a physical device (required if this touches TelephonyManager/SIM data)
 2. Log in with a test account
-3. Confirm the Dashboard shows a PET value, not just Total Used
+3. Confirm Home shows the expected quota forecast/state; sample forecasts are labeled
 -->
 
 ## Checklist
 
 - [ ] Builds, and existing tests still pass
 - [ ] No secrets, keys, or `local.properties` in the diff
-- [ ] Nothing under "Scope boundaries" in `AGENTS.md` reintroduced (SMS reading, address field, budget enforcement)
+- [ ] Nothing under "Scope boundaries" in `AGENTS.md` reintroduced (SMS reading, address field, network enforcement; user-defined tracking quotas are allowed)
 
 ## Screenshots
 

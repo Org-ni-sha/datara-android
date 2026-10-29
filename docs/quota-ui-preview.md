@@ -1,8 +1,8 @@
 # Quota UI preview
 
-Provisional user-defined quota direction, pending adviser review. This does not mark roadmap D2â€“D6 complete.
+User-defined usage-quota forecasting is the approved product direction (confirmed 2026-10-29). This document describes the implemented preview, not production tracking. It does not mark roadmap D2–D9 integrations complete. PET means when device-measured mobile consumption reaches the chosen amount, not carrier allowance depletion. Freebie traffic counts when measured; no billing-bucket classification, carrier reconciliation or network enforcement is provided.
 
-The quota flow uses the user-approved light design: off-white background, white surfaces, navy text and accents, navy forecast cards, a circular quota gauge, and outline navigation icons. Authentication keeps the dark navy theme. `QuotaTheme` scopes the palette and system-bar appearance to quota screens; shared inputs and buttons follow the enclosing color scheme. There is no theme toggle.
+The quota flow follows Direction C: off-white background, white surfaces and forecast hero, navy text/actions, teal progress, soft blue information panels and mint selected navigation. A slim progress indicator accompanies the hero metrics; there is no circular gauge. Quota shapes use 16dp controls, 20dp cards and a 24dp hero. Authentication and launch retain dark navy. `QuotaTheme` scopes the palette and system bars; shared components respect their enclosing theme. No theme toggle is planned. See [UI design](ui-redesign.md) and [brand assets](brand-assets.md).
 
 History is available through the floating bottom navigation. It uses Vico 3.3.1 with illustrative 24-hour, 7-day and quota-cycle data, a total/average summary, peak interval, an exact-readings bottom sheet, and read-only past-cycle details. The 24-hour chart groups readings into 4-hour totals; the exact-readings list retains hourly resolution. Use **Preview options → Preview empty history** to review the empty state. These fixtures are independent of the current sample quota and are not a persistent archive of actions performed on Home.
 
@@ -16,6 +16,6 @@ Settings is a real navigation destination with a Profile subpage, preview milest
 
 Use **View quota details** below the quota summary to see starting amount, used/remaining data, start time, status and forecast. **End cycle** requires confirmation, stops the sample forecast and retains the values on the details screen. Returning Home reflects the ended state. **Create another quota** opens the form; cancelling returns to Details, and submitting starts a fresh sample cycle. Start/end timestamps survive recreation. Selecting a sample scenario clears the ended status for previewing. Creating another quota replaces the session's previous details; historical persistence is deferred.
 
-Usage Access is simulated: **About Usage Access â†’ Preview enabled access** changes only the sample state. No Android permissions, telemetry, background services, backend schema or model changes are included. No quota caps or throttles network traffic.
+Usage Access is simulated: **About Usage Access → Preview enabled access** changes only the sample state. No Android permissions, telemetry, background services, backend schema or model changes are included. No quota caps or throttles network traffic.
 
 Compose previews cover all Home states, Create Quota, enlarged fonts and landscape Home. Unit tests cover numeric conversion, invalid input and sample-state restoration; instrumentation tests cover state rendering and form submission.

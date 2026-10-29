@@ -1,14 +1,22 @@
 # DATAra — End-to-End Capstone Master Roadmap & Build Order
 
-> **Capstone Project:** Probable Exhaustion Time (PET) Prediction for Prepaid Mobile Data  
+> **Original capstone framing:** Probable Exhaustion Time (PET) Prediction for Prepaid Mobile Data (manuscript alignment pending)
 > **Institution:** University of Science and Technology of Southern Philippines (USTP) – Cagayan de Oro City  
 > **Scope:** Full Capstone Ecosystem — ML Training Pipeline (`datara-ml`), Dataset Harvesting (`data-harvester`), Backend (`Supabase`), and Android Client (`datara-android`).
 
 ---
 
+## Current direction and implementation status (2026-10-29)
+
+User-defined usage-quota forecasting is the approved product direction. The user chooses an amount in MB or GB to track; PET means the estimated time when device-measured mobile consumption reaches that amount. It does not predict carrier balance depletion, promo expiry or loss of connectivity. Traffic covered by freebies or zero-rating still counts when recorded by the device; the app does not classify carrier billing buckets or reconcile a carrier balance. Quotas inform the user and never block or throttle traffic.
+
+Authentication and the branded launch flow are implemented. Home, Create Quota, Quota Details, History, Notifications, Settings and Profile are implemented as UI previews using sample/session state. Room, real telemetry, quota persistence, inference, OS alert delivery and cloud sync remain pending. Completed UI checkboxes below do not mean their production integrations are complete.
+
+The applied C2 schema still contains legacy promo tables. Quota schema design and new migrations are pending; this direction does not authorize deleting deployed tables. The manuscript, data labels and evaluation protocol must be aligned before research implementation proceeds. The original title above is historical, not a newly approved thesis title.
+
 ## 1. System Ecosystem & Architecture
 
-The project consists of three interconnected deliverables supporting the dual-layer XGBoost prediction architecture:
+The planned architecture connects three deliverables around a global XGBoost model and a local personalization layer. The diagram is a target architecture, not a list of implemented services:
 
 ```
 ┌───────────────────────────┐      ┌───────────────────────────┐
@@ -49,7 +57,7 @@ Everything in Track D except D6 can proceed in parallel with Tracks A and B. **D
 
 ## 2. Open Decisions — resolve before building the affected phase
 
-These two items are specified in ways that cannot be built as written. Both change what gets claimed in the manuscript, so they are decisions, not implementation details.
+The quota direction is approved. Polling and local personalization below remain open technical decisions; their provisional defaults are not implementation commitments.
 
 ### ⚠️ DECISION 1 — Durable polling interval (affects D4, and the thesis text)
 
@@ -75,7 +83,7 @@ Keep this distinction explicit in all documentation: **on-device _inference_ is 
 | **(b) Cloud retraining, on-device inference** | Per-user model retrained in `datara-ml`, exported to ONNX, stored in Supabase Storage, downloaded by the client. True per-user XGBoost. Does **not** violate the no-`/predict` rule (inference stays local) but gives up offline-only for the retraining step. |
 | **(c) On-device lightweight learner** | A small incremental regressor (SGD/ridge) trained locally that replaces the global model once it outperforms it. Fully on-device training, but no longer XGBoost at the local layer. |
 
-D6 below is written against **(a)**. E3's comparison is valid under any option.
+D6 below is written against **(a)** as a provisional default, not a resolved decision. E3's comparison is valid under any option.
 
 #### Alternatives evaluated and rejected
 
@@ -96,6 +104,12 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 
 ---
 
+### Pending alignment — quota storage and research contract
+
+- [ ] Design quota/cycle persistence and its relationships to usage and notifications before C2 follow-up migrations and D2 entities. Preserve existing deployed data and RLS; do not assume the seven-table promo model is the final quota schema.
+- [ ] Align manuscript objectives, diagrams, target labels and evaluation protocol with device-measured quota-reaching time. Define cycle baselines, observation gaps, quota crossings and cycles that end before reaching the quota. Do not score unobserved crossings as known outcomes.
+- [ ] Keep changes to `data-harvester` and `datara-ml` as separately scoped work; this Android documentation update does not implement those changes.
+
 ## 3. Cross-Ecosystem Roadmap (By Track & Phase)
 
 ### Track A: Dataset Harvesting & Preprocessing (`data-harvester`)
@@ -109,7 +123,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
   - Keep signed consent records as a defense appendix.
 - [ ] **Phase A3 — Pilot Data Gathering:** Run pilot collection across volunteer respondents (prepaid users on Smart, Globe, DITO).
   - **Sizing — decide before launch:** target respondent count, and days of collection per respondent. Note the downstream floor: D6's local-model switch needs **≥ 7 days per user**, so 14–30 days per respondent is the realistic minimum.
-  - **Measurement-validity check (do not skip):** at fixed intervals, record the carrier-reported balance (`*143#` / carrier app) alongside the app's measured consumption for the same window. Device-side byte counters do **not** equal carrier accounting — zero-rated apps, promo-specific inclusions, header overhead, and carrier rounding all cause drift. Log the observed drift; it becomes the error floor for every PET claim and the panel will ask about it.
+  - **Measurement-validity check:** validate mobile-only cumulative usage over a defined cycle window, including counter resets, missing intervals and bucket resolution. Record quota-crossing observations and their timing uncertainty. Carrier balances are not ground truth for this target; freebie/zero-rated traffic is included in device-measured consumption. No carrier-balance reconciliation is required.
   - Record device model, Android version, and carrier per respondent so B1 can check for device-specific measurement bias.
 - [ ] **Phase A4 — Dataset Anonymization & Export:** Strip device/user identifiers so the exported dataset is genuinely anonymized (not merely pseudonymized), and format raw logs into standardized CSV (`usage_date`, `time_interval`, `consumed_mb`, `signal_strength`, `carrier`, `session_duration`).
 
@@ -128,11 +142,11 @@ The claim the thesis actually defends is *"per-user personalization improves PET
   - `rolling_consumption_rate`: 1-hour, 3-hour, and 24-hour moving averages.
     - **Resolution constraint:** `NetworkStatsManager` is coarsely bucketed (roughly 2-hour granularity for detailed queries), so on-device features are running totals, not true 10/15-minute resolution. Engineer features the client can actually reproduce at inference time — a feature the app cannot compute is useless no matter how well it trains.
   - `time_features`: hour of day (cyclical sine/cosine), day of week, is_weekend.
-  - `network_features`: signal strength (dBm/bars), network type (LTE/5G).
-  - Target variable definition: Exhaustion timeframe / Consumption rate to compute PET.
+  - `network_features`: signal strength (dBm/bars), network type (LTE/5G), and measured speed. Confirm the speed field, units and availability in the research contract before training; the earlier A4 export list is not a finalized quota dataset schema.
+  - Target variable definition: time until measured usage reaches the chosen quota, or a consumption-rate forecast from which quota PET is derived. Finalize the target and horizon before training; use consistent cycle windows and quota units.
 - [ ] **Phase B3 — Global XGBoost Model Training & Hyperparameter Tuning:**
   - Algorithm: `XGBRegressor` / `XGBoost`.
-  - Objective: Minimize exhaustion error margin across generalized prepaid users.
+  - Objective: minimize quota-reaching-time prediction error across users.
   - Hyperparameter optimization via Optuna or GridSearchCV (`learning_rate`, `max_depth`, `n_estimators`, `subsample`, `reg_lambda`).
   - Split by **respondent**, not by row — random row splits leak the same user into train and test and will inflate every metric.
 - [ ] **Phase B4 — Model Evaluation & Thesis Metrics:**
@@ -153,10 +167,11 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 *Goal: Centralized authentication, synced Postgres schema, and backup logging.*
 
 - [x] **Phase C1 — Auth Setup:** Supabase Auth with Email/Password.
-- [x] **Phase C2 — Database Schema Definition:** *(Applied to the live project — `supabase db push --dry-run` reports up to date — and RLS verified against two live accounts on 2026-09-17. See "RLS verification" in [`supabase/README.md`](supabase/README.md) to re-run it.)*
+- [x] **Phase C2 — Original Database Schema Definition:** *(Historical verification: applied schema and RLS checked against two live accounts on 2026-09-17. See "RLS verification" in [`supabase/README.md`](supabase/README.md) to re-run it.)*
   - Tables: `users`, `devices`, `providers`, `promos`, `data_usage`, `notifications`, `associations`.
   - Enforce Row Level Security (RLS) policies per `user_id`. No table ships without its policy.
-  - Align schema types 1:1 with Android Room entities. Convention: Postgres is `snake_case` plural (`data_usage`), Room entities are `PascalCase` singular (`DataUsage`) — the mapping is naming-only, types must match exactly.
+  - Room is not implemented. Future entities and sync mappers must match the agreed schema. Convention: Postgres is `snake_case` plural (`data_usage`), Room entities are `PascalCase` singular (`DataUsage`) — the mapping is naming-only, types must match exactly.
+- [ ] **C2 follow-up — Quota schema:** design and apply new migrations for quota/cycle persistence, relationships and RLS. Legacy `promos`/`associations` remain deployed until an explicit migration handles compatibility.
 - [ ] **Phase C3 — Telemetry Sync:**
   - Batched background sync of usage records from the Android client.
   - **Implementation note:** this is a batched Postgrest insert from `supabase-kt`, not a custom HTTP endpoint. Only introduce a Supabase Edge Function if server-side validation or aggregation is genuinely needed — otherwise there is no endpoint to build.
@@ -167,26 +182,32 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 ### Track D: Android Client App (`datara-android`)
 *Goal: User-facing application with real-time telemetry, dual-layer on-device inference, and PET dashboard.*
 
-#### Phase D1: Authentication & App Shell *(Status: Completed / Minor Polish)*
+#### Phase D1: Authentication, Branding & App Shell *(implemented)*
 - [x] Supabase Auth (`auth-kt`) with Ktor client.
 - [x] Dark navy UI (`#0C101A` / `#141B2B`) for `LoginScreen` and `RegisterScreen`.
 - [x] `AuthRepository`, `AuthViewModel`, and Hilt injection.
 - [x] Session auto-login persistence on launch — `SessionViewModel` maps `sessionStatus` to `SessionState`, `MainActivity` shows `SplashScreen` until it resolves, then picks the start destination.
 - [x] Initial user record creation in Supabase on sign-up — created server-side by the `on_auth_user_created` trigger (C2); registration now collects a full name and sends it as auth metadata so the trigger populates `users.name` on insert.
 
+- [x] Password recovery via email OTP; no phone/SMS login.
+- [x] Official DATAra logo in authentication, session loading and Home; adaptive/monochrome launcher assets and AndroidX native splash. No forced video or minimum startup delay. See [brand assets](docs/brand-assets.md).
+
 #### Phase D2: Room Local Database & Hardware Detection
 - [ ] Add Room dependencies and KSP compiler (`ksp`, never `kapt` — matches the existing Hilt setup).
-- [ ] Create 7 Room entities mirroring Supabase schema (`User`, `Device`, `Provider`, `Promo`, `DataUsage`, `Notification`, `Association`). *(Coordinate with C2 so the two do not drift.)*
+- [ ] Create Room entities and sync mappings after the C2 quota-schema follow-up is designed. Do not blindly mirror the legacy promo model into new quota persistence.
 - [ ] Implement `DataraDatabase` and DAOs.
 - [ ] Auto-detect SIM/Carrier via `TelephonyManager` (*strictly no SMS reading, no manual carrier entry*).
   - Try `getSimOperatorName()` / `getSimOperator()` first — these need **no permission**. Only request `READ_PHONE_STATE` if a specific value genuinely requires it; it is a dangerous permission and needs a justification you can defend.
 - [ ] Extract hardware metadata (`Build.MODEL`, `Build.VERSION.SDK_INT`).
 
-#### Phase D3: Active Promo & Data Baseline Setup
-- [ ] Prepaid promo catalog filtered by detected carrier (Smart, Globe, DITO).
-- [ ] Custom manual promo entry dialog (`data_amount_gb`, `validity_days`, `expiry_date`).
-- [ ] Calculate baseline remaining data (`data_remaining_gb`) as promo allowance minus measured consumption.
-  - **Known limitation to surface in the UI and the manuscript:** this is an *estimate* derived from device-side measurement, not the carrier's true balance (see A3's validity check). Consider letting the user correct the baseline against their carrier-reported balance, which both improves accuracy and is an honest answer to the panel's inevitable question.
+#### Phase D3: User-Defined Quota & Cycle Setup
+- [x] Create Quota UI: decimal MB/GB amount, optional name, validation, draft restoration and cancel/submit navigation. Units: 1 MB = 1,000,000 bytes; 1 GB = 1,000 MB.
+- [x] Sample cycle creation, Quota Details, confirmed end-cycle action and replacement-cycle flow. State uses SavedStateHandle, not a persistent database or historical archive.
+- [ ] Persist quota amount, cycle boundaries and status using the agreed C2/D2 design.
+- [ ] Establish the measured mobile-usage baseline at cycle start; derive used and remaining quota consistently from that window. Integrate reached/ended behavior with real measurements.
+- [ ] Preserve past cycles and restore the active cycle across app restarts through durable storage.
+
+The former promo catalog, promo entry and expiry setup are superseded. A chosen quota is a tracking amount, not a purchased allowance; all measured mobile traffic counts regardless of carrier freebies.
 
 #### Phase D4: Dual Background Telemetry Harvester
 *See ⚠️ DECISION 1 — written below against the 15-minute option.*
@@ -202,21 +223,21 @@ The claim the thesis actually defends is *"per-user personalization improves PET
   - Persistent notification copy should explain the tracking honestly (users see it constantly, and the panel will too).
 - [ ] **15-Minute WorkManager Worker** *(interval per DECISION 1)*:
   - Measure durable bucketed cellular data using `NetworkStatsManager`.
-  - Calculate remaining data balance against active promo.
+  - Calculate remaining tracking quota against the active cycle baseline; include all measured mobile traffic regardless of carrier billing treatment.
   - Reconcile against the foreground service's `TrafficStats` figures; `NetworkStatsManager` is the source of truth for durable totals.
 - [ ] **Signal Strength Monitor:**
   - `TelephonyCallback` on API 31+, `PhoneStateListener` below it (deprecated at 31). With `minSdk 26` **both** paths are required — pick by `Build.VERSION.SDK_INT`.
 - [ ] Persist snapshots to local Room database and queue for cloud sync. *(Blocked by: D2, C3.)*
 - [ ] Verify behavior under Doze and battery optimization on a real device, not just the emulator.
 
-#### Phase D5: Core Dashboard & Floating Navigation
-- [ ] Fixed floating pill bottom nav (`Home`, `History`, `Settings`).
-- [ ] Replace `ui/dashboard/DashboardPlaceholderScreen.kt` — a D1 stub that only proves auto-login works (shows the signed-in email and a sign-out button). Delete the whole file; it implements none of the content below.
-- [ ] **PET Hero Card (Centerpiece):** Prominent hours/days remaining countdown and predicted exhaustion timestamp.
-  - Define the pre-prediction state: what the card shows before D6 exists, and before a new user has enough history for any prediction at all.
-- [ ] **Data Balance Gauge:** Remaining vs. consumed progress bar with status colors (`DataraNeonGreen`, `DataraPrimaryBlue`, `DataraError`).
-- [ ] **Live Network Strip:** Carrier badge, live speed, and signal bars.
-- [ ] **Active Promo Card:** Plan name and expiration timer.
+#### Phase D5: Home & Floating Navigation
+- [x] Home replaces the old dashboard placeholder; floating Material 3 navigation connects Home, History and Settings.
+- [x] Home UI covers no active quota, collecting usage, forecast available, missing permission and quota reached, plus an ended-cycle presentation. Scenarios are under Preview options and forecasts are explicitly sample data.
+- [x] Prominent forecast hero, quota progress/details action and seven-day usage bars. Collecting and missing-access states do not fabricate measured balances. The chart uses an independent History fixture.
+- [x] Direction C light QuotaTheme: white hero/surfaces, navy text/actions, teal progress, soft blue panels and mint navigation selection. Authentication stays dark navy; no theme toggle.
+- [ ] Connect Home and Details to persisted quota state, real access status, telemetry and D6 inference; retain honest loading/unavailable states.
+
+Promo/expiry cards and live network badges are not part of the current UI. Signal and speed remain planned model inputs; omitting display badges does not remove them from the prediction pipeline.
 
 #### Phase D6: On-Device Machine Learning & Dual-Model Execution
 *Blocked by: B5 (needs `global_xgboost.onnx`), D2, D4. See ⚠️ DECISION 2 — written below against the residual-correction option.*
@@ -231,36 +252,28 @@ The claim the thesis actually defends is *"per-user personalization improves PET
   - The switch is conditional and reversible — never hardcode one mode.
   - *Strict rule:* all **inference** is on-device via ONNX Runtime. No live `/predict` server call, ever.
 - [ ] Output predicted PET timestamp and expose via `StateFlow` to the UI.
-- [ ] Log each prediction with its inputs and the eventual actual exhaustion time — E3 cannot be done retroactively without this.
+- [ ] Log each prediction with its inputs and the observed quota-reaching time (or an explicitly incomplete observation) — E3 cannot be done retroactively without this.
 
 #### Phase D7: Usage History & Analytics (Vico Charts)
-- [x] Add Vico Compose charting library (3.3.1 via version catalog).
-- [ ] Build `HistoryScreen`:
-  - UI preview implemented for the provisional user-defined quota flow with sample data; real usage/history integration remains pending.
-  - Time-series charts for hourly and daily data usage.
-  - Peak usage hours breakdown.
-  - Average daily consumption rate.
-  - Filters: 24h, 7 days, full promo cycle.
+- [x] Vico Compose 3.3.1 through the version catalog.
+- [x] History UI with independent sample data: 24-hour, 7-day and quota-cycle filters, total/average and peak interval, exact-readings sheet, empty preview and read-only past-cycle details.
+- [ ] Connect charts and cycle details to durable measured usage and quota history. Home actions do not currently create History entries.
 
 #### Phase D8: Proactive Alerts & Notification System
-*Blocked by: D4 (`POST_NOTIFICATIONS`), D6 (PET values to alert on).*
+*Production delivery depends on D4 measurements/access and D6 forecasts.*
 
-- [ ] High-priority notification channels for data exhaustion warnings.
-- [ ] Triggers:
-  - Critical PET window (e.g. predicted exhaustion in 4 hours).
-  - Depletion milestones at **50%, 80%, and 90%** of promo data. (A 100% alert fires when the data is already gone — that is a post-mortem, not a warning.)
-- [ ] Rate-limit alerts so a fluctuating prediction cannot notify repeatedly for the same threshold.
-- [ ] In-app notification center and Room `NotificationEntity` history.
-  - In-app UI preview implemented: sample alerts, read/unread filters, mark-all-read, and read-only sample cycle links. OS notifications, triggers, Room persistence and real telemetry integration remain pending.
+- [x] In-app sample notification center: All/Unread filters, mark-all-read, unread badges, empty preview and read-only sample-cycle links.
+- [x] Sample copy for 50%, 80% and 90% quota milestones, a four-hour forecast reminder and an informational quota-reached event. Reaching a quota does not mean connectivity stops.
+- [ ] Implement OS notification channels, permission handling and delivery.
+- [ ] Connect threshold and forecast triggers to real measurements and user preferences; rate-limit repeated alerts.
+- [ ] Persist notification history/read flags in Room and integrate agreed sync behavior. Current read flags are SavedStateHandle preview state only.
 
 #### Phase D9: Profile, Settings & Developer ML Diagnostics Screen
-- [ ] Profile management (name, optional secondary phone number).
-- [ ] Settings (notification toggles, manual cloud sync, sign out).
-  - UI preview implemented: Settings/Profile navigation, session-only name edits and notification switches, simulated sync/status, privacy/about and confirmed sign-out. Persistent account edits, real permission/status checks and cloud sync remain pending.
-  - The user-approved quota UI uses a light theme with dark navy accents (see [`AGENTS.md`](AGENTS.md)); authentication retains its dark navy theme. No theme toggle is planned.
-- [ ] **Developer ML Diagnostics Screen (Hidden):**
-  - Gated behind secret gesture (e.g. 5 taps on app version text).
-  - Displays: active model mode (Global vs. Local), MAE, RMSE, R², input tensors, inference latency.
+- [x] Settings/Profile UI: session-only name edits and notification switches, simulated sync states, Usage Access guidance, version/privacy information and signed-in email.
+- [x] Confirmed sign-out through existing Supabase Auth, pending/error handling and navigation only after success.
+- [ ] Persist profile name and preferences; connect actual permission/status checks and cloud sync. No phone field is required by the current UI.
+- [ ] **Developer ML Diagnostics Screen (Hidden):** gated behind a secret gesture; expose active model mode, MAE/RMSE/R², inputs and latency only when the real pipeline exists.
+
 
 ---
 
@@ -271,13 +284,14 @@ The claim the thesis actually defends is *"per-user personalization improves PET
   - **No-network inference:** with the network fully off, confirm PET inference still runs on stored telemetry and the dashboard renders a prediction.
   - **Cellular up, Supabase unreachable:** with mobile data live but sync failing, confirm tracking continues, snapshots persist to Room, the sync queue accumulates, and it drains correctly once connectivity returns.
 - [ ] **Phase E2 — Battery & Overhead Benchmarking:** Profile foreground service and background worker energy usage using Android Studio Energy Profiler. Report measured drain over a fixed window (e.g. %/hour over 8 hours) — panels ask for a number, not a claim of efficiency.
-- [ ] **Phase E3 — Global vs. Local Accuracy Comparison:** Compare PET error (actual vs. predicted exhaustion) under Global vs. Local personalization, using the prediction log from D6.
+- [ ] **Phase E3 — Global vs. Local Accuracy Comparison:** Compare PET error (observed vs. predicted quota-reaching time) under Global vs. Local personalization, using the prediction log from D6.
   - **State the win condition in advance:** the improvement in MAE that makes the personalization layer worth having (e.g. "Local must reduce MAE by ≥ 15% over Global"). Report it honestly if the local layer does not help — a negative result with a clear explanation defends far better than a metric chosen after the fact.
-  - Report measured-vs-carrier drift from A3 alongside these figures, so model error and measurement error are not conflated.
+  - Report A3 measurement resolution, gaps and quota-crossing uncertainty separately from model error. State how incomplete/ended cycles are handled; do not use carrier balance depletion as the target.
 - [ ] **Phase E4 — Automated Test Coverage Audit** *(write tests continuously per phase; this phase is the final gap audit, not the first time tests are written — see the testing expectations in [`AGENTS.md`](AGENTS.md))*:
   - JUnit 4 tests for ViewModel state transitions, dual-model switch logic, feature-extraction parity, and Room queries.
   - Compose UI tests for Auth, Dashboard, and History flows.
 - [ ] **Phase E5 — Capstone Manuscript & Presentation Assets:**
+  - Align the original prepaid-exhaustion framing, ERD/use cases and research claims with the approved quota direction; confirm the final title separately.
   - Export final evaluation tables (MAE, RMSE, R²).
   - Screen recordings and interactive demo scripts.
   - Build a signed demo APK and verify it on the actual defense device.
@@ -289,6 +303,6 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 Worth deciding now, while there is still time to change course:
 
 - **Pilot yields too little usable data for a defensible global model (A3 → B3).** Fallback: train on a reduced feature set, or ship a transparent heuristic baseline (rolling average consumption rate) as the prediction engine and reframe the XGBoost layer as evaluated-but-not-shipped. Decide the minimum viable dataset size at A3 so this trigger is objective rather than a judgment call under deadline.
-- **Measured-vs-carrier drift is too large for credible PET claims (A3).** Fallback: reframe PET as a prediction over *device-measured* consumption, state the drift explicitly as a limitation, and add the user-correctable baseline from D3.
-- **Track B slips and D6 cannot land.** D1–D5 and D7–D9 form a complete, demonstrable app without the ML layer. Keep the prediction interface behind an abstraction from D5 onward so a heuristic can be swapped in for the ONNX model without touching UI code.
+- **Measured quota-crossing time is too uncertain (A3).** Refine the observation protocol or prediction horizon, report timing uncertainty, and withhold unsupported accuracy claims. Switching to carrier balances would change the approved target.
+- **Track B slips and D6 cannot land.** Once their production integrations are implemented, D1–D5 and D7–D9 can demonstrate tracking without ML; the current sample UI alone is not a working tracker. Keep the prediction interface behind an abstraction from D5 onward so a heuristic can be swapped in for the ONNX model without touching UI code.
 - **Local personalization shows no improvement (E3).** This is a legitimate finding, not a failure — report it with the dual-layer architecture intact and the negative result explained.
