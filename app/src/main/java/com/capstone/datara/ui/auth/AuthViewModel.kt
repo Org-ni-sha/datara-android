@@ -82,9 +82,16 @@ class AuthViewModel @Inject constructor(
      */
     fun signOut(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
+            if (_uiState.value is AuthUiState.Loading) return@launch
+            _uiState.value = AuthUiState.Loading
             repository.signOut()
-            _uiState.value = AuthUiState.Idle
-            onComplete()
+                .onSuccess {
+                    _uiState.value = AuthUiState.Idle
+                    onComplete()
+                }
+                .onFailure {
+                    _uiState.value = AuthUiState.Error("Couldn't sign out. Check your connection and try again.")
+                }
         }
     }
 

@@ -44,6 +44,7 @@ Everything below marked *planned* does not exist in the codebase yet. Do not ass
 | Serialization | `kotlinx-serialization-json` |
 | Navigation | `navigation-compose` + `hilt-navigation-compose` |
 | Testing | JUnit 4, Compose UI Test |
+| Charts | Vico Compose 3.3.1 — sample History UI; real telemetry integration pending |
 
 ### Planned — not yet a dependency
 
@@ -52,7 +53,6 @@ Everything below marked *planned* does not exist in the codebase yet. Do not ass
 | Local DB | Room (SQLite), KSP compiler | D2 |
 | Background work | WorkManager + Foreground Service — 30-sec (`TrafficStats`) and 15-min (`NetworkStatsManager`) polling | D4 |
 | On-device inference | ONNX Runtime Mobile (`com.microsoft.onnxruntime:onnxruntime-android`) | D6 |
-| Charts | **Vico** (Compose-native) — decided; do not swap in MPAndroidChart | D7 |
 
 **Auth OTP note:** password recovery does use a one-time code, but it is an *email* OTP (`verifyEmailOtp(OtpType.Email.RECOVERY)` in `AuthRepository`). That is intended and correct. The banned pattern is *phone/SMS* OTP as a login identifier.
 
@@ -146,13 +146,17 @@ Rules:
 ## Design system
 
 - **Dark navy** (`#0C101A` / `DataraDarkBg`) background, card/input surface (`#141B2B` / `DataraCardBg`).
-- The app is **dark-only**. `DATAraTheme` defaults to `darkTheme = true`, `dynamicColor = false`, and only `DarkColorScheme` is defined. Do not add a light color scheme or a theme toggle unless explicitly asked.
+- Authentication retains the dark navy `DATAraTheme`. The user-approved quota UI uses the scoped **light `QuotaTheme`**: off-white background, white surfaces, navy text and dark navy accents. Home, Create Quota, Quota Details, History, Notifications, Settings and Profile use this theme. No theme toggle is planned.
 - Always use the semantic brand tokens defined in `ui/theme/Color.kt` (`DataraDarkBg`, `DataraCardBg`, `DataraInputBg`, `DataraInputBorder`, `DataraTextSecondary`, etc.) — never a raw hex literal inside a screen.
+- In quota screens, use `MaterialTheme.colorScheme` roles mapped by `QuotaTheme` to the light brand tokens. Shared components must respect their enclosing theme.
 - Accent colors: vibrant/electric blue (`#1E64FA` / `DataraPrimaryBlue`, `#2F6BFF` / `DataraNeonBlue`), lime green (`#CEFF37` / `DataraNeonGreen`) for positive status, red (`#EF4444` / `DataraError`) for errors.
 - Typography: use `MaterialTheme.typography` styles backed by `DataraFontFamily` (currently `FontFamily.SansSerif`, chosen for offline/emulator reliability).
-- **Reuse the shared components in `ui/auth/components/DataraAuthComponents.kt`** (text fields, buttons, etc.) instead of writing new ones. Icons live in `DataraIcons.kt` — outline/line style, not filled glyphs.
-- Card radius: 12–16dp, flat with subtle elevation — avoid full-pill/oval stat cards (pill shapes are reserved for inputs and primary buttons).
-- Bottom nav (Home / History / Settings) is a fixed floating pill, shown on Dashboard, History, Profile, Settings — **not** on Login/Register. (Planned, D5.)
+- Authentication reuses `ui/auth/components/DataraAuthComponents.kt`. Signed-in quota screens use native Material 3 controls and shared wrappers in `ui/components/DataraUi.kt`. Outline icons remain in `DataraIcons.kt`.
+- Quota shapes use a hierarchy: 16dp controls and inset panels, 20dp cards, 24dp forecast hero; smaller icon and label containers use 8–14dp. Direction C refinement favors lighter white surfaces with soft blue grouping.
+- Quota navigation uses Material 3 `NavigationBar` / `NavigationBarItem` inside a floating rounded surface (Home / History / Settings). Profile selects Settings. Authentication has no bottom navigation.
+- Navy remains the primary quota accent for text and actions. Accessible teal highlights progress/status, with soft blue inset panels and mint selected states. The forecast hero is a white surface. Authentication retains its existing palette.
+- UI fixtures remain labeled as sample data; scenario controls live under the top-bar **Preview options** menu. See `docs/ui-redesign.md` for rationale, inspiration and verification.
+
 
 ---
 
