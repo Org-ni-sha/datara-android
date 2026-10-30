@@ -201,7 +201,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 - [ ] Extract hardware metadata (`Build.MODEL`, `Build.VERSION.SDK_INT`).
 
 #### Phase D3: User-Defined Quota & Cycle Setup
-- [x] Create Quota UI: decimal MB/GB amount, optional name, validation, draft restoration and cancel/submit navigation. Units: 1 MB = 1,000,000 bytes; 1 GB = 1,000 MB.
+- [x] Create Quota UI: decimal MB/GB amount, optional name, validation, draft restoration and cancel/submit navigation. Units: 1 MB = 1,000,000 bytes; 1 GB = 1,000 MB (user-facing). The app stores usage in bytes. The model’s MB features and output use 1 MB = 1,048,576 bytes (harvester mb_used); the feature extractor converts bytes → model MB, and PET converts the model output back to bytes before comparing with the quota.
 - [x] Sample cycle creation, Quota Details, confirmed end-cycle action and replacement-cycle flow. State uses SavedStateHandle, not a persistent database or historical archive.
 - [ ] Persist quota amount, cycle boundaries and status using the agreed C2/D2 design.
 - [ ] Establish the measured mobile-usage baseline at cycle start; derive used and remaining quota consistently from that window. Integrate reached/ended behavior with real measurements.

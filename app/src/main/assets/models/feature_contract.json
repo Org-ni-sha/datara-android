@@ -1,0 +1,89 @@
+{
+  "contract_version": 1,
+  "model_version": "dev-v0-placeholder",
+  "for_evaluation": false,
+  "onnx": {
+    "file": "global_xgboost.onnx",
+    "input_name": "features",
+    "input_dtype": "float32",
+    "input_shape": [
+      -1,
+      11
+    ],
+    "output_name": "variable",
+    "output_shape": [
+      -1,
+      1
+    ],
+    "opset": 15
+  },
+  "output": {
+    "meaning": "predicted mobile data used in the next 60 minutes, in MB (1 MB = 1,048,576 bytes, same as UsageRecord.mb_used)",
+    "post_processing": "clamp to >= 0",
+    "pet_derivation": "PET = now + remaining_quota_mb / max(predicted_mb_per_hour, 0.01) hours; recompute every hour"
+  },
+  "hour_window": "local clock hour [HH:00, HH+1:00) using utc_offset_minutes; features describe the hour that just ended",
+  "mobile_usage_rule": "mobile MB = sum of per-tick usage where network_type is not WIFI or NONE; WIFI/NONE ticks count as 0, not missing",
+  "features": [
+    {
+      "index": 0,
+      "name": "hour_sin",
+      "formula": "sin(2*pi*hour/24), hour 0-23 of the hour just ended"
+    },
+    {
+      "index": 1,
+      "name": "hour_cos",
+      "formula": "cos(2*pi*hour/24)"
+    },
+    {
+      "index": 2,
+      "name": "dow_sin",
+      "formula": "sin(2*pi*(dow-1)/7), ISO dow 1=Mon..7=Sun"
+    },
+    {
+      "index": 3,
+      "name": "dow_cos",
+      "formula": "cos(2*pi*(dow-1)/7)"
+    },
+    {
+      "index": 4,
+      "name": "is_weekend",
+      "formula": "1.0 if Sat/Sun else 0.0"
+    },
+    {
+      "index": 5,
+      "name": "mobile_mb_last_1h",
+      "formula": "mobile MB in the hour just ended"
+    },
+    {
+      "index": 6,
+      "name": "mobile_mb_avg_last_3h",
+      "formula": "mean hourly mobile MB over the last 3 hours (hours with data only)"
+    },
+    {
+      "index": 7,
+      "name": "mobile_mb_avg_last_24h",
+      "formula": "mean hourly mobile MB over the last 24 hours (hours with data only)"
+    },
+    {
+      "index": 8,
+      "name": "wifi_share_last_1h",
+      "formula": "fraction 0-1 of the last hour on Wi-Fi"
+    },
+    {
+      "index": 9,
+      "name": "signal_dbm_last_1h",
+      "formula": "mean cellular signal dBm in the last hour; -100.0 if none valid (-999 excluded)"
+    },
+    {
+      "index": 10,
+      "name": "screen_on_share_last_1h",
+      "formula": "fraction 0-1 of the last hour with the screen on"
+    }
+  ],
+  "cleaning": {
+    "max_mb_per_30s_tick": 50.0,
+    "gap_seconds": 300,
+    "min_hour_coverage": 0.5
+  }
+}
