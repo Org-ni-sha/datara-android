@@ -28,7 +28,7 @@ class AuthErrorParserTest {
         val error = RuntimeException("HTTP request to https://xyz.supabase.co/auth/v1/token?grant_type=password failed with message: Invalid login credentials")
         val message = AuthErrorParser.parse(error, AuthAction.LOGIN)
 
-        assertEquals("Incorrect email or password. Please check your credentials and try again.", message)
+        assertEquals("Incorrect email, username or password. Please check your details and try again.", message)
     }
 
     @Test

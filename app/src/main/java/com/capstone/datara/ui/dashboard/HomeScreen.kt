@@ -23,6 +23,7 @@ import com.capstone.datara.ui.quota.*
 import com.capstone.datara.ui.history.HistoryScreen
 import com.capstone.datara.ui.notifications.*
 import com.capstone.datara.ui.settings.*
+import com.capstone.datara.ui.profile.ProfileViewModel
 import com.capstone.datara.ui.auth.AuthUiState
 import com.capstone.datara.ui.theme.*
 
@@ -32,11 +33,13 @@ fun DashboardScreen(
     viewModel: QuotaDemoViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel(),
     notificationsViewModel: NotificationPreviewViewModel = hiltViewModel(),
-    settingsViewModel: SettingsPreviewViewModel = hiltViewModel()
+    settingsViewModel: SettingsPreviewViewModel = hiltViewModel(),
+    profileViewModel: ProfileViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val notificationState by notificationsViewModel.uiState.collectAsState()
     val settingsState by settingsViewModel.uiState.collectAsState()
+    val profileState by profileViewModel.uiState.collectAsState()
     val authState by authViewModel.uiState.collectAsState()
     var creating by rememberSaveable { mutableStateOf(false) }
     var details by rememberSaveable { mutableStateOf(false) }
@@ -63,7 +66,7 @@ fun DashboardScreen(
     } else if (settings) {
         screenStates.SaveableStateProvider("settings") {
             SettingsScreen(settingsState, authViewModel.currentUserEmail,
-                onSaveName = settingsViewModel::saveName,
+                onSaveName = profileViewModel::saveName,
                 onMilestonesChange = settingsViewModel::setMilestones,
                 onForecastsChange = settingsViewModel::setForecasts,
                 onSelectSync = settingsViewModel::selectSync,
@@ -72,7 +75,9 @@ fun DashboardScreen(
                 onHistory = { settings = false; history = true },
                 onSignOut = { authViewModel.signOut(onComplete = onSignedOut) },
                 isSigningOut = authState is AuthUiState.Loading,
-                signOutError = (authState as? AuthUiState.Error)?.message)
+                signOutError = (authState as? AuthUiState.Error)?.message,
+                profile = profileState,
+                onNameEdited = profileViewModel::onNameEdited)
         }
     } else if (history) {
         screenStates.SaveableStateProvider("history") {

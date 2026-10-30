@@ -35,10 +35,10 @@ class MainActivity : ComponentActivity() {
                     // change when the user later signs out, or NavHost would be rebuilt underneath
                     // a live back stack. Sign-out navigates explicitly instead.
                     val startDestination = rememberSaveable {
-                        if (sessionState == SessionState.Authenticated) {
-                            DataraRoute.DASHBOARD
-                        } else {
-                            DataraRoute.LOGIN
+                        when (sessionState) {
+                            SessionState.Authenticated -> DataraRoute.DASHBOARD
+                            SessionState.NeedsUsername -> DataraRoute.USERNAME
+                            else -> DataraRoute.LOGIN
                         }
                     }
                     DataraNavGraph(startDestination = startDestination)
