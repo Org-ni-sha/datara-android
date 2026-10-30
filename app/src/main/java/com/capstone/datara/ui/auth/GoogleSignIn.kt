@@ -2,7 +2,11 @@ package com.capstone.datara.ui.auth
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.res.painterResource
+import com.capstone.datara.R
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -87,21 +91,25 @@ suspend fun requestGoogleIdToken(context: Context): GoogleSignInResult {
 private const val TAG = "GoogleSignIn"
 
 /**
- * "or" divider plus the Google button, used by both Login and Register. Renders nothing when
- * Google sign-in isn't configured, so builds without a client ID keep working.
+ * The Google button (with the standard "G" mark), optionally preceded by an "or" divider. Shown
+ * in the Login and Register panels. Renders nothing when Google sign-in isn't configured, so
+ * builds without a client ID keep working.
  */
 @Composable
 fun GoogleSignInSection(
     text: String,
     enabled: Boolean,
-    viewModel: AuthViewModel
+    viewModel: AuthViewModel,
+    showDivider: Boolean = true
 ) {
     if (!isGoogleSignInConfigured) return
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     Column {
-        DataraOrDivider()
-        Spacer(modifier = Modifier.height(20.dp))
+        if (showDivider) {
+            DataraOrDivider()
+            Spacer(modifier = Modifier.height(20.dp))
+        }
         DataraSecondaryButton(
             text = text,
             enabled = enabled,
@@ -114,6 +122,13 @@ fun GoogleSignInSection(
                         GoogleSignInResult.Cancelled -> Unit
                     }
                 }
+            },
+            leadingIcon = {
+                Image(
+                    painter = painterResource(R.drawable.ic_google_g),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         )
     }

@@ -22,6 +22,6 @@ fun DataraLogo(modifier: Modifier = Modifier, size: Dp = 104.dp, contentDescript
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0C101A)
+@Preview(showBackground = true, backgroundColor = 0xFFF5F7FB)
 @Composable
 private fun DataraLogoPreview() { DataraLogo() }

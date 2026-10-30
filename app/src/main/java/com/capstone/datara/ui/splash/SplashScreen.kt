@@ -22,9 +22,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import com.capstone.datara.ui.auth.components.DataraLogo
 import com.capstone.datara.ui.theme.DATAraTheme
-import com.capstone.datara.ui.theme.DataraDarkBg
-import com.capstone.datara.ui.theme.DataraPrimaryBlue
-import com.capstone.datara.ui.theme.DataraTextSecondary
 
 /**
  * Shown while Supabase restores any persisted session. Without this the app would flash the
@@ -35,7 +32,7 @@ fun SplashScreen(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(DataraDarkBg)
+            .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -51,7 +48,7 @@ fun SplashScreen(modifier: Modifier = Modifier) {
 
         CircularProgressIndicator(
             modifier = Modifier.size(28.dp),
-            color = DataraPrimaryBlue,
+            color = MaterialTheme.colorScheme.primary,
             strokeWidth = 3.dp
         )
 
@@ -60,13 +57,13 @@ fun SplashScreen(modifier: Modifier = Modifier) {
         Text(
             text = "Restoring your session…",
             style = MaterialTheme.typography.bodyMedium,
-            color = DataraTextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
         )
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0C101A)
+@Preview(showBackground = true, backgroundColor = 0xFFF5F7FB)
 @Composable
 private fun SplashScreenPreview() {
     DATAraTheme {

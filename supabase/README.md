@@ -54,6 +54,12 @@ or deep link is involved. Setup:
 Google accounts get a `public.users` row from the same trigger (Google supplies the `name`
 metadata key) and are sent to the username screen on first sign-in.
 
+Password rules (2026-10-31): the app requires at least 8 characters with a letter and a number
+(`AuthValidator.isPasswordValid`), and resend is limited to once a minute. Match them on the
+hosted project — dashboard → Authentication → Providers → Email: **Minimum password length 8**,
+**Password requirements: Letters and digits**; and Authentication → Rate Limits / email settings:
+one email per **60 seconds**. `config.toml` already has the same values for a local stack.
+
 Email confirmation is deliberately **off** while the app is in development. Turn it on before
 release (dashboard → Authentication → Sign In / Providers → Email); the app will then need a
 "check your inbox" step after Register, because sign-up will no longer return a session.

@@ -90,8 +90,8 @@ app/src/main/java/com/capstone/datara/
     ├── auth/
     │   ├── AuthViewModel.kt          # @HiltViewModel
     │   ├── AuthErrorParser.kt        # error text + AuthValidator (pure form rules)
-    │   ├── LoginScreen.kt
-    │   ├── RegisterScreen.kt
+    │   ├── AuthEntryScreen.kt        # Welcome + animated Login/Register panel
+    │   ├── UsernameScreen.kt
     │   ├── ForgotPasswordScreen.kt
     │   └── components/               # DataraAuthComponents, DataraIcons, DataraLogo
     ├── session/                      # SessionState (pure mapper) + SessionViewModel
@@ -150,16 +150,14 @@ Rules:
 
 ## Design system
 
-- **Authentication and launch:** dark navy (`#0C101A` / `DataraDarkBg`) background, card/input surface (`#141B2B` / `DataraCardBg`).
-- Authentication retains the dark navy `DATAraTheme`. The user-approved quota UI uses the scoped **light `QuotaTheme`**: off-white background, white surfaces, navy text and dark navy accents. Home, Create Quota, Quota Details, History, Notifications, Settings and Profile use this theme. No theme toggle is planned.
-- Always use the semantic brand tokens defined in `ui/theme/Color.kt` (`DataraDarkBg`, `DataraCardBg`, `DataraInputBg`, `DataraInputBorder`, `DataraTextSecondary`, etc.) — never a raw hex literal inside a screen.
+- **One light theme everywhere (2026-10-31):** `DATAraTheme` delegates to `QuotaTheme`, so launch, authentication and the signed-in screens share it: off-white background (`#F5F7FB`), white surfaces, navy text and dark navy accents. The native splash and launcher icon background are light too. No dark theme or toggle is planned.
+- Use `MaterialTheme.colorScheme` roles in screens, backed by the semantic tokens in `ui/theme/Color.kt` — never a raw hex literal inside a screen. The old dark auth tokens (`DataraDarkBg`, `DataraCardBg`, `DataraNeonBlue`, …) remain defined but are no longer used by screens.
 - In quota screens, use `MaterialTheme.colorScheme` roles mapped by `QuotaTheme` to the light brand tokens. Shared components must respect their enclosing theme.
-- Authentication accent colors: vibrant/electric blue (`#1E64FA` / `DataraPrimaryBlue`, `#2F6BFF` / `DataraNeonBlue`), lime green (`#CEFF37` / `DataraNeonGreen`) for positive status, red (`#EF4444` / `DataraError`) for errors.
 - Typography: use `MaterialTheme.typography` styles backed by `DataraFontFamily` (currently `FontFamily.SansSerif`, chosen for offline/emulator reliability).
-- Authentication reuses `ui/auth/components/DataraAuthComponents.kt`. Signed-in quota screens use native Material 3 controls and shared wrappers in `ui/components/DataraUi.kt`. Outline icons remain in `DataraIcons.kt`.
+- Authentication reuses `ui/auth/components/DataraAuthComponents.kt` (16dp controls, autofill `contentType` on every field). The light welcome screen (Log in / Create account only) raises an in-screen panel for Login/Register rather than a `ModalBottomSheet`; the panel uses the dark navy `AuthPanelTheme` (`ui/theme/AuthPanelTheme.kt`, contrast-checked) and is the only place Google sign-in appears. See `AuthEntryScreen`. Signed-in quota screens use native Material 3 controls and shared wrappers in `ui/components/DataraUi.kt`. Outline icons remain in `DataraIcons.kt`.
 - Quota shapes use a hierarchy: 16dp controls and inset panels, 20dp cards, 24dp forecast hero; smaller icon and label containers use 8–14dp. Direction C refinement favors lighter white surfaces with soft blue grouping.
 - Quota navigation uses Material 3 `NavigationBar` / `NavigationBarItem` inside a floating rounded surface (Home / History / Settings). Profile selects Settings. Authentication has no bottom navigation.
-- Navy remains the primary quota accent for text and actions. Accessible teal highlights progress/status, with soft blue inset panels and mint selected states. The forecast hero is a white surface. Authentication retains its existing palette.
+- Navy remains the primary quota accent for text and actions. Accessible teal highlights progress/status, with soft blue inset panels and mint selected states. The forecast hero is a white surface. Authentication uses the same palette.
 - UI fixtures remain labeled as sample data; scenario controls live under the top-bar **Preview options** menu. See `docs/ui-redesign.md` for rationale, inspiration and verification.
 
 

@@ -1,8 +1,10 @@
 package com.capstone.datara
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.runtime.collectAsState
@@ -22,7 +24,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // Transparent bars with no contrast scrim. The default would put a translucent light scrim
+        // behind 3-button navigation, washing out the navy auth panel that runs underneath it.
+        // Screens choose icon colors themselves (QuotaTheme, AuthEntryScreen).
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        )
         setContent {
             DATAraTheme {
                 val sessionViewModel: SessionViewModel = hiltViewModel()
@@ -38,7 +46,7 @@ class MainActivity : ComponentActivity() {
                         when (sessionState) {
                             SessionState.Authenticated -> DataraRoute.DASHBOARD
                             SessionState.NeedsUsername -> DataraRoute.USERNAME
-                            else -> DataraRoute.LOGIN
+                            else -> DataraRoute.WELCOME
                         }
                     }
                     DataraNavGraph(startDestination = startDestination)
