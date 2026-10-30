@@ -1,6 +1,7 @@
 package com.capstone.datara.ui.auth
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -63,18 +64,27 @@ suspend fun requestGoogleIdToken(context: Context): GoogleSignInResult {
             val idToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
             GoogleSignInResult.Success(GoogleIdToken(idToken, rawNonce))
         } else {
+            Log.w(TAG, "Unexpected credential type: ${credential.type}")
             GoogleSignInResult.Failure(GOOGLE_GENERIC_ERROR)
         }
     } catch (e: GetCredentialCancellationException) {
+        // Play Services also reports some misconfigurations (SHA-1 or client ID mismatch) as a
+        // cancellation, so log it even though the user sees nothing.
+        Log.w(TAG, "Google sign-in cancelled: ${e.type} ${e.errorMessage}", e)
         GoogleSignInResult.Cancelled
     } catch (e: NoCredentialException) {
+        Log.w(TAG, "No Google credential: ${e.errorMessage}", e)
         GoogleSignInResult.Failure("No Google account is available on this device.")
     } catch (e: GetCredentialException) {
+        Log.w(TAG, "Google sign-in failed: ${e.type} ${e.errorMessage}", e)
         GoogleSignInResult.Failure(GOOGLE_GENERIC_ERROR)
     } catch (e: GoogleIdTokenParsingException) {
+        Log.w(TAG, "Couldn't parse Google ID token", e)
         GoogleSignInResult.Failure(GOOGLE_GENERIC_ERROR)
     }
 }
+
+private const val TAG = "GoogleSignIn"
 
 /**
  * "or" divider plus the Google button, used by both Login and Register. Renders nothing when
