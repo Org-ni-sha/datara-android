@@ -69,7 +69,7 @@ object AuthErrorParser {
                     details.contains("invalid_grant") ||
                     details.contains("invalid_credentials") ||
                     details.contains("invalid email or password") -> {
-                "Incorrect email or password. Please check your credentials and try again."
+                "Incorrect email, username or password. Please check your details and try again."
             }
             details.contains("email not confirmed") ||
                     details.contains("email_not_confirmed") -> {
@@ -85,6 +85,10 @@ object AuthErrorParser {
                     details.contains("status code: 429") ||
                     details.contains("status code 429") -> {
                 "Too many failed login attempts. Please wait a moment and try again."
+            }
+            details.contains("provider is not enabled") ||
+                    details.contains("provider_disabled") -> {
+                "Google sign-in isn't available right now. Please use your email or username."
             }
             else -> "Unable to log in. Please check your credentials and try again."
         }
@@ -196,6 +200,34 @@ object AuthErrorParser {
 
 object AuthValidator {
     private val EMAIL_REGEX = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+
+    /** Must match the `users_username_format` check in the usernames migration. */
+    private val USERNAME_REGEX = Regex("^[a-z0-9_]{3,20}$")
+    const val USERNAME_MIN_LENGTH = 3
+    const val USERNAME_MAX_LENGTH = 20
+
+    /** Usernames are stored lowercase, so input is compared and saved in this form. */
+    fun canonicalUsername(input: String): String = input.trim().lowercase()
+
+    fun isValidUsername(username: String): Boolean = USERNAME_REGEX.matches(canonicalUsername(username))
+
+    /** Explains why [username] is not allowed, or returns null when it is. */
+    fun usernameError(username: String): String? {
+        val canonical = canonicalUsername(username)
+        return when {
+            canonical.isEmpty() -> "Please choose a username."
+            canonical.length < USERNAME_MIN_LENGTH ->
+                "Username must be at least $USERNAME_MIN_LENGTH characters."
+            canonical.length > USERNAME_MAX_LENGTH ->
+                "Username can be at most $USERNAME_MAX_LENGTH characters."
+            !USERNAME_REGEX.matches(canonical) ->
+                "Use only letters, numbers and underscores."
+            else -> null
+        }
+    }
+
+    /** The login field accepts either; anything containing `@` is treated as an email. */
+    fun isEmailIdentifier(identifier: String): Boolean = '@' in identifier
 
     fun isValidEmail(email: String): Boolean {
         val trimmed = email.trim()

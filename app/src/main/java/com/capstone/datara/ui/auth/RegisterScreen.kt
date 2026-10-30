@@ -70,7 +70,7 @@ import com.capstone.datara.ui.theme.DataraTextSecondary
 
 @Composable
 fun RegisterScreen(
-    onRegisterSuccess: () -> Unit,
+    onRegisterSuccess: (needsUsername: Boolean) -> Unit,
     onNavigateToLogin: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
@@ -82,9 +82,7 @@ fun RegisterScreen(
     val focusManager = LocalFocusManager.current
 
     LaunchedEffect(uiState) {
-        if (uiState is AuthUiState.Success) {
-            onRegisterSuccess()
-        }
+        (uiState as? AuthUiState.Success)?.let { onRegisterSuccess(it.needsUsername) }
     }
 
     DisposableEffect(Unit) {
@@ -296,8 +294,17 @@ fun RegisterScreen(
                     focusManager.clearFocus()
                     viewModel.register(name, email, password, confirmPassword)
                 },
-                enabled = email.isNotBlank() && password.isNotBlank() && confirmPassword.isNotBlank(),
+                enabled = name.isNotBlank() && email.isNotBlank() &&
+                    password.isNotBlank() && confirmPassword.isNotBlank(),
                 isLoading = uiState is AuthUiState.Loading
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            GoogleSignInSection(
+                text = "Sign up with Google",
+                enabled = uiState !is AuthUiState.Loading,
+                viewModel = viewModel
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -341,7 +348,7 @@ fun RegisterScreen(
 fun RegisterScreenPreview() {
     DATAraTheme {
         RegisterScreen(
-            onRegisterSuccess = {},
+            onRegisterSuccess = { _ -> },
             onNavigateToLogin = {}
         )
     }

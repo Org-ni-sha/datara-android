@@ -62,20 +62,18 @@ import com.capstone.datara.ui.theme.DataraTextSecondary
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
+    onLoginSuccess: (needsUsername: Boolean) -> Unit,
     onNavigateToRegister: () -> Unit,
     onForgotPasswordClick: () -> Unit = {},
     viewModel: AuthViewModel = hiltViewModel()
 ) {
-    var email by remember { mutableStateOf("") }
+    var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
 
     LaunchedEffect(uiState) {
-        if (uiState is AuthUiState.Success) {
-            onLoginSuccess()
-        }
+        (uiState as? AuthUiState.Success)?.let { onLoginSuccess(it.needsUsername) }
     }
 
     DisposableEffect(Unit) {
@@ -119,17 +117,17 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Email Field
-            DataraFieldLabel(label = "Email Address")
+            // Email or username — AuthViewModel.login tells them apart by the '@'
+            DataraFieldLabel(label = "Email or Username")
             Spacer(modifier = Modifier.height(8.dp))
             DataraTextField(
-                value = email,
+                value = identifier,
                 onValueChange = {
-                    email = it
+                    identifier = it
                     viewModel.clearError()
                 },
-                placeholder = "Email",
-                leadingIcon = DataraIcons.Email,
+                placeholder = "Email or username",
+                leadingIcon = DataraIcons.Person,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Next
@@ -178,7 +176,7 @@ fun LoginScreen(
                 keyboardActions = KeyboardActions(
                     onDone = {
                         focusManager.clearFocus()
-                        viewModel.login(email, password)
+                        viewModel.login(identifier, password)
                     }
                 )
             )
@@ -220,10 +218,18 @@ fun LoginScreen(
                 text = "Login",
                 onClick = {
                     focusManager.clearFocus()
-                    viewModel.login(email, password)
+                    viewModel.login(identifier, password)
                 },
-                enabled = email.isNotBlank() && password.isNotBlank(),
+                enabled = identifier.isNotBlank() && password.isNotBlank(),
                 isLoading = uiState is AuthUiState.Loading
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            GoogleSignInSection(
+                text = "Continue with Google",
+                enabled = uiState !is AuthUiState.Loading,
+                viewModel = viewModel
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -267,7 +273,7 @@ fun LoginScreen(
 fun LoginScreenPreview() {
     DATAraTheme {
         LoginScreen(
-            onLoginSuccess = {},
+            onLoginSuccess = { _ -> },
             onNavigateToRegister = {}
         )
     }

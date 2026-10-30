@@ -22,7 +22,7 @@ This repo is the Android client only. The GitHub repo is `Org-ni-sha/datara-andr
 
 As of 2026-10-29:
 
-- **Implemented:** D1 authentication, session routing, official logo/launcher icons and native splash plus session-loading UI.
+- **Implemented:** D1 authentication (email/username + password, Google, username screen and `NeedsUsername` gate), session routing, official logo/launcher icons and native splash plus session-loading UI.
 - **Implemented as previews:** Home, Create Quota, Quota Details, History, Notifications, Settings and Profile. Sample forecasts, usage, notification preferences, name edits and sync states are not production integrations. Sign-out uses real Supabase Auth.
 - **Historically applied:** C2 legacy promo-based Postgres schema, RLS and profile trigger. `supabase/` remains the schema source of truth; never edit applied migrations.
 - **Pending:** quota-schema design/new migrations, Room, telemetry, durable cycles/history, inference, OS alert delivery, persistent profile/preferences and sync. Do not mark D2–D9 complete just because their UI exists.
@@ -42,7 +42,7 @@ The current implementation details and limitations are in [quota UI preview](doc
 | Architecture | MVVM — ViewModel + StateFlow, no LiveData |
 | DI | Hilt 2.60.1 (annotation processing via **KSP**, not kapt) |
 | Backend | Supabase 3.8.0 — `auth-kt`, `postgrest-kt`, `storage-kt` — **not** Firebase |
-| Auth | Email + password via Supabase Auth — **not** phone/SMS OTP (see note below) |
+| Auth | Email or username + password, and Google (Credential Manager ID token), via Supabase Auth — **not** phone/SMS OTP (see note below). Username login goes through the `username-login` Edge Function. |
 | Networking | Ktor `ktor-client-android` 3.0.3, declared explicitly as the engine for `supabase-kt` |
 | Serialization | `kotlinx-serialization-json` |
 | Navigation | `navigation-compose` + `hilt-navigation-compose` |
@@ -176,7 +176,7 @@ These were deliberately cut during design review because they fall outside the t
 - ❌ **No network enforcement** (`NetworkPolicyManager` restrictions), throttling or blocking other apps when the quota is reached.
 - ❌ **No standalone data-usage calculator** unrelated to prediction.
 - ⚠️ **ML diagnostics (MAE/RMSE/R² display) do not belong in the main Settings menu** — gate them behind the hidden dev-only screen (D9, secret gesture), since end users (prepaid students/professionals) aren't the audience for model metrics.
-- ✅ Phone number, if present at all, is an **optional secondary profile field** — email/password is the login identifier, not phone/SMS OTP.
+- ✅ Phone number, if present at all, is an **optional secondary profile field** — email (or the username that maps to it) with a password, or Google, is the login identifier, not phone/SMS OTP.
 
 If a task description conflicts with this list, ask before proceeding rather than assuming the older behavior is still correct.
 

@@ -11,10 +11,52 @@ Quota/cycle storage, usage relationships and notification links require a separa
 | `migrations/20260917000001_init_schema.sql` | Seven tables, constraints, indexes |
 | `migrations/20260917000002_rls_policies.sql` | RLS enabled + per-table policies + grants |
 | `migrations/20260917000003_handle_new_user.sql` | Profile row created on sign-up |
+| `migrations/20261031000001_usernames.sql` | `users.username` (lowercase, unique, `^[a-z0-9_]{3,20}$`) + `is_username_available()` |
+| `functions/username-login/` | Edge Function: signs in by username without revealing the email |
 | `seed.sql` | The three carriers |
 
 They are re-runnable except for the policy file, which errors on a second run because
-`create policy` has no `if not exists`. To re-apply it, drop the policies first.
+`create policy` has no `if not exists`, and the usernames file, whose `add constraint` does the
+same. To re-apply either, drop the policies or the `users_username_format` constraint first.
+
+## Usernames and Google sign-in
+
+Email stays the account identity and the only recovery channel. A username is an alternative
+login identifier: the app sends username + password to the `username-login` Edge Function, which
+looks up the email with the service role, signs in on the server and returns session tokens only.
+The function answers `invalid_credentials` for an unknown username and for a wrong password alike.
+
+Deploy (once per change to the function):
+
+```bash
+supabase functions deploy username-login --no-verify-jwt
+```
+
+`--no-verify-jwt` is required: callers are signed out. `SUPABASE_URL`, `SUPABASE_ANON_KEY` and
+`SUPABASE_SERVICE_ROLE_KEY` are provided to the function automatically; set nothing by hand.
+
+Known limitation: Auth rate-limits sign-in per IP, and every username login reaches Auth from the
+function's IP rather than the phone's. Repeated failures from one person can therefore throttle
+username logins for others, and the per-device limit no longer applies. Acceptable for the
+development phase; revisit before a public release (e.g. a per-username attempt counter).
+
+Google sign-in uses Credential Manager on the device and `signInWith(IDToken)`; no redirect URL
+or deep link is involved. Setup:
+
+1. Google Cloud Console → APIs & Services → Credentials: create a **Web application** OAuth
+   client and an **Android** OAuth client (package `com.capstone.datara` + your debug keystore's
+   SHA-1 from `./gradlew signingReport`).
+2. Supabase dashboard → Authentication → Providers → Google: enable it, enter the Web client ID
+   and secret, and leave nonce checks on.
+3. Put the Web client ID in `local.properties` as `GOOGLE_WEB_CLIENT_ID`. Without it the Google
+   button is hidden.
+
+Google accounts get a `public.users` row from the same trigger (Google supplies the `name`
+metadata key) and are sent to the username screen on first sign-in.
+
+Email confirmation is deliberately **off** while the app is in development. Turn it on before
+release (dashboard → Authentication → Sign In / Providers → Email); the app will then need a
+"check your inbox" step after Register, because sign-up will no longer return a session.
 
 ## CLI setup
 

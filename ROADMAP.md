@@ -190,6 +190,9 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 - [x] Initial user record creation in Supabase on sign-up — created server-side by the `on_auth_user_created` trigger (C2); registration now collects a full name and sends it as auth metadata so the trigger populates `users.name` on insert.
 
 - [x] Password recovery via email OTP; no phone/SMS login.
+- [x] Username as an alternative login identifier (2026-10-31): `users.username` migration, `username-login` Edge Function (email never sent to the client), username screen after sign-up, and a `NeedsUsername` launch gate for any signed-in user without one.
+- [x] Google sign-in/sign-up via Credential Manager + Supabase ID-token auth; hidden unless `GOOGLE_WEB_CLIENT_ID` is set. Requires Google Cloud and Supabase provider setup — see [supabase/README.md](supabase/README.md#usernames-and-google-sign-in).
+- [ ] Before release: turn email confirmation on and add a "check your inbox" step after Register; revisit the Edge Function's shared-IP rate limiting.
 - [x] Official DATAra logo in authentication, session loading and Home; adaptive/monochrome launcher assets and AndroidX native splash. No forced video or minimum startup delay. See [brand assets](docs/brand-assets.md).
 
 #### Phase D2: Room Local Database & Hardware Detection

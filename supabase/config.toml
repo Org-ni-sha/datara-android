@@ -333,6 +333,16 @@ skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
 
+# Google sign-in from the Android app (native ID token via Credential Manager, no browser
+# redirect). client_id is the Web OAuth client ID from Google Cloud — the same value as
+# GOOGLE_WEB_CLIENT_ID in local.properties. Configure the hosted project in the dashboard:
+# Authentication -> Providers -> Google.
+[auth.external.google]
+enabled = false
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+skip_nonce_check = false
+
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.
 [auth.web3.solana]
@@ -383,6 +393,11 @@ deno_version = 2
 
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
+
+# Username login is called by signed-out clients, so it cannot require a user JWT.
+# Deploy with: supabase functions deploy username-login --no-verify-jwt
+[functions.username-login]
+verify_jwt = false
 
 [analytics]
 enabled = true
