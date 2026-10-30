@@ -20,6 +20,7 @@ import com.capstone.datara.BuildConfig
 import com.capstone.datara.ui.components.*
 import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.profile.ProfileScreen
+import com.capstone.datara.ui.profile.ProfileUiState
 import com.capstone.datara.ui.quota.QuotaBottomBar
 import com.capstone.datara.ui.theme.QuotaTheme
 
@@ -28,10 +29,11 @@ fun SettingsScreen(state: SettingsPreviewState, email: String?, onSaveName: (Str
     onMilestonesChange: (Boolean) -> Unit, onForecastsChange: (Boolean) -> Unit,
     onSelectSync: (SyncPreview) -> Unit, onPreviewSync: () -> Unit,
     onHome: () -> Unit, onHistory: () -> Unit, onSignOut: () -> Unit,
-    isSigningOut: Boolean = false, signOutError: String? = null) {
+    isSigningOut: Boolean = false, signOutError: String? = null,
+    profile: ProfileUiState = ProfileUiState(), onNameEdited: () -> Unit = {}) {
     QuotaTheme {
         SettingsContent(state, email, onSaveName, onMilestonesChange, onForecastsChange, onSelectSync,
-            onPreviewSync, onHome, onHistory, onSignOut, isSigningOut, signOutError)
+            onPreviewSync, onHome, onHistory, onSignOut, isSigningOut, signOutError, profile, onNameEdited)
     }
 }
 
@@ -40,7 +42,8 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
     onMilestonesChange: (Boolean) -> Unit, onForecastsChange: (Boolean) -> Unit,
     onSelectSync: (SyncPreview) -> Unit, onPreviewSync: () -> Unit,
     onHome: () -> Unit, onHistory: () -> Unit, onSignOut: () -> Unit,
-    isSigningOut: Boolean, signOutError: String?) {
+    isSigningOut: Boolean, signOutError: String?,
+    profileState: ProfileUiState, onNameEdited: () -> Unit) {
     var profile by rememberSaveable { mutableStateOf(false) }
     var dialog by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(profile) { profile = false }
@@ -48,7 +51,8 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
         QuotaBottomBar(false, onHome, onHistory, { profile = false }, settingsSelected = true)
     }
     if (profile) {
-        ProfileScreen(state.displayName, email, onBack = { profile = false }, onSaveName = onSaveName, bottomBar = bottomBar)
+        ProfileScreen(profileState, email, onBack = { profile = false }, onSaveName = onSaveName,
+            onNameEdited = onNameEdited, bottomBar = bottomBar)
         return
     }
     Scaffold(containerColor = MaterialTheme.colorScheme.background, bottomBar = bottomBar,
@@ -62,9 +66,9 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
                     Surface(color = MaterialTheme.colorScheme.tertiaryContainer, shape = MaterialTheme.shapes.medium) {
                         Icon(DataraIcons.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(12.dp).size(28.dp))
                     }
-                    Text(state.displayName.ifBlank { "Your profile" }, style = MaterialTheme.typography.headlineMedium)
+                    Text(profileState.name.ifBlank { "Your profile" }, style = MaterialTheme.typography.headlineMedium)
                     Text(email ?: "Email unavailable", style = MaterialTheme.typography.bodyMedium)
-                    Text("View and edit preview profile →", style = MaterialTheme.typography.labelLarge)
+                    Text("View and edit profile →", style = MaterialTheme.typography.labelLarge)
                 }
             }
             SettingsCard("Notification preferences") {

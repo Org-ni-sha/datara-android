@@ -23,9 +23,9 @@ This repo is the Android client only. The GitHub repo is `Org-ni-sha/datara-andr
 As of 2026-10-29:
 
 - **Implemented:** D1 authentication (email/username + password, Google, username screen and `NeedsUsername` gate), session routing, official logo/launcher icons and native splash plus session-loading UI.
-- **Implemented as previews:** Home, Create Quota, Quota Details, History, Notifications, Settings and Profile. Sample forecasts, usage, notification preferences, name edits and sync states are not production integrations. Sign-out uses real Supabase Auth.
+- **Implemented as previews:** Home, Create Quota, Quota Details, History, Notifications, Settings and Profile. Sample forecasts, usage, notification preferences and sync states are not production integrations. Sign-out uses real Supabase Auth, and the Profile name and username are read from and saved to `public.users`.
 - **Historically applied:** C2 legacy promo-based Postgres schema, RLS and profile trigger. `supabase/` remains the schema source of truth; never edit applied migrations.
-- **Pending:** quota-schema design/new migrations, Room, telemetry, durable cycles/history, inference, OS alert delivery, persistent profile/preferences and sync. Do not mark D2–D9 complete just because their UI exists.
+- **Pending:** quota-schema design/new migrations, Room, telemetry, durable cycles/history, inference, OS alert delivery, persistent preferences and sync. Do not mark D2–D9 complete just because their UI exists.
 
 The current implementation details and limitations are in [quota UI preview](docs/quota-ui-preview.md).
 
@@ -100,7 +100,7 @@ app/src/main/java/com/capstone/datara/
     ├── quota/                        # Create/Details, sample state and navigation
     ├── history/                      # Vico sample charts and cycle details
     ├── notifications/                # Sample alerts and read state
-    ├── settings/, profile/           # Preview preferences/profile; real sign-out
+    ├── settings/, profile/           # Preview preferences; real profile name/username and sign-out
     ├── components/                   # Theme-aware shared Material 3 wrappers
     ├── navigation/NavGraph.kt        # DataraRoute constants + start destination
     └── theme/                        # Color.kt, Theme.kt, Type.kt

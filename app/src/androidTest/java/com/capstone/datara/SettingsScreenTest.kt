@@ -2,6 +2,9 @@ package com.capstone.datara
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.runtime.mutableStateOf
+import com.capstone.datara.ui.profile.ProfileScreen
+import com.capstone.datara.ui.profile.ProfileUiState
 import com.capstone.datara.ui.settings.SettingsPreviewState
 import com.capstone.datara.ui.settings.SettingsScreen
 import org.junit.Assert.assertEquals
@@ -24,14 +27,28 @@ class SettingsScreenTest {
     }
 
     @Test fun profileShowsReadOnlyEmailAndValidatesName() {
-        compose.setContent { SettingsScreen(SettingsPreviewState(), "student@example.com", { if (it.isBlank()) "Enter a name" else null }, {}, {}, {}, {}, {}, {}, {}) }
-        compose.onNodeWithText("View and edit preview profile →").performScrollTo().performClick()
+        var saves = 0
+        compose.setContent {
+            SettingsScreen(SettingsPreviewState(), "student@example.com",
+                { if (it.isBlank()) "Enter a name" else null.also { saves++ } }, {}, {}, {}, {}, {}, {}, {},
+                profile = ProfileUiState(username = "student_01"))
+        }
+        compose.onNodeWithText("View and edit profile →").performScrollTo().performClick()
         compose.onNodeWithText("student@example.com").assertExists()
+        compose.onNodeWithText("@student_01").assertExists()
         compose.captureUi("profile")
-        compose.onNodeWithText("Save preview name").performClick()
+        compose.onNodeWithText("Save name").performClick()
         compose.onNodeWithText("Enter a name").assertExists()
         compose.onNode(hasSetTextAction()).performScrollTo().performTextInput("Student")
-        compose.onNodeWithText("Save preview name").performClick()
-        compose.onNodeWithText("Preview name saved for this session.").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Save name").performClick()
+        compose.runOnIdle { assertEquals(1, saves) }
+    }
+
+    @Test fun profileReportsSaveOutcome() {
+        val profile = mutableStateOf(ProfileUiState(name = "Student", nameSaved = true))
+        compose.setContent { ProfileScreen(profile.value, "student@example.com", {}, { null }) }
+        compose.onNodeWithText("Name saved.").performScrollTo().assertIsDisplayed()
+        profile.value = ProfileUiState(name = "Student", saveError = "Couldn't save your name.")
+        compose.onNodeWithText("Couldn't save your name.").performScrollTo().assertIsDisplayed()
     }
 }

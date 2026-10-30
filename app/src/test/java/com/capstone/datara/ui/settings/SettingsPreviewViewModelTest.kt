@@ -5,21 +5,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SettingsPreviewViewModelTest {
-    @Test fun invalidNamesLeavePreviousNameUntouched() {
-        val model = SettingsPreviewViewModel(SavedStateHandle())
-        assertNull(model.saveName("  Student  "))
-        listOf("", "x", "a".repeat(61), "Hi\nthere").forEach { assertNotNull(model.saveName(it)) }
-        assertEquals("Student", model.uiState.value.displayName)
-    }
-
-    @Test fun preferencesAndNameSurviveRecreation() {
+    @Test fun preferencesSurviveRecreation() {
         val saved = SavedStateHandle()
         val model = SettingsPreviewViewModel(saved)
-        model.saveName("  Student Name  ")
         model.setMilestones(false)
         model.setForecasts(false)
         val restored = SettingsPreviewViewModel(saved).uiState.value
-        assertEquals("Student Name", restored.displayName)
         assertFalse(restored.milestonesEnabled)
         assertFalse(restored.forecastsEnabled)
     }

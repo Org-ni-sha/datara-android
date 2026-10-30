@@ -272,7 +272,7 @@ Promo/expiry cards and live network badges are not part of the current UI. Signa
 - [ ] Persist notification history/read flags in Room and integrate agreed sync behavior. Current read flags are SavedStateHandle preview state only.
 
 #### Phase D9: Profile, Settings & Developer ML Diagnostics Screen
-- [x] Settings/Profile UI: session-only name edits and notification switches, simulated sync states, Usage Access guidance, version/privacy information and signed-in email.
+- [x] Settings/Profile UI: display name loaded from and saved to `public.users.name` (with the `@username` shown read-only), preview notification switches, simulated sync states, Usage Access guidance, version/privacy information and signed-in email.
 - [x] Confirmed sign-out through existing Supabase Auth, pending/error handling and navigation only after success.
 - [ ] Persist profile name and preferences; connect actual permission/status checks and cloud sync. No phone field is required by the current UI.
 - [ ] **Developer ML Diagnostics Screen (Hidden):** gated behind a secret gesture; expose active model mode, MAE/RMSE/R², inputs and latency only when the real pipeline exists.

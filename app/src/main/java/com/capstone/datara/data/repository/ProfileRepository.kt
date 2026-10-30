@@ -8,6 +8,10 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import javax.inject.Inject
 
+/** The user-facing parts of the signed-in user's `public.users` row. */
+@Serializable
+data class Profile(val name: String? = null, val username: String? = null)
+
 /** Thrown by [ProfileRepository.setUsername] when another account already holds the name. */
 class UsernameTakenException : Exception("username_taken")
 
@@ -21,18 +25,25 @@ class ProfileRepository @Inject constructor(
     private val postgrest: Postgrest
 ) {
 
-    @Serializable
-    private data class UsernameRow(val username: String? = null)
-
-    /** The user's username, or null when they have not chosen one yet. */
-    suspend fun fetchUsername(): Result<String?> = runCatching {
+    suspend fun fetchProfile(): Result<Profile> = runCatching {
         val userId = requireUserId()
         postgrest.from(USERS_TABLE)
-            .select(Columns.list("username")) {
+            .select(Columns.list("name", "username")) {
                 filter { eq("id", userId) }
             }
-            .decodeSingleOrNull<UsernameRow>()
-            ?.username
+            .decodeSingleOrNull<Profile>()
+            ?: Profile()
+    }
+
+    /** The user's username, or null when they have not chosen one yet. */
+    suspend fun fetchUsername(): Result<String?> = fetchProfile().map { it.username }
+
+    /** Saves the display name (already trimmed and validated). */
+    suspend fun updateName(name: String): Result<Unit> = runCatching {
+        val userId = requireUserId()
+        postgrest.from(USERS_TABLE).update({ set("name", name) }) {
+            filter { eq("id", userId) }
+        }
     }
 
     suspend fun isUsernameAvailable(username: String): Result<Boolean> = runCatching {

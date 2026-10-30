@@ -24,23 +24,23 @@ import com.capstone.datara.ui.components.*
 import com.capstone.datara.ui.theme.QuotaTheme
 
 @Composable
-fun ProfileScreen(displayName: String, email: String?, onBack: () -> Unit,
-    onSaveName: (String) -> String?, bottomBar: @Composable () -> Unit = {}) {
+fun ProfileScreen(profile: ProfileUiState, email: String?, onBack: () -> Unit,
+    onSaveName: (String) -> String?, onNameEdited: () -> Unit = {}, bottomBar: @Composable () -> Unit = {}) {
     QuotaTheme {
-        var draft by rememberSaveable { mutableStateOf(displayName) }
+        val displayName = profile.name
+        // Keyed on the stored name so the field fills in once the profile loads.
+        var draft by rememberSaveable(displayName) { mutableStateOf(displayName) }
         var error by rememberSaveable { mutableStateOf<String?>(null) }
-        var saved by rememberSaveable { mutableStateOf(false) }
         val focus = LocalFocusManager.current
         val save = {
             error = onSaveName(draft)
-            saved = error == null
-            if (saved) { draft = draft.trim(); focus.clearFocus() }
+            if (error == null) { draft = draft.trim(); focus.clearFocus() }
         }
         Scaffold(modifier = Modifier.imePadding(), containerColor = MaterialTheme.colorScheme.background,
             topBar = { DataraAppBar("Profile", onBack) }, bottomBar = {
                 Column {
                     Surface(color = MaterialTheme.colorScheme.background) {
-                        Box(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) { DataraActionButton("Save preview name", { save() }) }
+                        Box(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) { DataraActionButton(if (profile.isSaving) "Saving…" else "Save name", { if (!profile.isSaving) save() }) }
                     }
                     bottomBar()
                 }
@@ -57,27 +57,33 @@ fun ProfileScreen(displayName: String, email: String?, onBack: () -> Unit,
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(displayName.ifBlank { "Your profile" }, style = MaterialTheme.typography.titleLarge)
-                            Text("Your DATAra profile", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(profile.username?.let { "@$it" } ?: "Your DATAra profile",
+                                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
                 SectionTitle("Display name", "Choose the name shown in the app.")
-                OutlinedTextField(draft, { draft = it; error = null; saved = false }, label = { Text("Display name") },
+                OutlinedTextField(draft, { draft = it; error = null; onNameEdited() }, label = { Text("Display name") },
                     placeholder = { Text("Enter your name") }, isError = error != null,
                     singleLine = true, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
-                    supportingText = { Text(error ?: "2 to 60 characters") },
+                    supportingText = { Text(error ?: "${DisplayNameValidator.MIN_LENGTH} to ${DisplayNameValidator.MAX_LENGTH} characters") },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { save() }))
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     ListItem(leadingContent = { TonalIcon(DataraIcons.Email) }, headlineContent = { Text(email ?: "Email unavailable") },
                         overlineContent = { Text("ACCOUNT EMAIL") }, supportingContent = { Text("Your sign-in email is read-only here.") })
                 }
-                SampleLabel("Preview profile")
-                Text("Name changes apply to this session and won’t update your account yet.", style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                AnimatedVisibility(visible = saved) { Surface(color = MaterialTheme.colorScheme.tertiaryContainer, shape = MaterialTheme.shapes.medium) {
-                    Text("Preview name saved for this session.", modifier = Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite },
+                if (profile.loadFailed) {
+                    Text("Couldn’t load your saved name. Check your connection; you can still set a new one.",
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                AnimatedVisibility(visible = profile.nameSaved) { Surface(color = MaterialTheme.colorScheme.tertiaryContainer, shape = MaterialTheme.shapes.medium) {
+                    Text("Name saved.", modifier = Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite },
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                } }
+                AnimatedVisibility(visible = profile.saveError != null) { Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium) {
+                    Text(profile.saveError.orEmpty(), modifier = Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite },
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
                 } }
             }
         }
@@ -87,4 +93,6 @@ fun ProfileScreen(displayName: String, email: String?, onBack: () -> Unit,
 @Preview(widthDp = 360, heightDp = 800)
 @Preview(name = "Profile large text", widthDp = 360, heightDp = 800, fontScale = 2f)
 @Composable
-private fun ProfilePreview() { ProfileScreen("Student", "student@example.com", {}, { null }) }
+private fun ProfilePreview() {
+    ProfileScreen(ProfileUiState(name = "Student", username = "student_01"), "student@example.com", {}, { null })
+}
