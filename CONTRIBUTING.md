@@ -76,11 +76,14 @@ Every change goes through a PR, even small ones — this is the safety net again
 1. Push your branch: `git push -u origin feature/login-screen`
 2. Open a PR: base = `main`, compare = your branch. Use the PR template — fill in what changed, why, and anything the reviewer should specifically check.
 3. Wait for the **Android CI** check to pass (see below).
-4. **At least one teammate approves before merging.**
+4. **The lead programmer (@saybbbb) approves before merging.** Approvals from anyone else do not unlock the merge.
 5. Merge using **Squash and merge** — collapses messy in-progress commits into one clean commit on `main`.
 6. Delete the branch after merge.
 
-`main` has branch protection enabled: PRs required, at least 1 approval required, the Android CI check must pass, no direct pushes (including from admins).
+`main` is protected by two repository rulesets (Settings → Rules → Rulesets):
+
+- **Protect main** — applies to everyone, no exceptions: PRs required, squash merge only, the Android CI check must pass on an up-to-date branch, no deletion, no force pushes, no direct pushes.
+- **Lead review** — one approval, and it must come from a code owner ([`.github/CODEOWNERS`](.github/CODEOWNERS): the lead). GitHub never lets anyone approve their own PR, so the `leads` team (the lead only) may bypass this ruleset when merging a pull request. The lead's own PRs therefore still need green CI, but no second approval; the bypass is recorded on the PR.
 
 ### Continuous integration (CI)
 
