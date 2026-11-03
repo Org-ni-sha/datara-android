@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.capstone.datara.data.repository.AuthRepository
 import com.capstone.datara.data.repository.ProfileRepository
+import com.capstone.datara.telemetry.TelemetryController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -41,7 +42,8 @@ data class PasswordResetState(
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val repository: AuthRepository,
-    private val profileRepository: ProfileRepository
+    private val profileRepository: ProfileRepository,
+    private val telemetryController: TelemetryController
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
@@ -97,6 +99,8 @@ class AuthViewModel @Inject constructor(
             _uiState.value = AuthUiState.Loading
             repository.signOut()
                 .onSuccess {
+                    // Tracking belongs to the signed-in user; the next one starts it again
+                    telemetryController.stop()
                     _uiState.value = AuthUiState.Idle
                     onComplete()
                 }

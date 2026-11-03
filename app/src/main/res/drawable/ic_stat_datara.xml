@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon for the tracking notification: the DATAra symbol from datara_monochrome, fitted to 24dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <group
+        android:scaleX="0.027919"
+        android:scaleY="0.027919"
+        android:translateX="-5.9239"
+        android:translateY="-6.0635">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 266 342 C 266 302 292 288 325 307 L 467 415 C 488 432 497 448 497 475 L 497 870 C 680 863 827 750 791 569 C 883 617 965 670 992 724 C 1010 777 991 838 970 875 C 911 990 796 1041 658 1041 L 340 1041 C 292 1041 266 1016 266 968 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 354 270 C 378 257 404 253 438 253 L 700 253 C 895 253 1018 430 1018 691 C 970 616 887 560 746 501 C 588 452 505 374 354 270 Z" />
+    </group>
+</vector>

@@ -99,6 +99,9 @@ dependencies {
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
 
+    // Background work (telemetry watchdog)
+    implementation(libs.androidx.work.runtime.ktx)
+
     // Ktor
     implementation(libs.ktor.client.android)
 
