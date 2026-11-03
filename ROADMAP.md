@@ -83,7 +83,13 @@ Keep this distinction explicit in all documentation: **on-device _inference_ is 
 | **(b) Cloud retraining, on-device inference** | Per-user model retrained in `datara-ml`, exported to ONNX, stored in Supabase Storage, downloaded by the client. True per-user XGBoost. Does **not** violate the no-`/predict` rule (inference stays local) but gives up offline-only for the retraining step. |
 | **(c) On-device lightweight learner** | A small incremental regressor (SGD/ridge) trained locally that replaces the global model once it outperforms it. Fully on-device training, but no longer XGBoost at the local layer. |
 
-D6 below is written against **(a)** as a provisional default, not a resolved decision. E3's comparison is valid under any option.
+**Decided (2026-11-03): (a) residual correction, with a next-hour usage target.** The team chose (a), and the global model predicts usage rather than the PET itself:
+
+- **Global model target:** mobile bytes used in the **next hour** for one device, from features available at the start of that hour. Training labels come straight from the harvester data (its 30-second rows summed per hour), with no need to invent quotas.
+- **PET is computed on the phone, not predicted:** starting from the remaining quota, the app predicts each following hour and subtracts it until the remainder reaches zero. That hour is the PET. The model never sees the quota, so any quota size works.
+- **Why not predict the PET directly:** a PET label exists only when a cycle actually reaches its quota, which happens a few times per user at most. A next-hour target is checked against real usage every hour (about 168 times a week), which gives the local correction enough data to learn from.
+- **Local layer:** a small per-user correction (for example a running ratio of actual to predicted usage, by time of day) learned from those hourly differences in plain Kotlin and applied to the global prediction before projecting.
+- **The thesis is still evaluated on PET** (predicted vs actual quota-reaching time); see B4 and E3.
 
 #### Alternatives evaluated and rejected
 
@@ -143,10 +149,11 @@ The claim the thesis actually defends is *"per-user personalization improves PET
     - **Resolution constraint:** `NetworkStatsManager` is coarsely bucketed (roughly 2-hour granularity for detailed queries), so on-device features are running totals, not true 10-minute resolution. Engineer features the client can actually reproduce at inference time — a feature the app cannot compute is useless no matter how well it trains.
   - `time_features`: hour of day (cyclical sine/cosine), day of week, is_weekend.
   - `network_features`: signal strength (dBm/bars), network type (LTE/5G), and measured speed. Confirm the speed field, units and availability in the research contract before training; the earlier A4 export list is not a finalized quota dataset schema.
-  - Target variable definition: time until measured usage reaches the chosen quota, or a consumption-rate forecast from which quota PET is derived. Finalize the target and horizon before training; use consistent cycle windows and quota units.
+  - **Target (decided, see Decision 2):** mobile bytes used in the **next hour** per device, built by summing the harvester's 30-second rows into hourly totals. Train on `log1p(bytes)`, since hourly usage is skewed with many near-zero hours. The PET is not a training label; the app derives it by projecting hourly predictions against the remaining quota.
+  - Every feature must be computable on the phone from the same 30 s and 10 min readings at the start of the hour, using the same definitions as the app (lags such as last hour, last 24 h average, same hour yesterday).
 - [ ] **Phase B3 — Global XGBoost Model Training & Hyperparameter Tuning:**
   - Algorithm: `XGBRegressor` / `XGBoost`.
-  - Objective: minimize quota-reaching-time prediction error across users.
+  - Objective: minimize next-hour usage error across users (for example MAE on bytes). PET accuracy is measured in B4 by projection.
   - Hyperparameter optimization via Optuna or GridSearchCV (`learning_rate`, `max_depth`, `n_estimators`, `subsample`, `reg_lambda`).
   - Split by **respondent**, not by row — random row splits leak the same user into train and test and will inflate every metric.
 - [ ] **Phase B4 — Model Evaluation & Thesis Metrics:**
@@ -155,6 +162,8 @@ The claim the thesis actually defends is *"per-user personalization improves PET
     - **RMSE** (Root Mean Squared Error).
     - **R²** (Coefficient of Determination).
   - **Acceptance target — decide before B3 runs, not after seeing results:** state the MAE the model must beat to be considered successful (e.g. "MAE ≤ 2 hours on a 24-hour prediction horizon") and the naive baseline it must outperform (e.g. constant average consumption rate). Committing to this in advance is the difference between an evaluation and a rationalization, and panels probe for it.
+  - Report two levels of error: next-hour usage error (MAE/RMSE on bytes or MB) and **PET error** (MAE in hours), the thesis metric.
+  - **PET evaluation without real quotas:** the harvester data has no user-set quotas, so evaluate PET by simulating cycles on held-out participants: pick a start time and a quota amount, run the same hour-by-hour projection the app uses, and compare the projected PET with the hour cumulative usage actually crossed the quota. Use several quota sizes, and do not score simulated cycles that never cross the quota within the data.
   - Generate feature importance plots (SHAP values, gain) for thesis documentation.
 - [ ] **Phase B5 — Model Export to ONNX (`.onnx`):**
   - Convert trained XGBoost model using `onnxmltools` / `skl2onnx`.
@@ -251,13 +260,15 @@ Promo/expiry cards and live network badges are not part of the current UI. Signa
 
 - [ ] Add `com.microsoft.onnxruntime:onnxruntime-android`.
 - [ ] Bundle `global_xgboost.onnx` (from B5) in `app/src/main/assets/models/`.
-- [ ] Build on-device Feature Extractor from Room `DataUsage` entries.
+- [ ] Build on-device Feature Extractor from Room `DataUsage` entries, producing one hourly feature row in exactly B2's definitions.
   - Must reproduce B2's feature order, shapes, and dtypes **exactly**. Add a parity test against a known input/output pair captured from the Python pipeline — silent feature-order mismatch produces plausible-looking wrong predictions, which is the worst possible failure mode for a defense demo.
 - [ ] **Dual-Model Conditional Switch:**
   - `ModelType.GLOBAL`: baseline pre-trained ONNX model, used for new users.
-  - `ModelType.LOCAL`: global ONNX output plus a per-user residual correction, activated once the user has sufficient telemetry (≥ 7 days).
+  - `ModelType.LOCAL`: global ONNX output multiplied (or offset) by the per-user correction learned from hourly prediction errors (Decision 2).
+  - Switch to LOCAL once the user has ≥ 7 days of telemetry **and** the corrected predictions' recent error is lower than the global model's; switch back automatically if it becomes worse.
   - The switch is conditional and reversible — never hardcode one mode.
   - *Strict rule:* all **inference** is on-device via ONNX Runtime. No live `/predict` server call, ever.
+- [ ] **PET projection:** starting from the active cycle's remaining quota, predict each following hour (updating time features and lags as it steps) and subtract until the remainder reaches zero; that hour is the PET. Cap the horizon (for example 30 days) and show "beyond 30 days" instead of an unbounded date.
 - [ ] Output predicted PET timestamp and expose via `StateFlow` to the UI.
 - [ ] Log each prediction with its inputs and the observed quota-reaching time (or an explicitly incomplete observation) — E3 cannot be done retroactively without this.
 
