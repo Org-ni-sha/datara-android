@@ -225,23 +225,26 @@ The former promo catalog, promo entry and expiry setup are superseded. A chosen 
 #### Phase D4: Dual Background Telemetry Harvester
 *Per ⚠️ DECISION 1 (decided): 30 s and 10 min inside one foreground service, plus a 15-minute WorkManager watchdog — the same scheme as `data-harvester`, so app features match the training data.*
 
-- [ ] **Permissions — three different mechanisms, do not treat them as one list:**
+*Status (2026-11-04): built without persistence, and checked on a POCO F3 (MIUI) over adb. See [usage telemetry](docs/telemetry.md).*
+
+- [x] **Permissions — three different mechanisms, do not treat them as one list:** *(Tracking setup screen; reached from Home and Settings)*
   - `PACKAGE_USAGE_STATS` — **special access, not a runtime permission.** There is no permission dialog. Send the user to `Settings.ACTION_USAGE_ACCESS_SETTINGS` and verify the grant via `AppOpsManager` (`unsafeCheckOpNoThrow`). Needs its own onboarding screen explaining why. This is the most common first-run failure for `NetworkStatsManager` apps.
   - `POST_NOTIFICATIONS` — **runtime permission on Android 13+.** Required for the foreground-service notification here and for all of D8. Request it before starting the service.
   - `FOREGROUND_SERVICE` — normal install-time permission, never requested at runtime. With `targetSdk 37` you additionally need a **typed** service: the `FOREGROUND_SERVICE_DATA_SYNC` permission (or `_SPECIAL_USE` with a written justification) plus `android:foregroundServiceType` on the `<service>` element. Untyped foreground services are rejected at this target level.
-  - `READ_PHONE_STATE` — runtime permission; only if D2 proves it is actually needed.
-- [ ] **30-Second Foreground Service:**
+  - `READ_PHONE_STATE` — runtime permission. Optional on the setup screen: it gives the 5G/LTE/3G label, a model input; without it the label is `CELLULAR`, as in the harvester. Signal and carrier need no permission.
+  - Also added with approval: `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (lets the watchdog restart the service on Android 12+), `RECEIVE_BOOT_COMPLETED` and `ACCESS_NETWORK_STATE`. The service type is `specialUse`.
+- [x] **30-Second Foreground Service:** *(verified on device: 30.0 s cadence; resumes when the app opens)*
   - Measure real-time delta and instantaneous speed (KB/s, MB/s) using `TrafficStats`.
   - **Handle reboots:** `TrafficStats` counters are device-wide and reset to zero on reboot. Persist the last-seen counter and, when the new reading is lower than the stored one, treat it as a reboot and re-baseline instead of recording a large negative delta.
   - Persistent notification copy should explain the tracking honestly (users see it constantly, and the panel will too).
-- [ ] **10-Minute `NetworkStatsManager` read (inside the foreground service)** *(interval per DECISION 1)*:
+- [ ] **10-Minute `NetworkStatsManager` read (inside the foreground service)** *(interval per DECISION 1)*: *(read, day-close and switch trigger built and verified on device; quota remaining waits on D3 cycles, and reconciliation is not coded yet; on device the durable total matched the 30 s sum within 335 bytes)*
   - Also run it immediately on a Wi-Fi ↔ mobile switch (debounced), as the harvester does.
   - Measure durable cellular totals with `NetworkStatsManager`. Its buckets are ~2 h, too coarse to query "the last 10 minutes" directly: read cumulative usage since a fixed anchor (the harvester uses UTC midnight) and store the difference from the previous reading.
   - Calculate remaining tracking quota against the active cycle baseline; include all measured mobile traffic regardless of carrier billing treatment.
   - Reconcile against the service's `TrafficStats` figures; `NetworkStatsManager` is the source of truth for durable totals.
-- [ ] **15-Minute WorkManager watchdog:** restarts the foreground service if the system killed it (WorkManager's minimum period). It does not take measurements itself.
-- [ ] **Mirror the harvester's measurement rules** (intervals, gap thresholds, network-switch handling, reboot re-baselining) from `data-harvester`'s `MeasurementRules` rather than re-deriving them, so recorded intervals mean the same thing in training and in the app.
-- [ ] **Signal Strength Monitor:**
+- [ ] **15-Minute WorkManager watchdog:** restarts the foreground service if the system killed it (WorkManager's minimum period). It does not take measurements itself. *(Built; not yet seen restarting on a device. MIUI blocks background starts while Autostart is off.)*
+- [x] **Mirror the harvester's measurement rules** (intervals, gap thresholds, network-switch handling, reboot re-baselining) from `data-harvester`'s `MeasurementRules` rather than re-deriving them, so recorded intervals mean the same thing in training and in the app. *(Mirrors v1.6.7, plus one approved deviation found on device. A baseline read while mobile data was down is re-baselined when mobile data returns. 1.6.7 counted 1.2 GB in 29 s there, so the harvester's data likely has the same spikes; see [usage telemetry](docs/telemetry.md).)*
+- [x] **Signal Strength Monitor:** *(on device: LTE RSRP −79 dBm, carrier GLOBE)*
   - `TelephonyCallback` on API 31+, `PhoneStateListener` below it (deprecated at 31). With `minSdk 26` **both** paths are required — pick by `Build.VERSION.SDK_INT`.
 - [ ] Persist snapshots to local Room database and queue for cloud sync. *(Blocked by: D2, C3.)*
 - [ ] Verify behavior under Doze and battery optimization on a real device, not just the emulator.
