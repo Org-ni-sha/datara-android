@@ -26,6 +26,7 @@ import com.capstone.datara.ui.settings.*
 import com.capstone.datara.ui.profile.ProfileViewModel
 import com.capstone.datara.ui.auth.AuthUiState
 import com.capstone.datara.ui.theme.*
+import com.capstone.datara.ui.tracking.TrackingSetupScreen
 
 @Composable
 fun DashboardScreen(
@@ -46,11 +47,14 @@ fun DashboardScreen(
     var history by rememberSaveable { mutableStateOf(false) }
     var settings by rememberSaveable { mutableStateOf(false) }
     var notifications by rememberSaveable { mutableStateOf(false) }
+    var tracking by rememberSaveable { mutableStateOf(false) }
     val screenStates = rememberSaveableStateHolder()
-    BackHandler(creating || details || notifications || history || settings) {
-        if (creating) creating = false else if (details) details = false else if (notifications) notifications = false else { history = false; settings = false }
+    BackHandler(tracking || creating || details || notifications || history || settings) {
+        if (tracking) tracking = false else if (creating) creating = false else if (details) details = false else if (notifications) notifications = false else { history = false; settings = false }
     }
-    if (creating) {
+    if (tracking) {
+        TrackingSetupScreen(onBack = { tracking = false })
+    } else if (creating) {
         CreateQuotaScreen(onBack = { creating = false }, onCreateQuota = { bytes, name ->
             viewModel.createQuota(bytes, name)
             creating = false
@@ -77,7 +81,8 @@ fun DashboardScreen(
                 isSigningOut = authState is AuthUiState.Loading,
                 signOutError = (authState as? AuthUiState.Error)?.message,
                 profile = profileState,
-                onNameEdited = profileViewModel::onNameEdited)
+                onNameEdited = profileViewModel::onNameEdited,
+                onTrackingSetup = { tracking = true })
         }
     } else if (history) {
         screenStates.SaveableStateProvider("history") {
@@ -90,7 +95,8 @@ fun DashboardScreen(
             onSignOut = { authViewModel.signOut(onComplete = onSignedOut) },
             onViewQuota = { details = true }, onHistory = { history = true },
             onNotifications = { notifications = true }, unreadCount = notificationState.unreadCount,
-            onSettings = { settings = true; history = false })
+            onSettings = { settings = true; history = false },
+            onTrackingSetup = { tracking = true })
     }
 }
 
@@ -98,8 +104,9 @@ fun DashboardScreen(
 fun HomeScreen(state: HomeUiState, onCreateQuota: () -> Unit,
     onSelectScenario: (HomeSampleState) -> Unit, onSignOut: () -> Unit,
     modifier: Modifier = Modifier, onViewQuota: () -> Unit = {}, onHistory: () -> Unit = {},
-    onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {}) {
-    QuotaTheme { HomeContent(state, onCreateQuota, onSelectScenario, onSignOut, modifier, onViewQuota, onHistory, onNotifications, unreadCount, onSettings) }
+    onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {},
+    onTrackingSetup: () -> Unit = {}) {
+    QuotaTheme { HomeContent(state, onCreateQuota, onSelectScenario, onSignOut, modifier, onViewQuota, onHistory, onNotifications, unreadCount, onSettings, onTrackingSetup) }
 }
 
 @Preview(name = "No quota", widthDp = 360, heightDp = 800)

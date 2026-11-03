@@ -30,10 +30,10 @@ fun SettingsScreen(state: SettingsPreviewState, email: String?, onSaveName: (Str
     onSelectSync: (SyncPreview) -> Unit, onPreviewSync: () -> Unit,
     onHome: () -> Unit, onHistory: () -> Unit, onSignOut: () -> Unit,
     isSigningOut: Boolean = false, signOutError: String? = null,
-    profile: ProfileUiState = ProfileUiState(), onNameEdited: () -> Unit = {}) {
+    profile: ProfileUiState = ProfileUiState(), onNameEdited: () -> Unit = {}, onTrackingSetup: () -> Unit = {}) {
     QuotaTheme {
         SettingsContent(state, email, onSaveName, onMilestonesChange, onForecastsChange, onSelectSync,
-            onPreviewSync, onHome, onHistory, onSignOut, isSigningOut, signOutError, profile, onNameEdited)
+            onPreviewSync, onHome, onHistory, onSignOut, isSigningOut, signOutError, profile, onNameEdited, onTrackingSetup)
     }
 }
 
@@ -43,7 +43,7 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
     onSelectSync: (SyncPreview) -> Unit, onPreviewSync: () -> Unit,
     onHome: () -> Unit, onHistory: () -> Unit, onSignOut: () -> Unit,
     isSigningOut: Boolean, signOutError: String?,
-    profileState: ProfileUiState, onNameEdited: () -> Unit) {
+    profileState: ProfileUiState, onNameEdited: () -> Unit, onTrackingSetup: () -> Unit) {
     var profile by rememberSaveable { mutableStateOf(false) }
     var dialog by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(profile) { profile = false }
@@ -78,10 +78,10 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             SettingsCard("Tracking status") {
-                Text("Usage Access · Not connected", style = MaterialTheme.typography.titleMedium)
-                Text("This UI preview is not reading mobile data usage. Sample values help you review the screens.",
+                Text("Usage Access and permissions", style = MaterialTheme.typography.titleMedium)
+                Text("Grant access and start or stop measuring mobile data. Home and History still show sample values.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = { dialog = "Usage Access" }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Usage Access guidance") }
+                OutlinedButton(onClick = onTrackingSetup, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open tracking setup") }
             }
             SettingsCard("Cloud sync") {
                 Text("Sample status · ${state.sync.label}", style = MaterialTheme.typography.titleMedium)
@@ -114,7 +114,6 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
             text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(when (title) {
                     "Sign out" -> "You’ll need to sign in again to access your account. Preview settings are not saved to the cloud."
-                    "Usage Access" -> "Android grants Usage Access through its Settings app, separately from notification permission. The tracking setup and permission check will be connected in a later phase; no access is requested by this preview."
                     else -> "This preview uses illustrative usage, history and alerts. Profile name edits and preferences are session-only. Signing in uses Supabase Auth. DATAra does not read SMS or block internet access. Data retention, deletion and real sync controls will be documented when storage is connected."
                 })
                 if (signingOut && signOutError != null) Text(signOutError, color = MaterialTheme.colorScheme.error)

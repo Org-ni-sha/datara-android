@@ -23,7 +23,8 @@ import com.capstone.datara.ui.quota.*
 internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
     onSelectScenario: (HomeSampleState) -> Unit, onSignOut: () -> Unit,
     modifier: Modifier = Modifier, onViewQuota: () -> Unit = {}, onHistory: () -> Unit = {},
-    onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {}) {
+    onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {},
+    onTrackingSetup: () -> Unit = {}) {
     var info by remember { mutableStateOf<String?>(null) }
     val empty = state.scenario == HomeSampleState.NO_QUOTA
     Scaffold(modifier, containerColor = MaterialTheme.colorScheme.background,
@@ -38,7 +39,7 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
                 Text("Forecasting against your chosen quota.", style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            ForecastHero(state, onCreateQuota, onAccess = { info = "Usage Access" }, onViewQuota = onViewQuota)
+            ForecastHero(state, onCreateQuota, onAccess = onTrackingSetup, onViewQuota = onViewQuota)
             if (!empty) {
                 if (state.scenario == HomeSampleState.FORECAST_AVAILABLE || state.scenario == HomeSampleState.QUOTA_REACHED) {
                     HomeUsageTrend()
@@ -70,10 +71,8 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
         }
     }
     info?.let { title -> AlertDialog(onDismissRequest = { info = null }, title = { Text(title) },
-        text = { Text(if (title == "Usage Access") "This preview doesn’t request Android permissions. Preview enabled access to see the collecting state."
-        else "Your quota counts mobile uploads and downloads on this device, including promo freebies. Wi-Fi is excluded. It does not represent your carrier balance or block internet access. This preview uses sample data.") },
-        confirmButton = { TextButton(onClick = { if (title == "Usage Access") onSelectScenario(HomeSampleState.COLLECTING); info = null }) {
-            Text(if (title == "Usage Access") "Preview enabled access" else "Got it") } },
+        text = { Text("Your quota counts mobile uploads and downloads on this device, including promo freebies. Wi-Fi is excluded. It does not represent your carrier balance or block internet access. This preview uses sample data.") },
+        confirmButton = { TextButton(onClick = { info = null }) { Text("Got it") } },
         dismissButton = { TextButton(onClick = { info = null }) { Text("Close") } }) }
 }
 
