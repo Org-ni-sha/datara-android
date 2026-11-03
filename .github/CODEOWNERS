@@ -1,0 +1,6 @@
+# Code owners — GitHub requests a review from these people on every pull request.
+# With the "Lead review" ruleset on main, only a code owner's approval lets a PR merge.
+# The lead's own PRs merge through the ruleset bypass instead (GitHub never allows
+# approving your own PR). See CONTRIBUTING.md › Pull Requests.
+
+* @saybbbb
