@@ -184,7 +184,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 
 #### Phase D1: Authentication, Branding & App Shell *(implemented)*
 - [x] Supabase Auth (`auth-kt`) with Ktor client.
-- [x] Light auth UI (2026-10-31, replacing the original dark navy screens): welcome screen with an animated in-screen Login/Register panel (`AuthEntryScreen`), light splash and launcher background, optically centered logo.
+- [x] Light auth UI (2026-10-31, replacing the original dark navy screens): welcome screen with an animated in-screen Login/Register panel (`AuthEntryScreen`), optically centered logo; navy launcher icon, splash and welcome with a splash-to-welcome logo transition (2026-11-03).
 - [x] Tier 1 auth hardening (2026-10-31): 8-character letters-and-digits password rule with a strength meter, 60-second resend cooldown, no "no account found" hints on login or reset, autofill hints on every auth field. Hosted Supabase settings must match — see [supabase/README.md](supabase/README.md#usernames-and-google-sign-in).
 - [x] `AuthRepository`, `AuthViewModel`, and Hilt injection.
 - [x] Session auto-login persistence on launch — `SessionViewModel` maps `sessionStatus` to `SessionState`, `MainActivity` shows `SplashScreen` until it resolves, then picks the start destination.

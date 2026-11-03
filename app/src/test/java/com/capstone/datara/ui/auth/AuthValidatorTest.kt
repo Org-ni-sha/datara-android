@@ -36,8 +36,7 @@ class AuthValidatorTest {
             AuthValidator.validateRegistration(
                 name = "Juan Dela Cruz",
                 email = "juan@ustp.edu.ph",
-                password = "secret123",
-                confirmPassword = "secret123"
+                password = "secret123"
             )
         )
     }
@@ -51,8 +50,7 @@ class AuthValidatorTest {
             AuthValidator.validateRegistration(
                 name = "",
                 email = "not-an-email",
-                password = "",
-                confirmPassword = ""
+                password = ""
             )
         )
     }
@@ -64,8 +62,7 @@ class AuthValidatorTest {
             AuthValidator.validateRegistration(
                 name = "J",
                 email = "juan@ustp.edu.ph",
-                password = "secret123",
-                confirmPassword = "secret123"
+                password = "secret123"
             )
         )
     }
@@ -77,8 +74,7 @@ class AuthValidatorTest {
             AuthValidator.validateRegistration(
                 name = "Juan Dela Cruz",
                 email = "juan@ustp",
-                password = "secret123",
-                confirmPassword = "secret123"
+                password = "secret123"
             )
         )
     }
@@ -90,8 +86,7 @@ class AuthValidatorTest {
             AuthValidator.validateRegistration(
                 name = "Juan Dela Cruz",
                 email = "juan@ustp.edu.ph",
-                password = "abc1234",
-                confirmPassword = "abc1234"
+                password = "abc1234"
             )
         )
     }
@@ -103,8 +98,7 @@ class AuthValidatorTest {
             AuthValidator.validateRegistration(
                 name = "Juan Dela Cruz",
                 email = "juan@ustp.edu.ph",
-                password = "abcdefghij",
-                confirmPassword = "abcdefghij"
+                password = "abcdefghij"
             )
         )
     }
@@ -122,32 +116,5 @@ class AuthValidatorTest {
     fun `passwordStrength rates longer mixed passwords higher`() {
         assertEquals(PasswordStrength.Fair, AuthValidator.passwordStrength("secret123"))
         assertEquals(PasswordStrength.Strong, AuthValidator.passwordStrength("Secret-Quota-2026"))
-    }
-
-    @Test
-    fun `validateRegistration rejects mismatched passwords`() {
-        assertEquals(
-            "Passwords do not match. Please make sure they are identical.",
-            AuthValidator.validateRegistration(
-                name = "Juan Dela Cruz",
-                email = "juan@ustp.edu.ph",
-                password = "secret123",
-                confirmPassword = "secret124"
-            )
-        )
-    }
-
-    @Test
-    fun `validateRegistration checks password length before comparing the two passwords`() {
-        // Both rules fail at once. Length is the more actionable message, so it must come first.
-        assertEquals(
-            AuthValidator.PASSWORD_RULE_MESSAGE,
-            AuthValidator.validateRegistration(
-                name = "Juan Dela Cruz",
-                email = "juan@ustp.edu.ph",
-                password = "abc",
-                confirmPassword = "xyz"
-            )
-        )
     }
 }

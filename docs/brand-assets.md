@@ -3,7 +3,7 @@
 Assets come from the user-supplied `DATAra-App-Kit.zip`. Its README and integration examples were treated as reference material; no supplied scripts were executed and no React Native code was introduced.
 
 - `drawable-nodpi/datara_brand_symbol.png`: supplied transparent two-ribbon mark, used by `DataraLogo` in authentication, session loading and the Home app bar. Proportions and colors are preserved without the old glow, shadow or rounded clipping.
-- `drawable/datara_foreground.xml` and `datara_monochrome.xml`: supplied native adaptive-icon paths. Launcher density PNGs, API 26 adaptive resources and API 33 monochrome resources also come from the kit. The launcher background is white (`datara_icon_background`) since 2026-10-31.
+- `drawable/datara_foreground.xml` and `datara_monochrome.xml`: supplied native adaptive-icon paths. Launcher density PNGs, API 26 adaptive resources and API 33 monochrome resources also come from the kit. The launcher keeps the kit's dark navy background (`datara_icon_background`, `#101522`); the splash and window use the same navy (`datara_launch_background`, `#101522`).
 - `drawable/datara_splash_symbol.xml`: same ribbon paths with additional padding for Android's circular splash mask. Device review caught clipping in the original kit spacing; scale is reduced to preserve the complete silhouette.
 - `Theme.DATAra.Starting`: native AndroidX SplashScreen theme, using the app's light launch background (`#F5F7FB`) and handing off to `Theme.DATAra`.
 
@@ -18,4 +18,8 @@ Historical validation (recorded in the documentation audit on 2026-10-29; not re
 ## Optical centering (2026-10-31)
 
 The mark's bounding box was centered, but its visual weight is not: the solid stem sits left and the curve thins out to the right, so the mark looked off-center to the left with extra space on the right. Measured on the 1024 px PNG, the alpha-weighted centroid is 38.5 px left of and 15.9 px below the box center (box width 866 px). Every copy of the mark was moved about two-thirds of that distance — the usual optical compromise, since a full shift overcorrects: 25 px right and 10 px up on `datara_brand_symbol.png`, and the equivalent `translateX`/`translateY` in `datara_foreground.xml`, `datara_monochrome.xml` and `datara_splash_symbol.xml`. The paths, colors and proportions are unchanged. The legacy density PNGs in `mipmap-*dpi/` were not regenerated; with `minSdk = 26` the adaptive icons are always used.
+
+## Splash-to-welcome handoff (2026-11-03)
+
+The native splash, the Compose session-loading screen and the first frame of the welcome screen draw the logo at the same size and window-center position: `SplashMatchedLogoSize` (145dp `DataraLogo`, whose mark matches the ≈122.7dp mark of the 288dp splash icon). Measured on a 1080×2400 device, the mark's bounds stayed within 2 px from the native splash through the welcome intro's first frame. The welcome screen then moves the logo to its layout position over 700 ms (emphasized-decelerate easing) and fades the copy and buttons in after it. The intro plays once per launch, only when the app starts signed out; signing out later shows the welcome screen without it. The loading screen's name, spinner and status text fade in only after 800 ms.
 

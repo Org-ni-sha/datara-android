@@ -273,10 +273,9 @@ object AuthValidator {
     fun validateRegistration(
         name: String,
         email: String,
-        password: String,
-        confirmPassword: String
+        password: String
     ): String? = when {
-        name.isBlank() || email.isBlank() || password.isBlank() || confirmPassword.isBlank() ->
+        name.isBlank() || email.isBlank() || password.isBlank() ->
             "Please fill in all required fields."
 
         !isValidName(name) ->
@@ -287,9 +286,6 @@ object AuthValidator {
 
         !isPasswordValid(password) ->
             PASSWORD_RULE_MESSAGE
-
-        password != confirmPassword ->
-            "Passwords do not match. Please make sure they are identical."
 
         else -> null
     }

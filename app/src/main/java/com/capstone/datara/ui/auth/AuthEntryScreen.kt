@@ -1,6 +1,5 @@
 package com.capstone.datara.ui.auth
 
-import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -8,10 +7,8 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -73,7 +70,6 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -87,7 +83,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.capstone.datara.ui.auth.components.DataraErrorBanner
 import com.capstone.datara.ui.auth.components.DataraFieldLabel
@@ -98,7 +93,16 @@ import com.capstone.datara.ui.auth.components.DataraSecondaryButton
 import com.capstone.datara.ui.auth.components.DataraTextField
 import com.capstone.datara.ui.auth.components.PasswordStrengthMeter
 import com.capstone.datara.ui.theme.DATAraTheme
-import com.capstone.datara.ui.theme.AuthPanelTheme
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.material3.ColorScheme
+import androidx.compose.ui.graphics.graphicsLayer
+import com.capstone.datara.ui.auth.components.SplashMatchedLogoSize
+import com.capstone.datara.ui.theme.SystemBarIcons
+import com.capstone.datara.ui.theme.WelcomeTheme
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 /** Which form the auth panel shows. Null on [AuthEntryScreen] means the welcome state. */
@@ -109,20 +113,31 @@ private val EmphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
 private val EmphasizedAccelerate = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
 private const val ENTER_MS = 400
 private const val EXIT_MS = 250
+/** Splash-to-welcome logo move, and the pause before it so the handoff registers. */
+private const val INTRO_MS = 700
+private const val INTRO_HOLD_MS = 150L
 
 private val PanelShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
 private val WelcomeLogoSize = 112.dp
-private val OpenLogoSize = 56.dp
+/** With a form open the logo box takes this share of the gap above the panel, within bounds. */
+private const val OPEN_LOGO_GAP_FRACTION = 0.6f
+private val OpenLogoMinSize = 48.dp
+private val OpenLogoMaxSize = 104.dp
 
 /** Height the collapsed hero (logo only) keeps above the open panel. */
 private val CollapsedHeroHeight = 104.dp
 
 /**
- * First screen for signed-out users. The welcome state shows the logo, what the app does, and
- * the ways in. Choosing Log in or Create account shrinks the logo to the top and raises a panel
- * holding the form; switching between the two forms morphs the panel in place. Back, the panel
- * handle, or dragging the handle down returns to the welcome state.
+ * First screen for signed-out users, on brand navy. The welcome state shows the logo, what the
+ * app does, and the ways in. Choosing Log in or Create account shrinks the logo to the top and
+ * raises a light panel holding the form; switching between the two forms morphs the panel in
+ * place. Back, the panel handle, or dragging the handle down returns to the welcome state.
+ *
+ * With [playIntro] (first launch, straight after the splash), the first frame matches the splash:
+ * the logo at [SplashMatchedLogoSize] in the window center and nothing else visible. Once the
+ * layout is measured, the logo shrinks and glides to its welcome position while the copy and the
+ * buttons fade in after it.
  *
  * This is an in-screen panel rather than a ModalBottomSheet: forms in a modal sheet fight the
  * keyboard, and Forgot password must navigate to a full screen and come back to the same panel.
@@ -131,7 +146,23 @@ private val CollapsedHeroHeight = 104.dp
 fun AuthEntryScreen(
     onSignedIn: (needsUsername: Boolean) -> Unit,
     onForgotPasswordClick: () -> Unit,
+    playIntro: Boolean = false,
     viewModel: AuthViewModel = hiltViewModel()
+) {
+    // The panel's forms stay in the app's light scheme; everything else here is navy.
+    val formColors = MaterialTheme.colorScheme
+    WelcomeTheme {
+        AuthEntryContent(onSignedIn, onForgotPasswordClick, playIntro, formColors, viewModel)
+    }
+}
+
+@Composable
+private fun AuthEntryContent(
+    onSignedIn: (needsUsername: Boolean) -> Unit,
+    onForgotPasswordClick: () -> Unit,
+    playIntro: Boolean,
+    formColors: ColorScheme,
+    viewModel: AuthViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var panel by rememberSaveable { mutableStateOf<AuthPanel?>(null) }
@@ -146,12 +177,15 @@ fun AuthEntryScreen(
     }
 
     // Focus left in a form would otherwise move to the first welcome button when the panel
-    // closes and leave it drawn in its focused (gray) state.
+    // closes and leave it drawn in its focused state.
     val focusManager = LocalFocusManager.current
+    // Duration of the next hero (logo) move: the intro, opening or closing the panel.
+    var heroDurationMs by remember { mutableIntStateOf(EXIT_MS) }
 
     fun openPanel(target: AuthPanel) {
         focusManager.clearFocus()
         viewModel.clearError()
+        heroDurationMs = ENTER_MS
         lastPanel = target
         panel = target
     }
@@ -159,36 +193,55 @@ fun AuthEntryScreen(
     fun closePanel() {
         focusManager.clearFocus()
         viewModel.clearError()
+        heroDurationMs = EXIT_MS
         panel = null
     }
 
     BackHandler(enabled = panel != null) { closePanel() }
 
     val isOpen = panel != null
-    val transition = updateTransition(targetState = isOpen, label = "AuthPanel")
-    val logoSize by transition.animateDp(
-        transitionSpec = { tween(if (targetState) ENTER_MS else EXIT_MS, easing = EmphasizedDecelerate) },
-        label = "LogoSize"
-    ) { open -> if (open) OpenLogoSize else WelcomeLogoSize }
+    // White status icons over navy always; navigation icons go dark over the open light panel.
+    SystemBarIcons(darkStatusIcons = false, darkNavigationIcons = isOpen)
 
     // Measured sizes, used to center the hero in whatever space the bottom content leaves.
     val density = LocalDensity.current
     var copyHeightPx by remember { mutableIntStateOf(0) }
     var actionsHeightPx by remember { mutableIntStateOf(0) }
     var panelHeightPx by remember { mutableIntStateOf(0) }
+    val measured = copyHeightPx > 0 && actionsHeightPx > 0
+
     // Until the first real measurement lands, jump to positions instead of animating, so the
-    // hero doesn't visibly slide into place on launch.
+    // hero doesn't visibly slide into place. The intro then starts from the splash position.
     var layoutSettled by remember { mutableStateOf(false) }
-    LaunchedEffect(copyHeightPx > 0 && actionsHeightPx > 0) {
-        if (copyHeightPx > 0 && actionsHeightPx > 0) {
-            withFrameNanos { }
-            layoutSettled = true
+    var introPending by rememberSaveable { mutableStateOf(playIntro) }
+    LaunchedEffect(measured) {
+        if (!measured) return@LaunchedEffect
+        withFrameNanos { }
+        layoutSettled = true
+        if (introPending) {
+            delay(INTRO_HOLD_MS)
+            heroDurationMs = INTRO_MS
+            introPending = false
         }
     }
 
-    NavigationBarIcons(lightIcons = isOpen)
+    val heroSpec: AnimationSpec<Dp> =
+        if (layoutSettled) tween(heroDurationMs, easing = EmphasizedDecelerate) else snap()
+    // Copy follows the logo; the buttons come last.
+    val copyAlpha by animateFloatAsState(
+        targetValue = if (introPending) 0f else 1f,
+        animationSpec = tween(450, delayMillis = INTRO_MS / 3),
+        label = "IntroCopyAlpha"
+    )
+    val actionsAlpha by animateFloatAsState(
+        targetValue = if (introPending) 0f else 1f,
+        animationSpec = tween(450, delayMillis = INTRO_MS / 2),
+        label = "IntroActionsAlpha"
+    )
 
-    // Only the status bar is padded here. The navy panel runs behind the navigation bar (gesture
+    val statusBarTopPx = WindowInsets.statusBars.getTop(density)
+
+    // Only the status bar is padded here. The panel runs behind the navigation bar (gesture
     // handle or 3-button bar), and the welcome buttons and panel content pad for it themselves.
     // imePadding consumes the IME inset, so that inner navigation-bar padding drops to zero while
     // the keyboard is up instead of being added twice.
@@ -199,26 +252,42 @@ fun AuthEntryScreen(
             .statusBarsPadding()
             .imePadding()
     ) {
+        // With a form open, the logo fills part of the navy gap above the panel: large over the
+        // short Login form, compact over the taller Create account form (and with the keyboard).
+        val openLogoSize = with(density) {
+            val gap = (constraints.maxHeight - panelHeightPx).toFloat().toDp()
+            (gap * OPEN_LOGO_GAP_FRACTION - 24.dp).coerceIn(OpenLogoMinSize, OpenLogoMaxSize)
+        }
+        val logoSize by animateDpAsState(
+            targetValue = when {
+                isOpen -> openLogoSize
+                introPending -> SplashMatchedLogoSize
+                else -> WelcomeLogoSize
+            },
+            animationSpec = heroSpec,
+            label = "LogoSize"
+        )
+
         val heroTopTarget = with(density) {
             val available = constraints.maxHeight.toFloat()
-            if (isOpen) {
-                // Logo (plus DataraLogo's 24dp clear space) centered above the panel.
-                val logoBox = (OpenLogoSize + 24.dp).toPx()
-                ((available - panelHeightPx - logoBox) / 2).toDp().coerceAtLeast(4.dp)
-            } else {
-                val heroHeight = (WelcomeLogoSize + 24.dp).toPx() + copyHeightPx
-                ((available - actionsHeightPx - heroHeight) / 2).toDp().coerceAtLeast(16.dp)
+            when {
+                isOpen -> {
+                    // Logo (plus DataraLogo's 24dp clear space) centered above the panel.
+                    val logoBox = (openLogoSize + 24.dp).toPx()
+                    ((available - panelHeightPx - logoBox) / 2).toDp().coerceAtLeast(4.dp)
+                }
+                introPending -> {
+                    // Window center, like the splash: this box starts below the status bar.
+                    val logoBox = (SplashMatchedLogoSize + 24.dp).toPx()
+                    ((available - statusBarTopPx - logoBox) / 2).toDp()
+                }
+                else -> {
+                    val heroHeight = (WelcomeLogoSize + 24.dp).toPx() + copyHeightPx
+                    ((available - actionsHeightPx - heroHeight) / 2).toDp().coerceAtLeast(16.dp)
+                }
             }
         }
-        val heroTop by animateDpAsState(
-            targetValue = heroTopTarget,
-            animationSpec = if (layoutSettled) {
-                tween(if (isOpen) ENTER_MS else EXIT_MS, easing = EmphasizedDecelerate)
-            } else {
-                snap()
-            },
-            label = "HeroTop"
-        )
+        val heroTop by animateDpAsState(heroTopTarget, heroSpec, label = "HeroTop")
 
         // In the welcome state the hero may not grow into the buttons: on a small screen with a
         // large font it scrolls within the space above them instead of sliding underneath.
@@ -233,7 +302,7 @@ fun AuthEntryScreen(
                 .fillMaxWidth()
                 .padding(top = heroTop)
                 .then(
-                    if (!isOpen && actionsHeightPx > 0) {
+                    if (!isOpen && !introPending && actionsHeightPx > 0) {
                         Modifier
                             .heightIn(max = heroMaxHeight)
                             .verticalScroll(heroScroll)
@@ -250,7 +319,11 @@ fun AuthEntryScreen(
                 enter = fadeIn(tween(ENTER_MS, delayMillis = 100)) + expandVertically(tween(ENTER_MS)),
                 exit = fadeOut(tween(EXIT_MS / 2)) + shrinkVertically(tween(EXIT_MS))
             ) {
-                WelcomeCopy(Modifier.onSizeChanged { copyHeightPx = it.height })
+                WelcomeCopy(
+                    Modifier
+                        .onSizeChanged { copyHeightPx = it.height }
+                        .graphicsLayer { alpha = copyAlpha }
+                )
             }
         }
 
@@ -266,7 +339,12 @@ fun AuthEntryScreen(
             WelcomeActions(
                 onLogIn = { openPanel(AuthPanel.Login) },
                 onCreateAccount = { openPanel(AuthPanel.Register) },
-                modifier = Modifier.onSizeChanged { actionsHeightPx = it.height }
+                modifier = Modifier
+                    .onSizeChanged { actionsHeightPx = it.height }
+                    .graphicsLayer {
+                        alpha = actionsAlpha
+                        translationY = (1f - actionsAlpha) * 24.dp.toPx()
+                    }
             )
         }
 
@@ -279,37 +357,25 @@ fun AuthEntryScreen(
             exit = slideOutVertically(tween(EXIT_MS, easing = EmphasizedAccelerate)) { it } +
                 fadeOut(tween(EXIT_MS, delayMillis = EXIT_MS / 2))
         ) {
-            AuthPanelSurface(
-                modifier = Modifier.onSizeChanged { panelHeightPx = it.height },
-                panel = panel ?: lastPanel,
-                maxHeight = maxHeight - CollapsedHeroHeight,
-                onDismiss = ::closePanel,
-                onSwitch = ::openPanel,
-                onForgotPasswordClick = {
-                    viewModel.clearError()
-                    onForgotPasswordClick()
-                },
-                viewModel = viewModel
-            )
+            MaterialTheme(
+                colorScheme = formColors,
+                typography = MaterialTheme.typography,
+                shapes = MaterialTheme.shapes
+            ) {
+                AuthPanelSurface(
+                    modifier = Modifier.onSizeChanged { panelHeightPx = it.height },
+                    panel = panel ?: lastPanel,
+                    maxHeight = maxHeight - CollapsedHeroHeight,
+                    onDismiss = ::closePanel,
+                    onSwitch = ::openPanel,
+                    onForgotPasswordClick = {
+                        viewModel.clearError()
+                        onForgotPasswordClick()
+                    },
+                    viewModel = viewModel
+                )
+            }
         }
-    }
-}
-
-/**
- * Light navigation-bar icons (gesture handle or back/home/recents) while the navy panel sits
- * behind them, dark ones over the light welcome screen. Restores dark icons when the screen
- * leaves, matching the rest of the light-themed app.
- */
-@Composable
-private fun NavigationBarIcons(lightIcons: Boolean) {
-    val view = LocalView.current
-    if (view.isInEditMode) return
-    DisposableEffect(view, lightIcons) {
-        val window = (view.context as? Activity)?.window
-        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
-        // "Appearance light" means dark icons, for a light background.
-        controller?.isAppearanceLightNavigationBars = !lightIcons
-        onDispose { controller?.isAppearanceLightNavigationBars = true }
     }
 }
 
@@ -359,7 +425,7 @@ private fun WelcomeActions(
     }
 }
 
-/** The form panel: dark navy ([AuthPanelTheme]) over the light welcome screen. */
+/** The form panel: a white sheet over the off-white welcome screen. */
 @Composable
 private fun AuthPanelSurface(
     panel: AuthPanel,
@@ -369,16 +435,15 @@ private fun AuthPanelSurface(
     onForgotPasswordClick: () -> Unit,
     viewModel: AuthViewModel,
     modifier: Modifier = Modifier
-) = AuthPanelTheme {
+) {
     val density = LocalDensity.current
     val dismissThresholdPx = with(density) { 120.dp.toPx() }
     var dragOffset by remember { mutableFloatStateOf(0f) }
 
     Surface(
         shape = PanelShape,
-        // In the panel scheme, background is the navy panel and surface the lighter field fill.
-        color = MaterialTheme.colorScheme.background,
-        contentColor = MaterialTheme.colorScheme.onBackground,
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shadowElevation = 12.dp,
         modifier = modifier
             .fillMaxWidth()
@@ -603,12 +668,11 @@ private fun RegisterForm(
     var name by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
-    var confirmPassword by rememberSaveable { mutableStateOf("") }
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
     val submit = {
         focusManager.clearFocus()
-        viewModel.register(name, email, password, confirmPassword)
+        viewModel.register(name, email, password)
     }
 
     PanelHeader("Create your account", "You'll choose a username next.")
@@ -668,33 +732,13 @@ private fun RegisterForm(
         contentType = ContentType.NewPassword,
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Password,
-            imeAction = ImeAction.Next
-        ),
-        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
-    )
-    PasswordStrengthMeter(AuthValidator.passwordStrength(password))
-
-    Spacer(Modifier.height(16.dp))
-
-    DataraFieldLabel(label = "Confirm password")
-    Spacer(Modifier.height(8.dp))
-    DataraTextField(
-        value = confirmPassword,
-        onValueChange = {
-            confirmPassword = it
-            viewModel.clearError()
-        },
-        placeholder = "Re-enter your password",
-        leadingIcon = DataraIcons.Lock,
-        isPassword = true,
-        isError = confirmPassword.isNotEmpty() && confirmPassword != password,
-        contentType = ContentType.NewPassword,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Password,
             imeAction = ImeAction.Done
         ),
         keyboardActions = KeyboardActions(onDone = { submit() })
     )
+    // One password field: Show/Hide and the strength meter catch typos without a confirm field,
+    // and Forgot password recovers a mistyped one.
+    PasswordStrengthMeter(AuthValidator.passwordStrength(password))
 
     DataraErrorBanner((uiState as? AuthUiState.Error)?.message)
 
@@ -702,8 +746,7 @@ private fun RegisterForm(
     DataraPrimaryButton(
         text = "Create account",
         onClick = submit,
-        enabled = name.isNotBlank() && email.isNotBlank() &&
-            password.isNotBlank() && confirmPassword.isNotBlank(),
+        enabled = name.isNotBlank() && email.isNotBlank() && password.isNotBlank(),
         isLoading = uiState is AuthUiState.Loading
     )
 

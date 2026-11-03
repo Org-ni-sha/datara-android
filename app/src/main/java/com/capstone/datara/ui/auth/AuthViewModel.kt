@@ -68,11 +68,11 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun register(name: String, email: String, password: String, confirmPassword: String) {
+    fun register(name: String, email: String, password: String) {
         val trimmedName = name.trim()
         val trimmedEmail = email.trim()
 
-        AuthValidator.validateRegistration(trimmedName, trimmedEmail, password, confirmPassword)
+        AuthValidator.validateRegistration(trimmedName, trimmedEmail, password)
             ?.let { error ->
                 _uiState.value = AuthUiState.Error(error)
                 return

@@ -6,6 +6,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -30,8 +36,12 @@ private const val TRANSITION_MS = 350
 @Composable
 fun DataraNavGraph(
     navController: NavHostController = rememberNavController(),
-    startDestination: String = DataraRoute.WELCOME
+    startDestination: String = DataraRoute.WELCOME,
+    /** Play the splash-to-welcome logo intro the first time the welcome screen shows. */
+    playWelcomeIntro: Boolean = false
 ) {
+    // Consumed on first use: returning to welcome after sign-out shouldn't replay the intro.
+    var welcomeIntroPending by rememberSaveable { mutableStateOf(playWelcomeIntro) }
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -54,9 +64,12 @@ fun DataraNavGraph(
                     fadeIn(tween(TRANSITION_MS))
             }
         ) {
+            val playIntro = remember { welcomeIntroPending }
+            LaunchedEffect(Unit) { welcomeIntroPending = false }
             AuthEntryScreen(
                 onSignedIn = { needsUsername -> navController.navigateAfterSignIn(needsUsername) },
-                onForgotPasswordClick = { navController.navigate(DataraRoute.FORGOT_PASSWORD) }
+                onForgotPasswordClick = { navController.navigate(DataraRoute.FORGOT_PASSWORD) },
+                playIntro = playIntro
             )
         }
         composable(
