@@ -75,11 +75,27 @@ Every change goes through a PR, even small ones — this is the safety net again
 
 1. Push your branch: `git push -u origin feature/login-screen`
 2. Open a PR: base = `main`, compare = your branch. Use the PR template — fill in what changed, why, and anything the reviewer should specifically check.
-3. **At least one teammate approves before merging.**
-4. Merge using **Squash and merge** — collapses messy in-progress commits into one clean commit on `main`.
-5. Delete the branch after merge.
+3. Wait for the **Android CI** check to pass (see below).
+4. **At least one teammate approves before merging.**
+5. Merge using **Squash and merge** — collapses messy in-progress commits into one clean commit on `main`.
+6. Delete the branch after merge.
 
-`main` has branch protection enabled: PRs required, at least 1 approval required, no direct pushes (including from admins).
+`main` has branch protection enabled: PRs required, at least 1 approval required, the Android CI check must pass, no direct pushes (including from admins).
+
+### Continuous integration (CI)
+
+Every PR and every push to `main` runs [`.github/workflows/android-ci.yml`](.github/workflows/android-ci.yml) on GitHub Actions. It runs the same checks you would run locally:
+
+```
+./gradlew testDebugUnitTest assembleDebug lintDebug
+```
+
+- **Where to see it:** the checks box at the bottom of the PR, or the **Actions** tab of the repo. It takes a few minutes; the first run is slower while Gradle downloads are cached.
+- **If it fails (red ❌):** click **Details** next to the check, open the step marked ❌ and read the last lines of its log. Fix it on your branch and push — CI re-runs automatically.
+  - *Unit tests* — a test broke; the `unit-test-report` artifact has the details.
+  - *Lint* — an error from Android's code checker; the `lint-report` artifact lists it with an explanation. Warnings do not fail the build, errors do.
+- **Try the PR build:** download the `datara-debug-apk` artifact from the run's page. CI has no `local.properties`, so that build cannot sign in — use it for checking UI, not accounts.
+- Run the command above before pushing to catch problems early.
 
 ---
 
