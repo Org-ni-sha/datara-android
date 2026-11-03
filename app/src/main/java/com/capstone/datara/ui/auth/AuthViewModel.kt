@@ -5,9 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.capstone.datara.data.repository.AuthRepository
 import com.capstone.datara.data.repository.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -30,7 +33,9 @@ data class PasswordResetState(
     val step: ResetPasswordStep = ResetPasswordStep.ENTER_EMAIL,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val email: String = ""
+    val email: String = "",
+    /** Seconds until "Resend" is allowed again; 0 when it is available. */
+    val resendSecondsLeft: Int = 0
 )
 
 @HiltViewModel
@@ -44,6 +49,8 @@ class AuthViewModel @Inject constructor(
 
     private val _passwordResetState = MutableStateFlow(PasswordResetState())
     val passwordResetState: StateFlow<PasswordResetState> = _passwordResetState.asStateFlow()
+
+    private var resendCooldownJob: Job? = null
 
     /** Email of the signed-in user, or null when there is no session. */
     val currentUserEmail: String?
@@ -61,11 +68,11 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun register(name: String, email: String, password: String, confirmPassword: String) {
+    fun register(name: String, email: String, password: String) {
         val trimmedName = name.trim()
         val trimmedEmail = email.trim()
 
-        AuthValidator.validateRegistration(trimmedName, trimmedEmail, password, confirmPassword)
+        AuthValidator.validateRegistration(trimmedName, trimmedEmail, password)
             ?.let { error ->
                 _uiState.value = AuthUiState.Error(error)
                 return
@@ -176,6 +183,7 @@ class AuthViewModel @Inject constructor(
                         error = null,
                         email = trimmedEmail
                     )
+                    startResendCooldown()
                 }
                 .onFailure {
                     _passwordResetState.value = _passwordResetState.value.copy(
@@ -220,7 +228,7 @@ class AuthViewModel @Inject constructor(
     fun updateNewPassword(newPassword: String, confirmPassword: String) {
         if (!AuthValidator.isPasswordValid(newPassword)) {
             _passwordResetState.value = _passwordResetState.value.copy(
-                error = "Password must be at least 6 characters long."
+                error = AuthValidator.PASSWORD_RULE_MESSAGE
             )
             return
         }
@@ -253,7 +261,7 @@ class AuthViewModel @Inject constructor(
 
     fun resendResetCode() {
         val email = _passwordResetState.value.email
-        if (email.isBlank()) return
+        if (email.isBlank() || _passwordResetState.value.resendSecondsLeft > 0) return
         viewModelScope.launch {
             _passwordResetState.value = _passwordResetState.value.copy(isLoading = true, error = null)
             repository.resetPassword(email)
@@ -262,6 +270,7 @@ class AuthViewModel @Inject constructor(
                         isLoading = false,
                         error = null
                     )
+                    startResendCooldown()
                 }
                 .onFailure {
                     _passwordResetState.value = _passwordResetState.value.copy(
@@ -287,6 +296,25 @@ class AuthViewModel @Inject constructor(
     }
 
     fun clearPasswordResetState() {
+        resendCooldownJob?.cancel()
         _passwordResetState.value = PasswordResetState()
+    }
+
+    /**
+     * Blocks "Resend" for [RESEND_COOLDOWN_SECONDS] after each send. Matches Supabase's
+     * `max_frequency` for auth emails, so the button never offers a send the server would reject.
+     */
+    private fun startResendCooldown() {
+        resendCooldownJob?.cancel()
+        resendCooldownJob = viewModelScope.launch {
+            for (secondsLeft in RESEND_COOLDOWN_SECONDS downTo 0) {
+                _passwordResetState.update { it.copy(resendSecondsLeft = secondsLeft) }
+                if (secondsLeft > 0) delay(1_000)
+            }
+        }
+    }
+
+    private companion object {
+        const val RESEND_COOLDOWN_SECONDS = 60
     }
 }

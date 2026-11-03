@@ -4,7 +4,7 @@
 
 User-defined usage-quota forecasting is the approved product direction. The current implementation remains a sample UI; real telemetry, persistence, inference and alert delivery are pending. This document describes the final Direction C adaptation and supersedes earlier navy-hero, lime-accent, circular-gauge and larger-radius designs.
 
-Home, Create Quota, Quota Details, History, Notifications, Settings and Profile use the scoped light QuotaTheme: off-white backgrounds, white surfaces and forecast hero, navy text/actions, accessible teal progress, soft blue information panels and mint selected navigation. Authentication and launch retain dark navy. There is no theme toggle. Typography remains offline-safe SansSerif through MaterialTheme styles.
+Home, Create Quota, Quota Details, History, Notifications, Settings and Profile use the scoped light QuotaTheme: off-white backgrounds, white surfaces and forecast hero, navy text/actions, accessible teal progress, soft blue information panels and mint selected navigation. Since 2026-10-31 authentication and launch use the same light theme (see AGENTS.md › Design system). There is no theme toggle. Typography remains offline-safe SansSerif through MaterialTheme styles.
 
 Use semantic theme roles and native Material 3 app bars, navigation items, outlined fields, segmented controls, cards, lists, buttons and bottom sheets. Shapes are 16dp controls/inset panels, 20dp cards and a 24dp hero; small icon/label containers use 8–14dp. Floating Home/History/Settings navigation has a quiet shadow. Profile selects Settings.
 

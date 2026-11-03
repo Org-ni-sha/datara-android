@@ -36,8 +36,7 @@ class AuthValidatorTest {
             AuthValidator.validateRegistration(
                 name = "Juan Dela Cruz",
                 email = "juan@ustp.edu.ph",
-                password = "secret123",
-                confirmPassword = "secret123"
+                password = "secret123"
             )
         )
     }
@@ -51,8 +50,7 @@ class AuthValidatorTest {
             AuthValidator.validateRegistration(
                 name = "",
                 email = "not-an-email",
-                password = "",
-                confirmPassword = ""
+                password = ""
             )
         )
     }
@@ -64,8 +62,7 @@ class AuthValidatorTest {
             AuthValidator.validateRegistration(
                 name = "J",
                 email = "juan@ustp.edu.ph",
-                password = "secret123",
-                confirmPassword = "secret123"
+                password = "secret123"
             )
         )
     }
@@ -77,49 +74,47 @@ class AuthValidatorTest {
             AuthValidator.validateRegistration(
                 name = "Juan Dela Cruz",
                 email = "juan@ustp",
-                password = "secret123",
-                confirmPassword = "secret123"
+                password = "secret123"
             )
         )
     }
 
     @Test
-    fun `validateRegistration rejects a password under six characters`() {
+    fun `validateRegistration rejects a password under eight characters`() {
         assertEquals(
-            "Password must be at least 6 characters long.",
+            AuthValidator.PASSWORD_RULE_MESSAGE,
             AuthValidator.validateRegistration(
                 name = "Juan Dela Cruz",
                 email = "juan@ustp.edu.ph",
-                password = "abc12",
-                confirmPassword = "abc12"
+                password = "abc1234"
             )
         )
     }
 
     @Test
-    fun `validateRegistration rejects mismatched passwords`() {
+    fun `validateRegistration rejects a long password without a number`() {
         assertEquals(
-            "Passwords do not match. Please make sure they are identical.",
+            AuthValidator.PASSWORD_RULE_MESSAGE,
             AuthValidator.validateRegistration(
                 name = "Juan Dela Cruz",
                 email = "juan@ustp.edu.ph",
-                password = "secret123",
-                confirmPassword = "secret124"
+                password = "abcdefghij"
             )
         )
     }
 
+    // --- passwordStrength ----------------------------------------------------
+
     @Test
-    fun `validateRegistration checks password length before comparing the two passwords`() {
-        // Both rules fail at once. Length is the more actionable message, so it must come first.
-        assertEquals(
-            "Password must be at least 6 characters long.",
-            AuthValidator.validateRegistration(
-                name = "Juan Dela Cruz",
-                email = "juan@ustp.edu.ph",
-                password = "abc",
-                confirmPassword = "xyz"
-            )
-        )
+    fun `passwordStrength is null for an empty field and weak below the rule`() {
+        assertNull(AuthValidator.passwordStrength(""))
+        assertEquals(PasswordStrength.Weak, AuthValidator.passwordStrength("abc123"))
+        assertEquals(PasswordStrength.Weak, AuthValidator.passwordStrength("12345678"))
+    }
+
+    @Test
+    fun `passwordStrength rates longer mixed passwords higher`() {
+        assertEquals(PasswordStrength.Fair, AuthValidator.passwordStrength("secret123"))
+        assertEquals(PasswordStrength.Strong, AuthValidator.passwordStrength("Secret-Quota-2026"))
     }
 }

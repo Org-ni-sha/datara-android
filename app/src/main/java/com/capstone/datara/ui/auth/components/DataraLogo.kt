@@ -13,6 +13,16 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.capstone.datara.R
 
+/**
+ * [DataraLogo] size at which the mark matches the native splash icon exactly, so the session
+ * loading screen and the welcome intro can take over from the system splash without a jump.
+ * The splash draws `datara_splash_symbol` at 288dp, where the mark spans 752 × 0.58 of 1024
+ * viewport units ≈ 122.7dp; in `datara_brand_symbol.png` the mark fills 866/1024 of the image,
+ * so 122.7 / 0.846 ≈ 145dp. Both carry the same optical-centering offset. Recompute this if
+ * either asset's scale changes.
+ */
+val SplashMatchedLogoSize = 145.dp
+
 /** Supplied transparent brand mark; preserve its colors, proportions and clear space. */
 @Composable
 fun DataraLogo(modifier: Modifier = Modifier, size: Dp = 104.dp, contentDescription: String? = "DATAra logo") {
@@ -22,6 +32,6 @@ fun DataraLogo(modifier: Modifier = Modifier, size: Dp = 104.dp, contentDescript
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0C101A)
+@Preview(showBackground = true, backgroundColor = 0xFFF5F7FB)
 @Composable
 private fun DataraLogoPreview() { DataraLogo() }

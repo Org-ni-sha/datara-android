@@ -31,6 +31,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -50,13 +51,6 @@ import com.capstone.datara.ui.auth.components.DataraLogo
 import com.capstone.datara.ui.auth.components.DataraPrimaryButton
 import com.capstone.datara.ui.auth.components.DataraTextField
 import com.capstone.datara.ui.theme.DATAraTheme
-import com.capstone.datara.ui.theme.DataraDarkBg
-import com.capstone.datara.ui.theme.DataraError
-import com.capstone.datara.ui.theme.DataraErrorBg
-import com.capstone.datara.ui.theme.DataraNeonBlue
-import com.capstone.datara.ui.theme.DataraNeonGreen
-import com.capstone.datara.ui.theme.DataraTextPrimary
-import com.capstone.datara.ui.theme.DataraTextSecondary
 
 /**
  * Asks a signed-in user to choose a username. There is no back button: the auth back stack is
@@ -78,7 +72,7 @@ fun UsernameScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DataraDarkBg)
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding()
@@ -96,12 +90,11 @@ fun UsernameScreen(
             Spacer(modifier = Modifier.height(18.dp))
 
             Text(
-                text = "CHOOSE A USERNAME",
+                text = "Choose a username",
                 style = MaterialTheme.typography.headlineMedium.copy(
-                    color = DataraTextPrimary,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 22.sp,
-                    letterSpacing = 1.sp
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 24.sp
                 ),
                 textAlign = TextAlign.Center
             )
@@ -110,7 +103,7 @@ fun UsernameScreen(
 
             Text(
                 text = "You can log in with it instead of your email.",
-                style = MaterialTheme.typography.bodyMedium.copy(color = DataraTextSecondary),
+                style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
                 textAlign = TextAlign.Center
             )
 
@@ -123,6 +116,7 @@ fun UsernameScreen(
                 onValueChange = viewModel::onInputChange,
                 placeholder = "e.g. juan_dc",
                 leadingIcon = DataraIcons.Person,
+                contentType = ContentType.NewUsername,
                 isError = uiState.formatError != null ||
                     uiState.availability == UsernameAvailability.Taken,
                 keyboardOptions = KeyboardOptions(
@@ -152,12 +146,12 @@ fun UsernameScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(color = DataraErrorBg, shape = RoundedCornerShape(14.dp))
+                            .background(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(14.dp))
                             .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
                         Text(
                             text = uiState.error.orEmpty(),
-                            color = DataraError,
+                            color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.Medium,
                                 textAlign = TextAlign.Center
@@ -184,9 +178,9 @@ fun UsernameScreen(
 
             Text(
                 text = if (uiState.isSigningOut) "Signing out…" else "Use a different account",
-                color = DataraNeonBlue,
+                color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.bodyMedium.copy(
-                    color = DataraNeonBlue,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 ),
                 modifier = Modifier
@@ -203,14 +197,14 @@ fun UsernameScreen(
 @Composable
 private fun UsernameHelperText(uiState: UsernameUiState) {
     val (text, color) = when {
-        uiState.formatError != null -> uiState.formatError to DataraError
+        uiState.formatError != null -> uiState.formatError to MaterialTheme.colorScheme.error
         uiState.availability == UsernameAvailability.Taken ->
-            "That username is taken. Try another." to DataraError
+            "That username is taken. Try another." to MaterialTheme.colorScheme.error
         uiState.availability == UsernameAvailability.Available ->
-            "Username is available." to DataraNeonGreen
+            "Username is available." to MaterialTheme.colorScheme.tertiary
         uiState.availability == UsernameAvailability.Checking ->
-            "Checking availability…" to DataraTextSecondary
-        else -> "3–20 characters: letters, numbers and underscores." to DataraTextSecondary
+            "Checking availability…" to MaterialTheme.colorScheme.onSurfaceVariant
+        else -> "3–20 characters: letters, numbers and underscores." to MaterialTheme.colorScheme.onSurfaceVariant
     }
     Text(
         text = text,
@@ -227,7 +221,7 @@ private fun UsernameHelperText(uiState: UsernameUiState) {
 @Composable
 fun UsernameHelperPreview() {
     DATAraTheme {
-        Column(Modifier.background(DataraDarkBg).padding(16.dp)) {
+        Column(Modifier.background(MaterialTheme.colorScheme.background).padding(16.dp)) {
             UsernameHelperText(UsernameUiState(input = "juan", availability = UsernameAvailability.Available))
             UsernameHelperText(UsernameUiState(input = "j!", formatError = "Use only letters, numbers and underscores."))
         }

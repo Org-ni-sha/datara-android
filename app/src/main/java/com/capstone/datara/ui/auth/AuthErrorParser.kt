@@ -75,10 +75,6 @@ object AuthErrorParser {
                     details.contains("email_not_confirmed") -> {
                 "Your email address has not been confirmed yet. Please check your inbox for the confirmation link."
             }
-            details.contains("user not found") ||
-                    details.contains("user_not_found") -> {
-                "No account found with this email. Please check your email or sign up."
-            }
             details.contains("over_request_rate_limit") ||
                     details.contains("too many requests") ||
                     details.contains("rate limit") ||
@@ -105,7 +101,7 @@ object AuthErrorParser {
             details.contains("password should be at least") ||
                     details.contains("weak_password") ||
                     details.contains("signup requires a valid password") -> {
-                "Password must be at least 6 characters long."
+                AuthValidator.PASSWORD_RULE_MESSAGE
             }
             details.contains("unable to validate email address") ||
                     details.contains("invalid_email") ||
@@ -131,10 +127,6 @@ object AuthErrorParser {
                     details.contains("status code: 429") ||
                     details.contains("status code 429") -> {
                 "Please wait a moment before requesting another verification code."
-            }
-            details.contains("user not found") ||
-                    details.contains("user_not_found") -> {
-                "No account found with this email address."
             }
             details.contains("unable to validate email address") ||
                     details.contains("invalid email") -> {
@@ -172,7 +164,7 @@ object AuthErrorParser {
             }
             details.contains("password should be at least") ||
                     details.contains("weak_password") -> {
-                "Password must be at least 6 characters long."
+                AuthValidator.PASSWORD_RULE_MESSAGE
             }
             details.contains("invalid_jwt") ||
                     details.contains("session_expired") ||
@@ -196,6 +188,12 @@ object AuthErrorParser {
             else -> "Failed to resend verification code. Please try again."
         }
     }
+}
+
+enum class PasswordStrength(val label: String) {
+    Weak("Weak — use 8+ characters with letters and numbers"),
+    Fair("Fair — longer, with mixed case or a symbol, is stronger"),
+    Strong("Strong password")
 }
 
 object AuthValidator {
@@ -234,8 +232,33 @@ object AuthValidator {
         return trimmed.isNotEmpty() && EMAIL_REGEX.matches(trimmed)
     }
 
-    fun isPasswordValid(password: String): Boolean {
-        return password.length >= 6
+    /**
+     * Must match Supabase Auth: minimum length 8 and "letters and digits" required
+     * (supabase/config.toml locally; Authentication → Providers → Email on the hosted project).
+     */
+    const val PASSWORD_MIN_LENGTH = 8
+    const val PASSWORD_RULE_MESSAGE =
+        "Password must be at least $PASSWORD_MIN_LENGTH characters and include a letter and a number."
+
+    fun isPasswordValid(password: String): Boolean =
+        password.length >= PASSWORD_MIN_LENGTH &&
+            password.any { it.isLetter() } &&
+            password.any { it.isDigit() }
+
+    /**
+     * Guidance for the strength meter; null for an empty field. Anything that fails
+     * [isPasswordValid] is [PasswordStrength.Weak], so the meter never contradicts the rule.
+     */
+    fun passwordStrength(password: String): PasswordStrength? {
+        if (password.isEmpty()) return null
+        if (!isPasswordValid(password)) return PasswordStrength.Weak
+        val classes = listOf(
+            password.any { it.isLowerCase() },
+            password.any { it.isUpperCase() },
+            password.any { it.isDigit() },
+            password.any { !it.isLetterOrDigit() }
+        ).count { it }
+        return if (password.length >= 12 && classes >= 3) PasswordStrength.Strong else PasswordStrength.Fair
     }
 
     fun isValidName(name: String): Boolean {
@@ -250,10 +273,9 @@ object AuthValidator {
     fun validateRegistration(
         name: String,
         email: String,
-        password: String,
-        confirmPassword: String
+        password: String
     ): String? = when {
-        name.isBlank() || email.isBlank() || password.isBlank() || confirmPassword.isBlank() ->
+        name.isBlank() || email.isBlank() || password.isBlank() ->
             "Please fill in all required fields."
 
         !isValidName(name) ->
@@ -263,10 +285,7 @@ object AuthValidator {
             "Please enter a valid email address."
 
         !isPasswordValid(password) ->
-            "Password must be at least 6 characters long."
-
-        password != confirmPassword ->
-            "Passwords do not match. Please make sure they are identical."
+            PASSWORD_RULE_MESSAGE
 
         else -> null
     }

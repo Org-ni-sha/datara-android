@@ -69,7 +69,7 @@ class AuthErrorParserTest {
         val error = RuntimeException("Password should be at least 6 characters")
         val message = AuthErrorParser.parse(error, AuthAction.REGISTER)
 
-        assertEquals("Password must be at least 6 characters long.", message)
+        assertEquals(AuthValidator.PASSWORD_RULE_MESSAGE, message)
     }
 
     @Test
@@ -125,10 +125,25 @@ class AuthErrorParserTest {
     }
 
     @Test
-    fun authValidator_validatesPasswordLength() {
-        assertTrue(AuthValidator.isPasswordValid("123456"))
+    fun authValidator_validatesPasswordRule() {
+        assertTrue(AuthValidator.isPasswordValid("secret12"))
         assertTrue(AuthValidator.isPasswordValid("securePassword123!"))
-        assertFalse(AuthValidator.isPasswordValid("12345"))
+        assertFalse(AuthValidator.isPasswordValid("secret1"))     // 7 characters
+        assertFalse(AuthValidator.isPasswordValid("12345678"))    // no letter
+        assertFalse(AuthValidator.isPasswordValid("password"))    // no number
         assertFalse(AuthValidator.isPasswordValid(""))
+    }
+
+    // --- No hints about which emails have accounts ---
+    @Test
+    fun parse_login_userNotFound_usesGenericMessage() {
+        val message = AuthErrorParser.parse(RuntimeException("user_not_found"), AuthAction.LOGIN)
+        assertEquals("Unable to log in. Please check your credentials and try again.", message)
+    }
+
+    @Test
+    fun parse_sendResetCode_userNotFound_usesGenericMessage() {
+        val message = AuthErrorParser.parse(RuntimeException("user_not_found"), AuthAction.SEND_RESET_CODE)
+        assertEquals("Unable to send verification code. Please try again.", message)
     }
 }
