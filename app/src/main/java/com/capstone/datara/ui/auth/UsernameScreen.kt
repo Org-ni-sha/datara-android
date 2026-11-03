@@ -1,30 +1,16 @@
 package com.capstone.datara.ui.auth
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,21 +26,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.capstone.datara.ui.auth.components.AuthCardScaffold
+import com.capstone.datara.ui.auth.components.DataraErrorBanner
 import com.capstone.datara.ui.auth.components.DataraFieldLabel
 import com.capstone.datara.ui.auth.components.DataraIcons
-import com.capstone.datara.ui.auth.components.DataraLogo
 import com.capstone.datara.ui.auth.components.DataraPrimaryButton
 import com.capstone.datara.ui.auth.components.DataraTextField
 import com.capstone.datara.ui.theme.DATAraTheme
 
 /**
- * Asks a signed-in user to choose a username. There is no back button: the auth back stack is
- * cleared on the way here, and the only ways out are saving a username or signing out.
+ * Asks a signed-in user to choose a username, on the navy card layout ([AuthCardScaffold]).
+ * There is no back button: the auth back stack is cleared on the way here, and the only ways out
+ * are saving a username or signing out ("Use a different account").
  */
 @Composable
 fun UsernameScreen(
@@ -69,127 +55,63 @@ fun UsernameScreen(
         if (uiState.isSaved) onUsernameSaved()
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .imePadding()
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 28.dp, vertical = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            DataraLogo(size = 96.dp)
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Text(
-                text = "Choose a username",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp
-                ),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "You can log in with it instead of your email.",
-                style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            DataraFieldLabel(label = "Username")
-            Spacer(modifier = Modifier.height(8.dp))
-            DataraTextField(
-                value = uiState.input,
-                onValueChange = viewModel::onInputChange,
-                placeholder = "e.g. juan_dc",
-                leadingIcon = DataraIcons.Person,
-                contentType = ContentType.NewUsername,
-                isError = uiState.formatError != null ||
-                    uiState.availability == UsernameAvailability.Taken,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.None,
-                    autoCorrectEnabled = false,
-                    keyboardType = KeyboardType.Ascii,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        focusManager.clearFocus()
-                        viewModel.submit()
-                    }
-                )
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-            UsernameHelperText(uiState)
-
-            AnimatedVisibility(
-                visible = uiState.error != null,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
+    AuthCardScaffold(
+        title = "Choose a username",
+        subtitle = "You can log in with it instead of your email.",
+        onBack = null,
+        footer = {
+            TextButton(
+                onClick = { viewModel.signOut(onSignedOut) },
+                enabled = !uiState.isSigningOut && !uiState.isSaving,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
             ) {
-                Column {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(14.dp))
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                    ) {
-                        Text(
-                            text = uiState.error.orEmpty(),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Medium,
-                                textAlign = TextAlign.Center
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
+                Text(
+                    text = if (uiState.isSigningOut) "Signing out…" else "Use a different account",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
             }
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            DataraPrimaryButton(
-                text = "Continue",
-                onClick = {
+        }
+    ) {
+        DataraFieldLabel(label = "Username")
+        Spacer(Modifier.height(8.dp))
+        DataraTextField(
+            value = uiState.input,
+            onValueChange = viewModel::onInputChange,
+            placeholder = "e.g. juan_dc",
+            leadingIcon = DataraIcons.Person,
+            contentType = ContentType.NewUsername,
+            isError = uiState.formatError != null ||
+                uiState.availability == UsernameAvailability.Taken,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.None,
+                autoCorrectEnabled = false,
+                keyboardType = KeyboardType.Ascii,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
                     focusManager.clearFocus()
                     viewModel.submit()
-                },
-                enabled = uiState.canSubmit,
-                isLoading = uiState.isSaving
+                }
             )
+        )
 
-            Spacer(modifier = Modifier.height(24.dp))
+        Spacer(Modifier.height(8.dp))
+        UsernameHelperText(uiState)
 
-            Text(
-                text = if (uiState.isSigningOut) "Signing out…" else "Use a different account",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                ),
-                modifier = Modifier
-                    .clickable(enabled = !uiState.isSigningOut && !uiState.isSaving) {
-                        viewModel.signOut(onSignedOut)
-                    }
-                    .padding(8.dp)
-            )
-        }
+        DataraErrorBanner(uiState.error)
+
+        Spacer(Modifier.height(20.dp))
+        DataraPrimaryButton(
+            text = "Continue",
+            onClick = {
+                focusManager.clearFocus()
+                viewModel.submit()
+            },
+            enabled = uiState.canSubmit,
+            isLoading = uiState.isSaving
+        )
     }
 }
 
