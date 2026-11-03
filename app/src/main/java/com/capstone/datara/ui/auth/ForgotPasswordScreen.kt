@@ -1,36 +1,33 @@
 package com.capstone.datara.ui.auth
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,15 +38,26 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.animation.SizeTransform
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -59,17 +67,34 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.capstone.datara.ui.auth.components.AuthCardScaffold
+import com.capstone.datara.ui.auth.components.AuthFooterLink
+import com.capstone.datara.ui.auth.components.DataraErrorBanner
 import com.capstone.datara.ui.auth.components.DataraFieldLabel
 import com.capstone.datara.ui.auth.components.DataraIcons
-import com.capstone.datara.ui.auth.components.DataraLogo
 import com.capstone.datara.ui.auth.components.DataraPrimaryButton
 import com.capstone.datara.ui.auth.components.DataraTextField
 import com.capstone.datara.ui.auth.components.PasswordStrengthMeter
-import androidx.compose.ui.autofill.ContentType
-import androidx.compose.ui.semantics.Role
 import com.capstone.datara.ui.theme.DATAraTheme
 import com.capstone.datara.ui.theme.DataraFontFamily
 
+/** The visible screens of the reset flow; email and code share the first one. */
+private enum class ResetScreen { EmailAndCode, NewPassword, Done }
+
+private val ResetPasswordStep.screen: ResetScreen
+    get() = when (this) {
+        ResetPasswordStep.ENTER_EMAIL, ResetPasswordStep.ENTER_CODE -> ResetScreen.EmailAndCode
+        ResetPasswordStep.SET_NEW_PASSWORD -> ResetScreen.NewPassword
+        ResetPasswordStep.SUCCESS -> ResetScreen.Done
+    }
+
+/**
+ * Password reset by email code, on the navy card layout ([AuthCardScaffold]).
+ *
+ * Screen 1 holds the email and the 6-digit code; after sending, the email collapses into a
+ * "Code sent to … · Change" summary and Verify plus a resend countdown appear. Screen 2
+ * sets the new password; then a confirmation offers Log in.
+ */
 @Composable
 fun ForgotPasswordScreen(
     onNavigateBack: () -> Unit,
@@ -77,536 +102,383 @@ fun ForgotPasswordScreen(
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val state by viewModel.passwordResetState.collectAsState()
-    var email by remember { mutableStateOf("") }
-    var code by remember { mutableStateOf("") }
-    var newPassword by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var code by rememberSaveable { mutableStateOf("") }
+    var newPassword by rememberSaveable { mutableStateOf("") }
+    var confirmPassword by rememberSaveable { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
 
     DisposableEffect(Unit) {
-        onDispose {
-            viewModel.clearPasswordResetState()
-        }
+        onDispose { viewModel.clearPasswordResetState() }
     }
 
-    BackHandler {
+    val goBack: () -> Unit = {
         when (state.step) {
-            ResetPasswordStep.SET_NEW_PASSWORD -> viewModel.backToCodeStep()
-            ResetPasswordStep.ENTER_CODE -> viewModel.backToEmailStep()
+            // The code was already verified; going back means verifying again.
+            ResetPasswordStep.SET_NEW_PASSWORD -> {
+                code = ""
+                viewModel.backToCodeStep()
+            }
+            ResetPasswordStep.SUCCESS -> onNavigateToLogin()
             else -> onNavigateBack()
         }
     }
+    BackHandler(onBack = goBack)
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .imePadding()
-    ) {
-        // Back Navigation Button (Pinned at top, guaranteed unobstructed click targets)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = CircleShape)
-                    .clickable(
-                        onClick = {
-                            when (state.step) {
-                                ResetPasswordStep.SET_NEW_PASSWORD -> viewModel.backToCodeStep()
-                                ResetPasswordStep.ENTER_CODE -> viewModel.backToEmailStep()
-                                else -> onNavigateBack()
-                            }
-                        }
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = DataraIcons.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.size(20.dp)
-                )
+    val (title, subtitle) = when (state.step) {
+        ResetPasswordStep.ENTER_EMAIL ->
+            "Reset password" to "Enter your account email. If it's registered, we'll send a 6-digit code."
+        ResetPasswordStep.ENTER_CODE ->
+            "Reset password" to "If an account exists for that email, we sent it a 6-digit code."
+        ResetPasswordStep.SET_NEW_PASSWORD ->
+            "New password" to "Choose a new password for your account."
+        ResetPasswordStep.SUCCESS ->
+            "Password updated" to "You can now log in with your new password."
+    }
+
+    AuthCardScaffold(
+        title = title,
+        subtitle = subtitle,
+        onBack = goBack,
+        footer = {
+            if (state.step.screen == ResetScreen.EmailAndCode) {
+                AuthFooterLink("Remember your password? ", "Log in", onNavigateToLogin)
             }
         }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            when (state.step) {
-                // STEP 1: Enter Email
-                ResetPasswordStep.ENTER_EMAIL -> {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    DataraLogo(size = 96.dp)
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Text(
-                        text = "Reset password",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 24.sp
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = "Enter your account email. If it's registered, we'll send a 6-digit code to reset your password.",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 20.sp
-                        ),
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(28.dp))
-
-                    DataraFieldLabel(label = "Email address")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    DataraTextField(
-                        value = email,
-                        onValueChange = {
+    ) {
+        AnimatedContent(
+            targetState = state.step.screen,
+            transitionSpec = { fadeIn(tween(250, delayMillis = 90)) togetherWith fadeOut(tween(90)) },
+            label = "ResetScreen"
+        ) { screen ->
+            Column {
+                when (screen) {
+                    ResetScreen.EmailAndCode -> EmailAndCodeCard(
+                        email = email,
+                        onEmailChange = {
                             email = it
                             viewModel.clearResetError()
                         },
-                        placeholder = "you@example.com",
-                        leadingIcon = DataraIcons.Email,
-                        contentType = ContentType.EmailAddress,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                focusManager.clearFocus()
-                                viewModel.sendResetCode(email)
-                            }
-                        )
-                    )
-
-                    AnimatedVisibility(
-                        visible = state.error != null,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        Column {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        color = MaterialTheme.colorScheme.errorContainer,
-                                        shape = RoundedCornerShape(14.dp)
-                                    )
-                                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                            ) {
-                                Text(
-                                    text = state.error.orEmpty(),
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontWeight = FontWeight.Medium,
-                                        textAlign = TextAlign.Center
-                                    ),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(28.dp))
-
-                    DataraPrimaryButton(
-                        text = "Send code",
-                        onClick = {
-                            focusManager.clearFocus()
-                            viewModel.sendResetCode(email)
-                        },
-                        enabled = email.isNotBlank(),
-                        isLoading = state.isLoading
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Row(
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Remember your password? ",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        )
-                        Text(
-                            text = "Log in",
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            modifier = Modifier.clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = onNavigateToLogin
-                            )
-                        )
-                    }
-                }
-
-                // STEP 2: Enter 6-Digit Code (Separate screen with 6 small boxes)
-                ResetPasswordStep.ENTER_CODE -> {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    DataraLogo(size = 88.dp)
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    Text(
-                        text = "Verify code",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 24.sp
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = "If an account exists for ${state.email}, we sent it a 6-digit code.",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 20.sp
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Text(
-                        text = "Wrong email? Change",
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        modifier = Modifier.clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = {
-                                code = ""
-                                viewModel.backToEmailStep()
-                            }
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    // 6 Small Digit Boxes Input
-                    DataraFieldLabel(
-                        label = "6-Digit Code",
-                        modifier = Modifier.padding(horizontal = 4.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    SixDigitCodeInput(
+                        codeSent = state.step == ResetPasswordStep.ENTER_CODE,
+                        sentTo = state.email,
                         code = code,
                         onCodeChange = {
                             code = it
                             viewModel.clearResetError()
                         },
-                        isError = state.error != null,
-                        onDone = {
+                        isLoading = state.isLoading,
+                        hasError = state.error != null,
+                        resendSecondsLeft = state.resendSecondsLeft,
+                        onSend = {
                             focusManager.clearFocus()
-                            if (code.length == 6) {
-                                viewModel.verifyResetCode(code)
-                            }
-                        }
-                    )
-
-                    AnimatedVisibility(
-                        visible = state.error != null,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        Column {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        color = MaterialTheme.colorScheme.errorContainer,
-                                        shape = RoundedCornerShape(14.dp)
-                                    )
-                                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                            ) {
-                                Text(
-                                    text = state.error.orEmpty(),
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontWeight = FontWeight.Medium,
-                                        textAlign = TextAlign.Center
-                                    ),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(28.dp))
-
-                    DataraPrimaryButton(
-                        text = "Verify code",
-                        onClick = {
+                            viewModel.sendResetCode(email)
+                        },
+                        // A different address needs a new code.
+                        onChangeEmail = {
+                            code = ""
+                            viewModel.backToEmailStep()
+                        },
+                        onVerify = {
                             focusManager.clearFocus()
                             viewModel.verifyResetCode(code)
                         },
-                        enabled = code.length == 6,
-                        isLoading = state.isLoading
+                        onResend = {
+                            code = ""
+                            viewModel.resendResetCode()
+                        }
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Row(
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Didn't receive the code? ",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        )
-                        val canResend = state.resendSecondsLeft == 0 && !state.isLoading
-                        Text(
-                            text = if (state.resendSecondsLeft > 0) {
-                                "Resend in 0:%02d".format(state.resendSecondsLeft)
-                            } else {
-                                "Resend"
-                            },
-                            color = if (canResend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            modifier = Modifier
-                                .clickable(enabled = canResend, role = Role.Button) {
-                                    code = ""
-                                    viewModel.resendResetCode()
-                                }
-                                .padding(horizontal = 4.dp, vertical = 12.dp)
-                        )
-                    }
-                }
-
-                // STEP 3: Set New Password (Only unlocks after code verification succeeds!)
-                ResetPasswordStep.SET_NEW_PASSWORD -> {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    DataraLogo(size = 88.dp)
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    Text(
-                        text = "New password",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            color = MaterialTheme.colorScheme.onBackground,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 24.sp
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(
-                        text = "Code verified! Please create a new password for your account.",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 20.sp
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(28.dp))
-
-                    // New Password Field
-                    DataraFieldLabel(label = "New password")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    DataraTextField(
-                        value = newPassword,
-                        onValueChange = {
+                    ResetScreen.NewPassword -> NewPasswordCard(
+                        newPassword = newPassword,
+                        onNewPasswordChange = {
                             newPassword = it
                             viewModel.clearResetError()
                         },
-                        placeholder = "At least 8 characters",
-                        leadingIcon = DataraIcons.Lock,
-                        isPassword = true,
-                        contentType = ContentType.NewPassword,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Next
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                        )
-                    )
-                    PasswordStrengthMeter(AuthValidator.passwordStrength(newPassword))
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Confirm Password Field
-                    DataraFieldLabel(label = "Confirm new password")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    DataraTextField(
-                        value = confirmPassword,
-                        onValueChange = {
+                        confirmPassword = confirmPassword,
+                        onConfirmPasswordChange = {
                             confirmPassword = it
                             viewModel.clearResetError()
                         },
-                        placeholder = "Re-enter new password",
-                        leadingIcon = DataraIcons.Lock,
-                        isPassword = true,
-                        contentType = ContentType.NewPassword,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                focusManager.clearFocus()
-                                viewModel.updateNewPassword(newPassword, confirmPassword)
-                            }
-                        )
-                    )
-
-                    AnimatedVisibility(
-                        visible = state.error != null,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        Column {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(
-                                        color = MaterialTheme.colorScheme.errorContainer,
-                                        shape = RoundedCornerShape(14.dp)
-                                    )
-                                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                            ) {
-                                Text(
-                                    text = state.error.orEmpty(),
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontWeight = FontWeight.Medium,
-                                        textAlign = TextAlign.Center
-                                    ),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(28.dp))
-
-                    DataraPrimaryButton(
-                        text = "Save new password",
-                        onClick = {
+                        isLoading = state.isLoading,
+                        onSave = {
                             focusManager.clearFocus()
                             viewModel.updateNewPassword(newPassword, confirmPassword)
-                        },
-                        enabled = newPassword.isNotBlank() && confirmPassword.isNotBlank(),
-                        isLoading = state.isLoading
-                    )
-                }
-
-                // STEP 4: Success Screen
-                ResetPasswordStep.SUCCESS -> {
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(MaterialTheme.colorScheme.surface)
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.35f),
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                            .padding(28.dp)
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(60.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = DataraIcons.CheckCircle,
-                                    contentDescription = "Success",
-                                    tint = MaterialTheme.colorScheme.tertiary,
-                                    modifier = Modifier.size(36.dp)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(18.dp))
-
-                            Text(
-                                text = "Password updated",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            Text(
-                                text = "Your password has been successfully updated. You can now log in to DATAra with your new password.",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center,
-                                    lineHeight = 20.sp
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.height(26.dp))
-
-                            DataraPrimaryButton(
-                                text = "Log in now",
-                                onClick = onNavigateToLogin
-                            )
                         }
-                    }
-                }
-            }
+                    )
 
-            Spacer(modifier = Modifier.height(20.dp))
+                    ResetScreen.Done -> DoneCard(onLogIn = onNavigateToLogin)
+                }
+                DataraErrorBanner(state.error)
+            }
         }
     }
 }
 
+/** "n•••@example.com": enough to recognise the address without showing it in full. */
+private fun maskEmail(email: String): String {
+    val at = email.indexOf('@')
+    if (at <= 0) return email
+    return email.first() + "•••" + email.substring(at)
+}
+
 /**
- * 6 Small individual boxes for entering the OTP code.
- * Handles auto-advancing, pasting, deleting, and highlights the active digit.
+ * Screen 1 of the reset flow. Before sending: a full-width email and Send code, with the code
+ * boxes already visible but locked. After sending: the email collapses into a "Code sent to …
+ * · Change" summary, the boxes unlock and take focus, and Verify plus a resend link appear.
+ */
+@Composable
+private fun EmailAndCodeCard(
+    email: String,
+    onEmailChange: (String) -> Unit,
+    codeSent: Boolean,
+    sentTo: String,
+    code: String,
+    onCodeChange: (String) -> Unit,
+    isLoading: Boolean,
+    hasError: Boolean,
+    resendSecondsLeft: Int,
+    onSend: () -> Unit,
+    onChangeEmail: () -> Unit,
+    onVerify: () -> Unit,
+    onResend: () -> Unit
+) {
+    AnimatedContent(
+        targetState = codeSent,
+        transitionSpec = {
+            (fadeIn(tween(250, delayMillis = 90)) togetherWith fadeOut(tween(90)))
+                .using(SizeTransform(clip = false))
+        },
+        label = "EmailOrSummary"
+    ) { sent ->
+        if (sent) {
+            SentToSummary(sentTo = sentTo, onChange = onChangeEmail)
+        } else {
+            Column {
+                DataraFieldLabel(label = "Email address")
+                Spacer(Modifier.height(8.dp))
+                DataraTextField(
+                    value = email,
+                    onValueChange = onEmailChange,
+                    placeholder = "you@example.com",
+                    leadingIcon = DataraIcons.Email,
+                    contentType = ContentType.EmailAddress,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Email,
+                        imeAction = ImeAction.Send
+                    ),
+                    keyboardActions = KeyboardActions(onSend = { onSend() })
+                )
+                Spacer(Modifier.height(16.dp))
+                DataraPrimaryButton(
+                    text = "Send code",
+                    onClick = onSend,
+                    enabled = email.isNotBlank(),
+                    isLoading = isLoading
+                )
+            }
+        }
+    }
+
+    Spacer(Modifier.height(20.dp))
+    DataraFieldLabel(label = "6-digit code")
+    Spacer(Modifier.height(8.dp))
+    // Always shown so the whole task is visible; locked (dimmed) until a code has been sent.
+    SixDigitCodeInput(
+        code = code,
+        onCodeChange = onCodeChange,
+        isError = hasError && codeSent,
+        enabled = codeSent,
+        onDone = { if (code.length == 6) onVerify() }
+    )
+
+    AnimatedContent(
+        targetState = codeSent,
+        transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(120)) },
+        label = "CodeFooter"
+    ) { sent ->
+        if (sent) {
+            Column {
+                ResendLink(resendSecondsLeft = resendSecondsLeft, isLoading = isLoading, onResend = onResend)
+                Spacer(Modifier.height(8.dp))
+                DataraPrimaryButton(
+                    text = "Verify code",
+                    onClick = onVerify,
+                    enabled = code.length == 6,
+                    // Resending clears the code, so the spinner only shows while verifying.
+                    isLoading = isLoading && code.length == 6
+                )
+            }
+        } else {
+            Text(
+                text = "Send a code to your email first.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+    }
+}
+
+/** The collapsed email after sending, with a way back to fix a typo. */
+@Composable
+private fun SentToSummary(sentTo: String, onChange: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = DataraIcons.Email,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = "Code sent to",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = maskEmail(sentTo),
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        TextButton(onClick = onChange) {
+            Text(
+                text = "Change",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ResendLink(resendSecondsLeft: Int, isLoading: Boolean, onResend: () -> Unit) {
+    val canResend = resendSecondsLeft == 0 && !isLoading
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start,
+        itemVerticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Didn't get it? ",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        TextButton(onClick = onResend, enabled = canResend) {
+            Text(
+                text = if (resendSecondsLeft > 0) "Resend in 0:%02d".format(resendSecondsLeft) else "Resend code",
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                color = if (canResend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun NewPasswordCard(
+    newPassword: String,
+    onNewPasswordChange: (String) -> Unit,
+    confirmPassword: String,
+    onConfirmPasswordChange: (String) -> Unit,
+    isLoading: Boolean,
+    onSave: () -> Unit
+) {
+    val focusManager = LocalFocusManager.current
+    DataraFieldLabel(label = "New password")
+    Spacer(Modifier.height(8.dp))
+    DataraTextField(
+        value = newPassword,
+        onValueChange = onNewPasswordChange,
+        placeholder = "At least 8 characters",
+        leadingIcon = DataraIcons.Lock,
+        isPassword = true,
+        contentType = ContentType.NewPassword,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+            imeAction = ImeAction.Next
+        ),
+        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+    )
+    PasswordStrengthMeter(AuthValidator.passwordStrength(newPassword))
+
+    Spacer(Modifier.height(16.dp))
+
+    // Kept here (unlike sign-up): the user is replacing a password they can't see or recall.
+    DataraFieldLabel(label = "Confirm new password")
+    Spacer(Modifier.height(8.dp))
+    DataraTextField(
+        value = confirmPassword,
+        onValueChange = onConfirmPasswordChange,
+        placeholder = "Re-enter new password",
+        leadingIcon = DataraIcons.Lock,
+        isPassword = true,
+        isError = confirmPassword.isNotEmpty() && confirmPassword != newPassword,
+        contentType = ContentType.NewPassword,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+            imeAction = ImeAction.Done
+        ),
+        keyboardActions = KeyboardActions(onDone = { onSave() })
+    )
+
+    Spacer(Modifier.height(24.dp))
+    DataraPrimaryButton(
+        text = "Save new password",
+        onClick = onSave,
+        enabled = newPassword.isNotBlank() && confirmPassword.isNotBlank(),
+        isLoading = isLoading
+    )
+}
+
+@Composable
+private fun DoneCard(onLogIn: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.tertiaryContainer)
+                .semantics { contentDescription = "Success" },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = DataraIcons.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(34.dp)
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = "Your password was changed. Use it the next time you log in.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(20.dp))
+        DataraPrimaryButton(text = "Log in now", onClick = onLogIn)
+    }
+}
+
+/**
+ * 6 individual boxes for entering the OTP code.
+ * Handles auto-advancing, pasting, deleting, and highlights the active digit. When [enabled] is
+ * false the boxes are shown dimmed and cannot be typed in. The boxes share the
+ * available width (up to 48dp each), so they fit inside the card on small screens.
  */
 @Composable
 fun SixDigitCodeInput(
@@ -614,14 +486,15 @@ fun SixDigitCodeInput(
     onCodeChange: (String) -> Unit,
     isError: Boolean,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onDone: () -> Unit = {}
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) {
-        // Automatically request focus when entering the code screen
-        focusRequester.requestFocus()
+    LaunchedEffect(enabled) {
+        // Focus the code as soon as it can be typed, so the number keyboard is ready for it.
+        if (enabled) focusRequester.requestFocus()
     }
 
     BasicTextField(
@@ -633,17 +506,18 @@ fun SixDigitCodeInput(
                 onDone()
             }
         },
+        enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.45f)
             .focusRequester(focusRequester)
-            .onFocusChanged { isFocused = it.isFocused },
+            .onFocusChanged { isFocused = it.isFocused }
+            .semantics { this.contentType = ContentType.SmsOtpCode },
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Number,
             imeAction = ImeAction.Done
         ),
-        keyboardActions = KeyboardActions(
-            onDone = { onDone() }
-        ),
+        keyboardActions = KeyboardActions(onDone = { onDone() }),
         decorationBox = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -664,8 +538,9 @@ fun SixDigitCodeInput(
 
                     Box(
                         modifier = Modifier
-                            .width(44.dp)
-                            .height(54.dp)
+                            .weight(1f)
+                            .widthIn(max = 48.dp)
+                            .heightIn(min = 54.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(MaterialTheme.colorScheme.surface)
                             .border(
@@ -680,14 +555,13 @@ fun SixDigitCodeInput(
                                 text = char,
                                 style = TextStyle(
                                     fontFamily = DataraFontFamily,
-                                    color = MaterialTheme.colorScheme.onBackground,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
                                     textAlign = TextAlign.Center
                                 )
                             )
                         } else if (isCurrentActiveBox) {
-                            // Active blinking indicator
                             Box(
                                 modifier = Modifier
                                     .width(2.dp)
