@@ -13,6 +13,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.capstone.datara.telemetry.TelemetryController
 import com.capstone.datara.ui.navigation.DataraNavGraph
 import com.capstone.datara.ui.navigation.DataraRoute
 import com.capstone.datara.ui.session.SessionState
@@ -20,9 +21,20 @@ import com.capstone.datara.ui.session.SessionViewModel
 import com.capstone.datara.ui.splash.SplashScreen
 import com.capstone.datara.ui.theme.DATAraTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var telemetryController: TelemetryController
+
+    override fun onStart() {
+        super.onStart()
+        // Resume tracking the user left on if Android or the vendor stopped it ("Open DATAra to
+        // resume"). A start from the foreground is always allowed, unlike the watchdog's.
+        telemetryController.restartIfWanted("App opened")
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)

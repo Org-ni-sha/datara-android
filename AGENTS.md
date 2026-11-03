@@ -25,7 +25,8 @@ As of 2026-10-29:
 - **Implemented:** D1 authentication (email/username + password, Google, username screen and `NeedsUsername` gate), session routing, official logo/launcher icons and native splash plus session-loading UI.
 - **Implemented as previews:** Home, Create Quota, Quota Details, History, Notifications, Settings and Profile. Sample forecasts, usage, notification preferences and sync states are not production integrations. Sign-out uses real Supabase Auth, and the Profile name and username are read from and saved to `public.users`.
 - **Historically applied:** C2 legacy promo-based Postgres schema, RLS and profile trigger. `supabase/` remains the schema source of truth; never edit applied migrations.
-- **Pending:** quota-schema design/new migrations, Room, telemetry, durable cycles/history, inference, OS alert delivery, persistent preferences and sync. Do not mark D2–D9 complete just because their UI exists.
+- **Implemented (D4, no persistence yet):** the telemetry foreground service (30 s `TrafficStats`, 10 min `NetworkStatsManager`, 15 min watchdog), signal/network/carrier inputs, the Tracking setup screen and its permissions. Samples go to an in-memory repository until D2 — see [usage telemetry](docs/telemetry.md).
+- **Pending:** quota-schema design/new migrations, Room, durable telemetry storage, durable cycles/history, inference, OS alert delivery, persistent preferences and sync. Do not mark D2–D9 complete just because their UI exists.
 
 The current implementation details and limitations are in [quota UI preview](docs/quota-ui-preview.md).
 
@@ -49,13 +50,13 @@ The current implementation details and limitations are in [quota UI preview](doc
 | Testing | JUnit 4, Compose UI Test |
 | Charts | Vico Compose 3.3.1 — sample History UI; real telemetry integration pending |
 | Launch | AndroidX core-splashscreen 1.2.0, native launch theme and Compose session loading |
+| Background work | `specialUse` foreground service sampling `TrafficStats` every 30 s and `NetworkStatsManager` every 10 min (matching `data-harvester`), plus a 15-min WorkManager 2.11.2 watchdog — ROADMAP Decision 1 |
 
 ### Planned — not yet a dependency
 
 | Layer | Choice | Roadmap phase |
 |---|---|---|
 | Local DB | Room (SQLite), KSP compiler | D2 |
-| Background work | Foreground Service sampling `TrafficStats` every 30 s and `NetworkStatsManager` every 10 min (matching `data-harvester`), plus a 15-min WorkManager watchdog — ROADMAP Decision 1 | D4 |
 | On-device inference | ONNX Runtime Mobile (`com.microsoft.onnxruntime:onnxruntime-android`) | D6 |
 
 **Auth OTP note:** password recovery does use a one-time code, but it is an *email* OTP (`verifyEmailOtp(OtpType.Email.RECOVERY)` in `AuthRepository`). That is intended and correct. The banned pattern is *phone/SMS* OTP as a login identifier.
@@ -70,7 +71,7 @@ Package root: `com.capstone.datara`
 - **All dependencies go through the version catalog** at [`gradle/libs.versions.toml`](gradle/libs.versions.toml). Never hardcode a version string in `app/build.gradle.kts`.
 - **SDK levels:** `minSdk = 26` (hard requirement — do not lower), `compileSdk = 37`, `targetSdk = 37`. Java/JVM target 11.
 - **AGP is 9.3.2**, which uses newer DSL syntax already present in `app/build.gradle.kts` — `compileSdk { version = release(37) }` and `release { optimization { enable = false } }`. These are correct for AGP 9; do not "fix" them back to the older `compileSdk = 37` / `isMinifyEnabled` form.
-- **The manifest currently declares only `INTERNET`.** Every additional permission (`READ_PHONE_STATE`, `PACKAGE_USAGE_STATS`, `FOREGROUND_SERVICE`, …) is a scope decision — see Scope Boundaries. Add them only when the corresponding roadmap phase is actually being built, and never add a permission the roadmap doesn't call for.
+- **The manifest declares `INTERNET` plus the D4 tracking permissions** (foreground service `specialUse`, `ACCESS_NETWORK_STATE`, `RECEIVE_BOOT_COMPLETED`, `PACKAGE_USAGE_STATS`, `POST_NOTIFICATIONS`, `READ_PHONE_STATE`, `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`), each commented with its reason; see [usage telemetry](docs/telemetry.md). Every further permission is a scope decision — see Scope Boundaries. Add one only when its roadmap phase is actually being built, and never add a permission the roadmap doesn't call for.
 
 ---
 
@@ -110,7 +111,7 @@ Tests cover auth validation/errors, quota input and sample-state behavior, Histo
 
 ### Planned infrastructure
 
-`data/local/` (Room), background telemetry, sync and inference are still pending. `ui/promos/` is no longer planned: quota setup replaces the former catalog flow.
+`data/local/` (Room), durable telemetry storage, sync and inference are still pending. Telemetry lives in `telemetry/` (service, rules, device readers), `data/telemetry/` (repository seam) and `ui/tracking/` (setup screen). `ui/promos/` is no longer planned: quota setup replaces the former catalog flow.
 
 ---
 
