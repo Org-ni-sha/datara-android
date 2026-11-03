@@ -247,6 +247,12 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# Password reset code (Forgot password in the app). The hosted project uses the same file,
+# pasted into Authentication -> Email Templates -> Reset Password.
+[auth.email.template.recovery]
+subject = "Your DATAra password reset code"
+content_path = "./supabase/templates/recovery.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true

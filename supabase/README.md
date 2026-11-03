@@ -60,6 +60,18 @@ hosted project — dashboard → Authentication → Providers → Email: **Minim
 **Password requirements: Letters and digits**; and Authentication → Rate Limits / email settings:
 one email per **60 seconds**. `config.toml` already has the same values for a local stack.
 
+Email templates live in `templates/` and are versioned here; the hosted project needs them
+pasted in by hand (dashboard → Authentication → Email Templates):
+
+| Template | File | Subject |
+|---|---|---|
+| Reset Password | `templates/recovery.html` | `Your DATAra password reset code` |
+
+It shows `{{ .Token }}` (the 6-digit code the app verifies) and says the code lasts 1 hour, so
+keep **Email OTP Expiration** at 3600 seconds or update the wording. The logo loads from this
+public repo's `main` branch on GitHub; if the repo goes private or the PNG moves, update the
+`<img src>`.
+
 Email confirmation is deliberately **off** while the app is in development. Turn it on before
 release (dashboard → Authentication → Sign In / Providers → Email); the app will then need a
 "check your inbox" step after Register, because sign-up will no longer return a session.
