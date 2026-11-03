@@ -55,7 +55,7 @@ The current implementation details and limitations are in [quota UI preview](doc
 | Layer | Choice | Roadmap phase |
 |---|---|---|
 | Local DB | Room (SQLite), KSP compiler | D2 |
-| Background work | WorkManager + Foreground Service — 30-sec (`TrafficStats`) and 15-min (`NetworkStatsManager`) polling | D4 |
+| Background work | Foreground Service sampling `TrafficStats` every 30 s and `NetworkStatsManager` every 10 min (matching `data-harvester`), plus a 15-min WorkManager watchdog — ROADMAP Decision 1 | D4 |
 | On-device inference | ONNX Runtime Mobile (`com.microsoft.onnxruntime:onnxruntime-android`) | D6 |
 
 **Auth OTP note:** password recovery does use a one-time code, but it is an *email* OTP (`verifyEmailOtp(OtpType.Email.RECOVERY)` in `AuthRepository`). That is intended and correct. The banned pattern is *phone/SMS* OTP as a login identifier.

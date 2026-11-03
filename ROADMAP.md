@@ -69,7 +69,7 @@ The roadmap previously specified a **10-minute WorkManager worker**. WorkManager
 | **(b) Self-rescheduling `OneTimeWorkRequest` chain, 10-min `initialDelay`** | Keeps the 10-minute figure. Loses periodic-work guarantees and drifts under Doze/battery optimization. |
 | **(c) Do the `NetworkStatsManager` read inside the 30-sec foreground service** | Keeps exact 10-minute cadence while the service is alive; drops WorkManager from D4 entirely. Nothing runs if the service is killed. |
 
-D4 below is written against **(a) 15 minutes** as the provisional default. Change it if you pick otherwise — and note the interval is also recorded in [`AGENTS.md`](AGENTS.md).
+**Decided (2026-11-03): (c), matching the `data-harvester` that produces the training data.** The harvester (v1.6.5, `MeasurementRules`) samples `TrafficStats` every **30 s** (`COLLECTION_INTERVAL_MS = 30_000`) and `NetworkStatsManager` every **10 min** (`APP_COLLECTION_INTERVAL_MS = 600_000`), both inside its foreground service and also on every Wi-Fi ↔ mobile switch, with a 15-minute WorkManager **watchdog** that only restarts collection. The app must measure at the same granularity: features computed at inference time have to match the B2 features computed from harvester data, or forecasts degrade silently. WorkManager cannot run every 10 minutes, so the 10-minute read lives in the service; the watchdog covers process death. The interval is also recorded in [`AGENTS.md`](AGENTS.md).
 
 ### ⚠️ DECISION 2 — What "Local model" actually means (affects D6, E3, and Chapter 3)
 
@@ -96,7 +96,7 @@ Documented so the panel question "why not just train on-device?" has a researche
 | **Native XGBoost / LightGBM C API via Android NDK** | Technically possible — XGBoost does expose a C API — but there are no official Android builds or prebuilt AARs. Requires cross-compiling a large C++ library per ABI, a JNI bridge, and several MB of native libs in the APK. Multi-week build-engineering risk against a defense deadline, and it does not address the data problem below. |
 | **River (online/incremental ML)** | Python-only, targeted at Linux edge nodes; there is no Kotlin/Android runtime. Shipping a Python runtime via Chaquopy to obtain it is disproportionate. **However, its underlying paradigm — incremental updates from streaming samples — is precisely what option (a) implements in ~50–80 lines of Kotlin with no dependency.** |
 
-**The deeper reason none of these change the decision:** all four try to preserve the premise that the local layer must be XGBoost. But at 15-minute polling, 7 days of a single user's data is **~672 rows**. Fitting a gradient-boosted ensemble on 672 rows with ~10 features overfits regardless of which runtime executes it. The constraint is statistical as well as technical, so a better runtime does not solve it.
+**The deeper reason none of these change the decision:** all four try to preserve the premise that the local layer must be XGBoost. But at 10-minute polling (Decision 1), 7 days of a single user's data is **~1,008 rows**. Fitting a gradient-boosted ensemble on ~1,000 rows with ~10 features overfits regardless of which runtime executes it. The constraint is statistical as well as technical, so a better runtime does not solve it.
 
 The claim the thesis actually defends is *"per-user personalization improves PET accuracy over a global baseline"* — not *"the local model is specifically XGBoost."* Options (a) and (c) deliver that claim without the engineering risk.
 
@@ -140,7 +140,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
   - Check for device- or carrier-specific measurement bias using the metadata from A3.
 - [ ] **Phase B2 — Feature Engineering:**
   - `rolling_consumption_rate`: 1-hour, 3-hour, and 24-hour moving averages.
-    - **Resolution constraint:** `NetworkStatsManager` is coarsely bucketed (roughly 2-hour granularity for detailed queries), so on-device features are running totals, not true 10/15-minute resolution. Engineer features the client can actually reproduce at inference time — a feature the app cannot compute is useless no matter how well it trains.
+    - **Resolution constraint:** `NetworkStatsManager` is coarsely bucketed (roughly 2-hour granularity for detailed queries), so on-device features are running totals, not true 10-minute resolution. Engineer features the client can actually reproduce at inference time — a feature the app cannot compute is useless no matter how well it trains.
   - `time_features`: hour of day (cyclical sine/cosine), day of week, is_weekend.
   - `network_features`: signal strength (dBm/bars), network type (LTE/5G), and measured speed. Confirm the speed field, units and availability in the research contract before training; the earlier A4 export list is not a finalized quota dataset schema.
   - Target variable definition: time until measured usage reaches the chosen quota, or a consumption-rate forecast from which quota PET is derived. Finalize the target and horizon before training; use consistent cycle windows and quota units.
@@ -214,7 +214,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 The former promo catalog, promo entry and expiry setup are superseded. A chosen quota is a tracking amount, not a purchased allowance; all measured mobile traffic counts regardless of carrier freebies.
 
 #### Phase D4: Dual Background Telemetry Harvester
-*See ⚠️ DECISION 1 — written below against the 15-minute option.*
+*Per ⚠️ DECISION 1 (decided): 30 s and 10 min inside one foreground service, plus a 15-minute WorkManager watchdog — the same scheme as `data-harvester`, so app features match the training data.*
 
 - [ ] **Permissions — three different mechanisms, do not treat them as one list:**
   - `PACKAGE_USAGE_STATS` — **special access, not a runtime permission.** There is no permission dialog. Send the user to `Settings.ACTION_USAGE_ACCESS_SETTINGS` and verify the grant via `AppOpsManager` (`unsafeCheckOpNoThrow`). Needs its own onboarding screen explaining why. This is the most common first-run failure for `NetworkStatsManager` apps.
@@ -225,10 +225,13 @@ The former promo catalog, promo entry and expiry setup are superseded. A chosen 
   - Measure real-time delta and instantaneous speed (KB/s, MB/s) using `TrafficStats`.
   - **Handle reboots:** `TrafficStats` counters are device-wide and reset to zero on reboot. Persist the last-seen counter and, when the new reading is lower than the stored one, treat it as a reboot and re-baseline instead of recording a large negative delta.
   - Persistent notification copy should explain the tracking honestly (users see it constantly, and the panel will too).
-- [ ] **15-Minute WorkManager Worker** *(interval per DECISION 1)*:
-  - Measure durable bucketed cellular data using `NetworkStatsManager`.
+- [ ] **10-Minute `NetworkStatsManager` read (inside the foreground service)** *(interval per DECISION 1)*:
+  - Also run it immediately on a Wi-Fi ↔ mobile switch (debounced), as the harvester does.
+  - Measure durable cellular totals with `NetworkStatsManager`. Its buckets are ~2 h, too coarse to query "the last 10 minutes" directly: read cumulative usage since a fixed anchor (the harvester uses UTC midnight) and store the difference from the previous reading.
   - Calculate remaining tracking quota against the active cycle baseline; include all measured mobile traffic regardless of carrier billing treatment.
-  - Reconcile against the foreground service's `TrafficStats` figures; `NetworkStatsManager` is the source of truth for durable totals.
+  - Reconcile against the service's `TrafficStats` figures; `NetworkStatsManager` is the source of truth for durable totals.
+- [ ] **15-Minute WorkManager watchdog:** restarts the foreground service if the system killed it (WorkManager's minimum period). It does not take measurements itself.
+- [ ] **Mirror the harvester's measurement rules** (intervals, gap thresholds, network-switch handling, reboot re-baselining) from `data-harvester`'s `MeasurementRules` rather than re-deriving them, so recorded intervals mean the same thing in training and in the app.
 - [ ] **Signal Strength Monitor:**
   - `TelephonyCallback` on API 31+, `PhoneStateListener` below it (deprecated at 31). With `minSdk 26` **both** paths are required — pick by `Build.VERSION.SDK_INT`.
 - [ ] Persist snapshots to local Room database and queue for cloud sync. *(Blocked by: D2, C3.)*
