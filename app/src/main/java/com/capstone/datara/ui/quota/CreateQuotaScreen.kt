@@ -19,20 +19,23 @@ import com.capstone.datara.ui.components.*
 import com.capstone.datara.ui.theme.QuotaTheme
 
 @Composable
-fun CreateQuotaScreen(onBack: () -> Unit, onCreateQuota: (Long, String) -> Unit, modifier: Modifier = Modifier) {
-    QuotaTheme { CreateQuotaContent(onBack, onCreateQuota, modifier) }
+fun CreateQuotaScreen(onBack: () -> Unit, onCreateQuota: (Long, String) -> Unit, modifier: Modifier = Modifier,
+    isSaving: Boolean = false, errorMessage: String? = null, replacingName: String? = null) {
+    QuotaTheme { CreateQuotaContent(onBack, onCreateQuota, modifier, isSaving, errorMessage, replacingName) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun CreateQuotaContent(onBack: () -> Unit, onCreateQuota: (Long, String) -> Unit, modifier: Modifier) {
+private fun CreateQuotaContent(onBack: () -> Unit, onCreateQuota: (Long, String) -> Unit, modifier: Modifier,
+    isSaving: Boolean, errorMessage: String?, replacingName: String?) {
     var amount by rememberSaveable { mutableStateOf("") }
     var unitName by rememberSaveable { mutableStateOf(QuotaUnit.GB.name) }
     var name by rememberSaveable { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     val unit = QuotaUnit.valueOf(unitName)
     val focus = LocalFocusManager.current
-    val submit = {
+    val submit = submit@{
+        if (isSaving) return@submit
         when (val result = QuotaInput.parseAmount(amount, unit)) {
             is QuotaAmountResult.Invalid -> error = result.message
             is QuotaAmountResult.Valid -> { focus.clearFocus(); onCreateQuota(result.bytes, name) }
@@ -43,8 +46,10 @@ private fun CreateQuotaContent(onBack: () -> Unit, onCreateQuota: (Long, String)
         bottomBar = {
             Surface(color = MaterialTheme.colorScheme.background) {
                 Column(Modifier.navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DataraActionButton("Start tracking", { submit() })
-                    Text("Sample cycle - Tracking is not connected yet", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    errorMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
+                    DataraActionButton(if (isSaving) "Starting…" else "Start tracking", { submit() })
+                    Text(replacingName?.let { "Starting ends your current cycle, “$it”." } ?: "Usage counts from the moment you start.",
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }) { insets ->

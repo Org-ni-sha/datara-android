@@ -62,7 +62,7 @@ Some vendor builds (MIUI and others) also need Autostart enabled before backgrou
 Samples go through `data/telemetry/TelemetryRepository`. Hilt binds it to `InMemoryTelemetryRepository` in `di/TelemetryModule`.
 
 - **What the in-memory version loses:** everything, checkpoints included, when the process dies. The next sample is then a `BASELINE`.
-- **What it keeps:** only the most recent day.
+- **What it keeps:** the most recent day of 30-second samples and about 35 days of 10-minute readings (D3 cycles sum the readings since a cycle's start).
 
 For D2, replace the binding with a Room-backed implementation that keeps these rules:
 - `commitPrimary` and `commitDurable` store the rows **and** their checkpoint in one transaction. That way a crash can never count bytes twice (see `crash before commit` in `PrimaryTickTest`).

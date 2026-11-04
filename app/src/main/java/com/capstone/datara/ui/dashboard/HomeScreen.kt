@@ -32,12 +32,15 @@ import com.capstone.datara.ui.tracking.TrackingSetupScreen
 fun DashboardScreen(
     onSignedOut: () -> Unit,
     viewModel: QuotaDemoViewModel = hiltViewModel(),
+    cycleViewModel: QuotaCycleViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel(),
     notificationsViewModel: NotificationPreviewViewModel = hiltViewModel(),
     settingsViewModel: SettingsPreviewViewModel = hiltViewModel(),
     profileViewModel: ProfileViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val cycleDetails by cycleViewModel.details.collectAsState()
+    val cycleAction by cycleViewModel.action.collectAsState()
     val notificationState by notificationsViewModel.uiState.collectAsState()
     val settingsState by settingsViewModel.uiState.collectAsState()
     val profileState by profileViewModel.uiState.collectAsState()
@@ -55,14 +58,20 @@ fun DashboardScreen(
     if (tracking) {
         TrackingSetupScreen(onBack = { tracking = false })
     } else if (creating) {
-        CreateQuotaScreen(onBack = { creating = false }, onCreateQuota = { bytes, name ->
-            viewModel.createQuota(bytes, name)
-            creating = false
-            details = false
-        })
+        CreateQuotaScreen(onBack = { cycleViewModel.clearError(); creating = false }, onCreateQuota = { bytes, name ->
+            cycleViewModel.createQuota(bytes, name) {
+                // Home still shows preview fixtures until D5; keep it in step with the real cycle
+                viewModel.createQuota(bytes, name)
+                creating = false
+                details = false
+            }
+        }, isSaving = cycleAction.isSaving, errorMessage = cycleAction.errorMessage,
+            replacingName = cycleDetails.takeIf { it.hasQuota && !it.isEnded }?.name)
     } else if (details) {
-        QuotaDetailsScreen(state, onBack = { details = false },
-            onEndCycle = { viewModel.endCycle() }, onCreateQuota = { creating = true })
+        // Quota Details shows the real cycle (D3); its forecast stays unavailable until D6
+        QuotaDetailsScreen(cycleDetails, onBack = { cycleViewModel.clearError(); details = false },
+            onEndCycle = { cycleViewModel.endCycle { viewModel.endCycle() } }, onCreateQuota = { creating = true },
+            onTrackingSetup = { tracking = true }, actionError = cycleAction.errorMessage)
     } else if (notifications) {
         NotificationsScreen(notificationState, notificationsViewModel.sampleCycle,
             onBack = { notifications = false }, onMarkRead = notificationsViewModel::markRead,
