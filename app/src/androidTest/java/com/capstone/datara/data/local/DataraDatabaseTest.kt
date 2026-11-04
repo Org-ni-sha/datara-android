@@ -94,7 +94,11 @@ class DataraDatabaseTest {
     fun dataUsageWindowQueriesAndQueue() = runBlocking {
         val dao = db.dataUsageDao()
         dao.upsertAll(listOf(usage(0), usage(600_000), usage(1_200_000), usage(0, device = "d2")))
-        assertConstraintViolation { dao.upsertAll(listOf(usage(0).copy(dataUsageId = "other-id"))) }
+        // Same (device, window) under another id: the unique key holds. @Upsert falls back to an
+        // update by id, which matches nothing, so the stray row is dropped rather than thrown
+        dao.upsertAll(listOf(usage(0).copy(dataUsageId = "other-id", bytesRx = 999)))
+        assertEquals(listOf("d1-0"), dao.between("u1", 0, 600_000).filter { it.deviceId == "d1" }.map { it.dataUsageId })
+        assertEquals(1L, dao.between("u1", 0, 600_000).first { it.deviceId == "d1" }.bytesRx)
 
         assertEquals(listOf(600_000L, 1_200_000L), dao.between("u1", 600_000, 1_800_000).map { it.intervalStartAt })
         assertEquals(1_200_000L, dao.latestIntervalStart("d1"))

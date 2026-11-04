@@ -10,7 +10,11 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface DataUsageDao {
 
-    /** Windows are final when rolled up, so an upsert only happens on a repeated rollup. */
+    /**
+     * Windows are final when rolled up, so an upsert only happens on a repeated rollup. Use
+     * `DataUsageRollup.rowId`: a row with another id for an existing (device, window) is silently
+     * dropped, because @Upsert's fallback updates by primary key.
+     */
     @Upsert
     suspend fun upsertAll(rows: List<DataUsage>)
 
