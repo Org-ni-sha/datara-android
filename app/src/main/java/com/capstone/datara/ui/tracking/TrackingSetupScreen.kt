@@ -161,7 +161,7 @@ private fun TrackingStatusCard(state: TrackingSetupUiState, onStart: () -> Unit,
                 TrackingStatus.PAUSED -> "Android stopped tracking. It restarts on its own when it can, or start it again now."
                 TrackingStatus.OFF -> "Start tracking to begin measuring. A notification stays visible while it runs."
             }, style = MaterialTheme.typography.bodyMedium)
-            Text("Readings stay on this phone for now and are cleared when Android closes the app. Saved history arrives in a later update.",
+            Text("Readings are saved on this phone. Backing them up to your account arrives in a later update.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (!state.isRunning) {
                 DataraActionButton(if (state.status == TrackingStatus.PAUSED) "Resume tracking" else "Start tracking", onStart, enabled = state.canStart)
