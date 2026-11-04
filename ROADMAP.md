@@ -112,7 +112,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 
 ### Pending alignment — quota storage and research contract
 
-- [ ] Design quota/cycle persistence and its relationships to usage and notifications before C2 follow-up migrations and D2 entities. Preserve existing deployed data and RLS; do not assume the seven-table promo model is the final quota schema.
+- [ ] Design quota/cycle persistence and its relationships to usage and notifications before C2 follow-up migrations and D2 entities. Preserve existing deployed data and RLS; do not assume the seven-table promo model is the final quota schema. *(Draft for the DB admin's review: [quota schema ERD](docs/erd-draft.md).)*
 - [ ] Align manuscript objectives, diagrams, target labels and evaluation protocol with device-measured quota-reaching time. Define cycle baselines, observation gaps, quota crossings and cycles that end before reaching the quota. Do not score unobserved crossings as known outcomes.
 - [ ] Keep changes to `data-harvester` and `datara-ml` as separately scoped work; this Android documentation update does not implement those changes.
 
