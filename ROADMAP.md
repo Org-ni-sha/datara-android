@@ -286,7 +286,7 @@ Promo/expiry cards and live network badges are not part of the current UI. Signa
 - [x] In-app sample notification center: All/Unread filters, mark-all-read, unread badges, empty preview and read-only sample-cycle links.
 - [x] Sample copy for 50%, 80% and 90% quota milestones, a four-hour forecast reminder and an informational quota-reached event. Reaching a quota does not mean connectivity stops.
 - [ ] Implement OS notification channels, permission handling and delivery.
-- [ ] Connect threshold and forecast triggers to real measurements and user preferences; rate-limit repeated alerts.
+- [ ] Connect threshold and forecast triggers to real measurements and user preferences; rate-limit repeated alerts. *(Decided 2026-11-04: milestones at 75%, 90% and 100% (quota reached), plus forecast alerts when the PET is within 24 h and within 3 h, each once per cycle. The sample copy above still shows 50/80/90% and a four-hour reminder and must be updated; see [quota schema ERD](docs/erd-draft.md).)*
 - [ ] Persist notification history/read flags in Room and integrate agreed sync behavior. Current read flags are SavedStateHandle preview state only.
 
 #### Phase D9: Profile, Settings & Developer ML Diagnostics Screen

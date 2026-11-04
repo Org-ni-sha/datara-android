@@ -1,6 +1,6 @@
 # Quota schema ERD (draft for the database admin)
 
-**Status:** draft, 2026-11-04. The DB admin reviews and owns the final ERD. Nothing here is migrated yet. Items marked **Decide** need a team answer before the migration is written.
+**Status:** draft, 2026-11-04. The DB admin reviews and owns the final ERD. Nothing here is migrated yet. The lead's answers to the open questions are recorded below as **Decided** (2026-11-04).
 
 This builds on the "database requirements" tab of the team's review doc and updates it with what has landed since:
 - **ROADMAP Decision 2:** the global model predicts next-hour usage, and the local layer is a per-user residual correction.
@@ -35,7 +35,7 @@ erDiagram
         text email UK
         text username UK "lowercase, 3-20 chars"
         text name
-        text phone_number "optional, Decide"
+        text phone_number "optional, user-entered, E.164"
         timestamptz created_at
     }
     devices {
@@ -106,6 +106,7 @@ erDiagram
         uuid user_id PK
         text active_model "global | local"
         jsonb parameters
+        uuid device_id "learned on, not a key"
         int hours_seen
         double global_recent_mae
         double local_recent_mae
@@ -167,7 +168,11 @@ These four match the D4 types field for field (`UsageSample`, `DurableUsageReadi
 ### users (existing, no change)
 
 Created by the `on_auth_user_created` trigger. `username` already exists (migration `20261031000001`). There is no password column, and there never was one in Postgres; the diagram's `password_hash` should be removed.
-- **Decide:** keep `phone_number`? The app never asks for it.
+- **Decided: keep `phone_number`.** Profile shows it next to the user's carrier.
+  - **Optional and typed in by the user.** It is never read from the SIM: that needs the dangerous `READ_PHONE_NUMBERS` permission, and most PH SIMs return it blank. It is never a login identifier (AGENTS.md Scope boundaries).
+  - **Format:** stored as E.164 for PH mobiles, `check (phone_number is null or phone_number ~ '^\+639[0-9]{9}$')`. The app accepts `09XX XXX XXXX` and normalizes it.
+  - **The carrier shown beside it** is the `carrier` of the user's latest `data_usage` row (detected, never entered).
+  - **Existing rows:** the column exists already, so this is only a new `check` constraint. Check that no current value violates it first.
 
 ### devices (existing, no structural change)
 
@@ -207,9 +212,8 @@ Usage history that outlives a reinstall (D7), and the observed side of the E3 ev
 - **Unique key:** `(device_id, interval_start_at)`, so a re-upload upserts.
 - **No `cycle_id`:** cycles are found by time window, and a window can straddle a cycle start.
 - **Removed:** `data_remaining_gb` and any stored daily totals. They can be computed from the rows, and a stored copy drifts.
-- **Decide:**
-  - Does B2's final feature list need more columns? AGENTS.md lists signal, network type and speed as model inputs. Speed is `(bytes_rx + bytes_tx) / window length` and needs no column.
-  - Are 10-minute windows right for the team, or would hourly rows do? Decision 2's model works in hours; 10 minutes keeps D7's 24-hour chart finer and matches the harvester.
+- **Decided: 10-minute windows.** They match the harvester and NetworkStatsManager, keep D7's 24-hour chart fine, and add up exactly to the model's hours.
+- **Decided: no extra columns for now.** Signal, network type and carrier are stored; speed is `(bytes_rx + bytes_tx) / window length`. If B2's final feature list adds an input (screen, battery, charging), D4 must collect it first and a later migration adds the column.
 
 ### forecasts (new): the prediction log
 
@@ -220,18 +224,27 @@ D6 logs every prediction so E3 can compare global and local accuracy. The log ca
 - `model_type`, `model_version` (the ONNX file) and `inputs` (the feature values as JSON), so every prediction can be checked later.
 
 The actual quota-reaching time is `tracking_cycles.reached_at` and is not stored twice.
-- **Decide:** sync every forecast, or only one per hour per cycle? Everything stays on the phone either way.
+- **Decided: one logged forecast per hour per active cycle, and every one is synced** (about 24 rows a day). The model predicts by the hour and the local layer learns once per hour, so the log has the same cadence. Home may refresh the PET more often without logging it.
+- **Unique key:** `(cycle_id, predicted_at)`, with `predicted_at` at the start of the hour, so re-uploads upsert.
 
 ### notifications (replaces the legacy table)
 
-- **notification_type:** `milestone_50`, `milestone_80`, `milestone_90`, `forecast_reminder` or `quota_reached`. Enforced with a `check`.
+- **Decided: fixed alerts.** Three usage milestones and two forecast alerts, so `notification_type` is one of:
+  - `milestone_75`, `milestone_90`: measured usage reached 75% / 90% of the quota
+  - `quota_reached`: 100%; informational, nothing is blocked
+  - `forecast_24h`, `forecast_3h`: the PET is within 24 hours / 3 hours
+
+  Enforced with a `check`.
 - **Read state:** `read_at` replaces `is_read`; empty means unread.
-- **Rule:** each milestone and `quota_reached` goes out once per cycle, enforced by the partial unique index `(cycle_id, notification_type) where notification_type <> 'forecast_reminder'`. Forecast reminders may repeat, rate-limited in the app.
-- **Decide:** are milestones fixed at 50/80/90%? If users can choose their own, `notification_type` becomes `milestone` with a `threshold_percent` column.
+- **Rule:** each type goes out at most once per cycle, enforced by the unique key `(cycle_id, notification_type)`. A forecast alert is not re-sent if the PET moves away and comes back.
+- **Not stored:** thresholds are fixed, so there is no `threshold_percent` column.
+- **UI and ROADMAP follow-up:** the current sample inbox and Settings copy still say 50/80/90% and a four-hour reminder. D8 (and D9 for the Settings text) must update them.
 
 ### notification_preferences (new)
 
-One row per user (`user_id` is the primary key), matching the two Settings switches.
+One row per user (`user_id` is the primary key), matching the two Settings switches:
+- `milestones_enabled` covers `milestone_75`, `milestone_90` and `quota_reached`.
+- `forecast_alerts_enabled` covers `forecast_24h` and `forecast_3h`.
 
 ### user_model_state (new): the local layer's backup
 
@@ -240,9 +253,8 @@ One row per user (`user_id` is the primary key), matching the two Settings switc
   - how many hours it has learned from
   - the recent error of the global and local predictions, which drives the reversible GLOBAL ↔ LOCAL switch (≥ 7 days and local error lower)
 - **Why back it up:** so a reinstall doesn't restart personalization from zero.
-- **Decide:**
-  - Keep it per user, or per device? Per user assumes one phone per user.
-  - Store it at all? Without a backup it is simply relearned from scratch.
+- **Decided: per user, and backed up.** The correction learns a person's habits, not a phone's. Without the backup, a reinstall puts the user back on the global model for at least 7 days, which would also cost E3 data during the pilot.
+- **Add a plain `device_id` column** (not part of the key) to record which phone it was learned on.
 
 ## Room mapping (D2)
 
@@ -265,11 +277,15 @@ One row per user (`user_id` is the primary key), matching the two Settings switc
 3. **Create the new tables** with their constraints, indexes, RLS policies and grants: `tracking_cycles`, `data_usage`, `forecasts`, `notifications`, `notification_preferences`, `user_model_state`. Policies use `(select auth.uid())`, as in `20260917000002`.
 4. **Update docs:** `supabase/README.md`, and the AGENTS.md "Data model" section.
 
-## Open questions for the team
+## Decisions (lead, 2026-11-04)
 
-1. Forecasts: sync all, or one per hour per cycle?
-2. B2's final feature list: does `data_usage` need more columns?
-3. Milestones: fixed at 50/80/90%, or user-chosen?
-4. Is `user_model_state` per user or per device, and should it be backed up at all?
-5. Keep `users.phone_number`?
-6. `data_usage` sync granularity: 10 minutes (recommended) or hourly?
+| Question | Decision |
+|---|---|
+| Forecast sync | One forecast per hour per active cycle, all synced |
+| Extra model inputs on `data_usage` | None for now; add with D4 and a new migration if B2 needs them |
+| Alerts | 75%, 90%, 100% (quota reached), plus PET within 24 h and within 3 h; each once per cycle |
+| `user_model_state` | Per user, backed up |
+| `users.phone_number` | Kept: optional, user-entered, shown next to the detected carrier |
+| `data_usage` granularity | 10-minute windows |
+
+Still open: the DB admin's review of the whole draft, and the hosted-table check in step 1 of the migration plan.
