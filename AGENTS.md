@@ -27,6 +27,7 @@ As of 2026-10-29:
 - **Applied to the hosted project:** C2 legacy promo-based Postgres schema, RLS and profile trigger.
 - **Written, not yet pushed:** the C2 follow-up quota schema (`20261104000001`), which replaces the legacy promo tables. `supabase/` remains the schema source of truth; never edit applied migrations.
 - **Implemented (D4, no persistence yet):** the telemetry foreground service (30 s `TrafficStats`, 10 min `NetworkStatsManager`, 15 min watchdog), signal/network/carrier inputs, the Tracking setup screen and its permissions. Samples go to an in-memory repository until D2 — see [usage telemetry](docs/telemetry.md).
+- **Implemented (D3, no persistence yet):** quota cycles — `TrackingCycle` model and repository seam matching `tracking_cycles`, pure cycle math (`domain/cycle/CycleMath`, `CycleRules`), and `QuotaCycleManager` use cases. Create Quota and Quota Details use real cycles; Home stays on fixtures until D5. Cycles are in memory until D2 — see [quota cycles](docs/quota-cycles.md).
 - **Pending:** pushing the quota migration to the hosted project, Room, durable telemetry storage, durable cycles/history, inference, OS alert delivery, persistent preferences and sync. Do not mark D2–D9 complete just because their UI exists.
 
 The current implementation details and limitations are in [quota UI preview](docs/quota-ui-preview.md).

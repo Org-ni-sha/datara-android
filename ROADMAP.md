@@ -215,10 +215,10 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 
 #### Phase D3: User-Defined Quota & Cycle Setup
 - [x] Create Quota UI: decimal MB/GB amount, optional name, validation, draft restoration and cancel/submit navigation. Units: 1 MB = 1,000,000 bytes; 1 GB = 1,000 MB.
-- [x] Sample cycle creation, Quota Details, confirmed end-cycle action and replacement-cycle flow. State uses SavedStateHandle, not a persistent database or historical archive.
-- [ ] Persist quota amount, cycle boundaries and status using the agreed C2/D2 design.
-- [ ] Establish the measured mobile-usage baseline at cycle start; derive used and remaining quota consistently from that window. Integrate reached/ended behavior with real measurements.
-- [ ] Preserve past cycles and restore the active cycle across app restarts through durable storage.
+- [x] Cycle creation, Quota Details, confirmed end-cycle action and replacement-cycle flow. *(2026-11-04: Create Quota and Quota Details run on real cycles through `QuotaCycleViewModel`; Home keeps its preview fixtures until D5. See [quota cycles](docs/quota-cycles.md).)*
+- [ ] Persist quota amount, cycle boundaries and status using the agreed C2/D2 design. *(The `TrackingCycle` model and `TrackingCycleRepository` seam match `tracking_cycles` field for field; Hilt binds an in-memory repository until D2's Room version replaces it.)*
+- [x] Establish the measured mobile-usage window at cycle start; derive used and remaining quota consistently from that window. Integrate reached/ended behavior with real measurements. *(Per the ERD there is no `baseline_bytes`: used = the 10-minute NetworkStatsManager readings in `[start_at, now)`, split proportionally at the edges. Reached/ended transitions follow the ERD. Unit-tested; not yet checked on a device.)*
+- [ ] Preserve past cycles and restore the active cycle across app restarts through durable storage. *(Restore logic is built and tested against the repository; with the in-memory binding a cycle survives activity recreation but not process death. Blocked by D2.)*
 
 The former promo catalog, promo entry and expiry setup are superseded. A chosen quota is a tracking amount, not a purchased allowance; all measured mobile traffic counts regardless of carrier freebies.
 
@@ -237,10 +237,10 @@ The former promo catalog, promo entry and expiry setup are superseded. A chosen 
   - Measure real-time delta and instantaneous speed (KB/s, MB/s) using `TrafficStats`.
   - **Handle reboots:** `TrafficStats` counters are device-wide and reset to zero on reboot. Persist the last-seen counter and, when the new reading is lower than the stored one, treat it as a reboot and re-baseline instead of recording a large negative delta.
   - Persistent notification copy should explain the tracking honestly (users see it constantly, and the panel will too).
-- [ ] **10-Minute `NetworkStatsManager` read (inside the foreground service)** *(interval per DECISION 1)*: *(read, day-close and switch trigger built and verified on device; quota remaining waits on D3 cycles, and reconciliation is not coded yet; on device the durable total matched the 30 s sum within 335 bytes)*
+- [ ] **10-Minute `NetworkStatsManager` read (inside the foreground service)** *(interval per DECISION 1)*: *(read, day-close and switch trigger built and verified on device; quota remaining is computed by D3 cycles, and reconciliation is not coded yet; on device the durable total matched the 30 s sum within 335 bytes)*
   - Also run it immediately on a Wi-Fi ↔ mobile switch (debounced), as the harvester does.
   - Measure durable cellular totals with `NetworkStatsManager`. Its buckets are ~2 h, too coarse to query "the last 10 minutes" directly: read cumulative usage since a fixed anchor (the harvester uses UTC midnight) and store the difference from the previous reading.
-  - Calculate remaining tracking quota against the active cycle baseline; include all measured mobile traffic regardless of carrier billing treatment.
+  - Calculate remaining tracking quota against the active cycle; include all measured mobile traffic regardless of carrier billing treatment. *(Done in D3 from these readings.)*
   - Reconcile against the service's `TrafficStats` figures; `NetworkStatsManager` is the source of truth for durable totals.
 - [ ] **15-Minute WorkManager watchdog:** restarts the foreground service if the system killed it (WorkManager's minimum period). It does not take measurements itself. *(Built; not yet seen restarting on a device. MIUI blocks background starts while Autostart is off.)*
 - [x] **Mirror the harvester's measurement rules** (intervals, gap thresholds, network-switch handling, reboot re-baselining) from `data-harvester`'s `MeasurementRules` rather than re-deriving them, so recorded intervals mean the same thing in training and in the app. *(Mirrors v1.6.7, plus one approved deviation found on device. A baseline read while mobile data was down is re-baselined when mobile data returns. 1.6.7 counted 1.2 GB in 29 s there, so the harvester's data likely has the same spikes; see [usage telemetry](docs/telemetry.md).)*
