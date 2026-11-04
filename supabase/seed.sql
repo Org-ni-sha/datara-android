@@ -1,13 +1,5 @@
--- DATAra — reference data.
--- Carrier names are matched against TelephonyManager.getSimOperatorName() in D2.
-insert into public.providers (provider_name)
-values ('Smart'), ('Globe'), ('DITO')
-on conflict (provider_name) do nothing;
-
--- Catalog promos (D3) are intentionally not seeded here. They are real carrier offers
--- with real prices and allowances, so they should be entered from verified carrier
--- sources rather than invented. Insert them as rows with user_id left null, e.g.:
+-- DATAra — seed data for a local stack (`supabase db reset`) and `db push --include-seed`.
 --
--- insert into public.promos (user_id, provider_id, promo_name, data_amount_gb, promo_price, validity_days)
--- select null, provider_id, '<promo name>', <gb>, <price>, <days>
--- from public.providers where provider_name = 'Smart';
+-- Intentionally empty. The quota schema (20261104000001) has no shared reference tables: the
+-- carrier is detected on the phone and stored on each data_usage row, and every other table
+-- is per-user data that must come from the app, never from a seed.

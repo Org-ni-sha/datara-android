@@ -1,23 +1,56 @@
-# Supabase schema (Phase C2)
+# Supabase schema
 
-These files describe the **applied legacy promo-based schema**, not the final schema for the approved user-defined quota direction (confirmed 2026-10-29). Room entities do not exist yet. Future persistence and sync mappings must agree with the relevant migrations.
+These files describe the **quota schema** for the approved user-defined quota direction
+(confirmed 2026-10-29), built from [`docs/erd-draft.md`](../docs/erd-draft.md) (lead's decisions
+of 2026-11-04; the DB admin's review is still pending). Room entities (D2) do not exist yet; when
+they land they must match these tables column for column. Never edit an applied migration.
 
-Quota/cycle storage, usage relationships and notification links require a separately designed C2 follow-up migration with RLS and compatibility handling. Do not delete `promos` or repurpose `associations` silently, and never edit applied migrations. Current quota UI state is sample/session state with no database integration. Auth and its profile trigger remain in use. See [ROADMAP](../ROADMAP.md) for pending work.
+The quota migration (`20261104000001`) replaces the legacy promo-based tables from the first C2
+pass. Until it is pushed, the hosted project still has the legacy schema — see
+[Applying the quota migration](#applying-the-quota-migration).
 
 ## Migrations
 
 | File | What it does |
 |---|---|
-| `migrations/20260917000001_init_schema.sql` | Seven tables, constraints, indexes |
-| `migrations/20260917000002_rls_policies.sql` | RLS enabled + per-table policies + grants |
+| `migrations/20260917000001_init_schema.sql` | Legacy: seven promo-based tables (five dropped by `20261104000001`) |
+| `migrations/20260917000002_rls_policies.sql` | Legacy: RLS + policies + grants for those seven tables |
 | `migrations/20260917000003_handle_new_user.sql` | Profile row created on sign-up |
 | `migrations/20261031000001_usernames.sql` | `users.username` (lowercase, unique, `^[a-z0-9_]{3,20}$`) + `is_username_available()` |
+| `migrations/20261104000001_quota_schema.sql` | Quota schema: drops the legacy tables, renames `devices.android_version`, adds the `users.phone_number` check, creates the six quota tables with RLS and grants |
 | `functions/username-login/` | Edge Function: signs in by username without revealing the email |
-| `seed.sql` | The three carriers |
+| `seed.sql` | Empty — the quota schema has no shared reference data |
 
 They are re-runnable except for the policy file, which errors on a second run because
 `create policy` has no `if not exists`, and the usernames file, whose `add constraint` does the
-same. To re-apply either, drop the policies or the `users_username_format` constraint first.
+same. `20261104000001` is not re-runnable at all (it drops and renames); it runs once, in one
+transaction, and aborts without changing anything if a legacy table it drops still holds rows.
+
+## Tables
+
+| Table | One row per | Key rules |
+|---|---|---|
+| `users` | account (from the `on_auth_user_created` trigger) | `phone_number` optional, E.164 PH mobile `^\+639[0-9]{9}$` |
+| `devices` | app install | `android_sdk_int` is `Build.VERSION.SDK_INT` |
+| `tracking_cycles` | quota the user set | `quota_bytes > 0`; `status` in `active`/`reached`/`ended`; `reached` needs `reached_at`; `reached_at`, `ended_at` ≥ `start_at`; one `active` cycle per device (partial unique index) |
+| `data_usage` | 10-minute window per device | unique `(device_id, interval_start_at)`; `measurement_status` in the harvester's eight values; `signal_dbm` null when unknown, never `-999`; bytes ≥ 0; end > start |
+| `forecasts` | active cycle per hour | unique `(cycle_id, predicted_at)`; `active_model` in `global`/`local`; `local_*` null until the local layer has learned; `local` shown needs `local_next_hour_bytes` |
+| `notifications` | alert sent | `notification_type` in `milestone_75`, `milestone_90`, `quota_reached`, `forecast_24h`, `forecast_3h`; unique `(cycle_id, notification_type)`; `read_at` null = unread |
+| `notification_preferences` | user (`user_id` is the PK) | two switches, both default `true` |
+| `user_model_state` | user (`user_id` is the PK) | `active_model` in `global`/`local`; `device_id` cleared (not cascaded) when its device row is deleted |
+
+**Ownership foreign keys.** Child rows reference their parents with composite keys that include
+`user_id`: `(device_id, user_id) → devices`, `(cycle_id, user_id) → tracking_cycles`. A plain FK
+check runs without RLS, so a single-column FK would let a user attach rows to someone else's
+device or cycle by guessing its UUID. The composite key makes that a `23503` FK violation.
+
+**Delete behavior.** Deleting a user cascades to everything. Deleting a device cascades to its
+cycles, usage and forecasts; deleting a cycle cascades to its forecasts and detaches (sets
+`cycle_id` null on) its notifications. `user_model_state.device_id` is set null. The column-list
+form `on delete set null (col)` needs Postgres 15 or later.
+
+**`updated_at`** has a `now()` default but no trigger: Room is the writer, and the sync mapper
+sends the phone's value.
 
 ## Usernames and Google sign-in
 
@@ -108,6 +141,28 @@ supabase db push --include-seed       # applies migrations, then seed.sql
 `link` writes the project ref into `supabase/.temp/`, which is git-ignored, so no
 project identifier or token is committed.
 
+### Applying the quota migration
+
+Run this in the dashboard SQL editor first. Push only if **every** count is 0; otherwise stop and
+plan a data copy (the migration also aborts on non-empty legacy tables, but do not rely on that):
+
+```sql
+select (select count(*) from public.promos) promos,
+       (select count(*) from public.associations) associations,
+       (select count(*) from public.data_usage) data_usage,
+       (select count(*) from public.notifications) notifications,
+       (select count(*) from public.users
+         where phone_number is not null
+           and phone_number !~ '^\+639[0-9]{9}$') bad_phone_numbers;
+```
+
+Then:
+
+```bash
+supabase db push --dry-run   # must list only 20261104000001_quota_schema.sql
+supabase db push
+```
+
 Adding a schema change later:
 
 ```bash
@@ -124,8 +179,9 @@ If you would rather not install anything, the SQL editor in the dashboard still 
 paste the files in filename order. That path does not record anything in the CLI's
 migration history, so pick one approach and keep to it.
 
-**The local Docker stack (`supabase start`) is deliberately not set up.** This repo uses
-the CLI for migration management against the hosted project only. `config.toml` is
+**The local Docker stack is optional.** The CLI's main job here is migration management
+against the hosted project, but `supabase db start` + `supabase db reset` (Docker required)
+proves a migration applies cleanly before it is pushed. `config.toml` is
 required by the CLI and its `[auth]` / `[api]` sections describe a local stack that is
 not run — they are not the live project's settings, so do not treat that file as a record
 of production configuration.
@@ -136,7 +192,8 @@ Policies that *look* right are not evidence. This is the check that closes C2, r
 live project through PostgREST — the same path the Android client uses, so it tests what the app
 actually experiences rather than what the SQL appears to say.
 
-Last run **2026-09-17**, all seven checks passing:
+Last run against the hosted project **2026-09-17**, on the **legacy** schema (`data_usage` and
+`providers` there are the since-dropped legacy tables), all seven checks passing:
 
 | # | Check | Expected | Result |
 |---|---|---|---|
@@ -156,45 +213,55 @@ Also confirmed in the same run: the `on_auth_user_created` trigger creates the `
 on sign-up and populates `name` from `raw_user_meta_data`, which is what `AuthRepository.signUp`
 sends.
 
+After the quota migration is pushed, re-run checks 1–6 against the new `data_usage` (insert a
+`devices` row and a 10-minute window as A) and drop check 7, since `providers` no longer exists.
+
 To re-run: sign up two accounts (`mailer_autoconfirm` is on, so the sign-up response carries a
 usable `access_token`), have A insert a `devices` row and then a `data_usage` row, and drive
-checks 1–7 with each account's bearer token. Delete the test rows afterwards; the test *accounts*
+the checks with each account's bearer token. Delete the test rows afterwards; the test *accounts*
 need a service_role key or Dashboard → Authentication → Users to remove.
 
-## Legacy type mapping (reference for future persistence design)
+## Type mapping (for the D2 Room entities)
 
-| Postgres table | Planned legacy entity name (not implemented) | Postgres type | Kotlin mapping |
-|---|---|---|---|
-| `users` | `User` | `uuid` | `String` |
-| `providers` | `Provider` | `text` | `String` |
-| `devices` | `Device` | `integer` (`android_version`) | `Int` |
-| `promos` | `Promo` | `double precision` (`data_amount_gb`) | `Double` |
-| `promos` | `Promo` | `numeric(10,2)` (`promo_price`) | `Double` |
-| `data_usage` | `DataUsage` | `double precision` | `Double` |
-| `data_usage` | `DataUsage` | `integer` (`signal_strength`) | `Int?` |
-| `notifications` | `Notification` | `boolean` (`is_read`) | `Boolean` |
-| `associations` | `Association` | `uuid` (nullable FKs) | `String?` |
+Room entity names are the table names in `PascalCase` singular: `User`, `Device`,
+`TrackingCycle`, `DataUsage`, `Forecast`, `Notification`, `NotificationPreferences`,
+`UserModelState`.
+
+| Postgres type | Kotlin (Room) | Columns |
+|---|---|---|
+| `uuid` | `String` (`String?` when nullable) | every PK and FK; nullable: `notifications.cycle_id`, `user_model_state.device_id` |
+| `bigint` | `Long` (`Long?` when nullable) | `quota_bytes`, `bytes_rx`, `bytes_tx`, `remaining_bytes`, `global_next_hour_bytes`; nullable: `local_next_hour_bytes` |
+| `integer` | `Int` (`Int?` when nullable) | `android_sdk_int`, `schema_version`, `hours_seen`; nullable: `signal_dbm` |
+| `double precision` | `Double?` | `global_recent_mae`, `local_recent_mae` |
+| `boolean` | `Boolean` | `milestones_enabled`, `forecast_alerts_enabled` |
+| `text` with a `check` list | `String` (constants in Kotlin) | `tracking_cycles.status`, `data_usage.measurement_status`, `forecasts.active_model`, `user_model_state.active_model`, `notifications.notification_type` |
+| `text` | `String` / `String?` | `name`, `title`, `message`, `carrier`, `network_type`, `model_version`, … |
+| `jsonb` | `String` (serialized JSON) | `forecasts.inputs`, `user_model_state.parameters` |
+| `timestamptz` | `Long` epoch millis UTC (`Long?` when nullable) | every `*_at` column |
 
 **Timestamps are the one place the types do not match literally.** Postgres uses
-`timestamptz`; the planned Room mapping uses `Long` epoch millis (UTC). Convert in the sync mapper, not in
+`timestamptz`; Room uses `Long` epoch millis (UTC). Convert in the sync mapper, not in
 the entity — a `String` timestamp in Room makes D7's range queries and D6's feature
 extraction needlessly painful.
 
-**Planned sync convention:** generate UUID primary keys client-side in Room and reuse them when syncing, so a
-retried batch upsert (C3) updates the same row instead of duplicating it. `data_usage`
-additionally has a `(user_id, device_id, usage_date)` unique constraint for that reason —
-future sync must use appropriate conflict handling rather than assume repeated plain inserts are idempotent.
+**Local-only column:** each synced Room entity adds `synced_at: Long?` (null = waiting to
+upload). It is not a Postgres column.
+
+**Sync convention:** generate UUID primary keys on the phone and reuse them when syncing, so a
+retried batch upsert (C3) updates the same row instead of duplicating it. The natural keys
+`data_usage (device_id, interval_start_at)`, `forecasts (cycle_id, predicted_at)` and
+`notifications (cycle_id, notification_type)` are unique too, so sync must use proper conflict
+handling rather than assume repeated plain inserts are idempotent.
 
 ## RLS
 
-Every table has RLS enabled and is scoped to `auth.uid()`.
+Every table has RLS enabled and policies scoped to `auth.uid()` (`users` by `id`, everything else
+by `user_id`), for `authenticated` only. There is no shared reference table any more: the legacy
+`providers` exception is gone, and the carrier is stored on each `data_usage` row.
 
-`providers` is the deliberate exception to "scoped by `user_id`": it is shared reference
-data with no owner, so it has a read-for-authenticated policy and **no** write policy.
-Writes go through the service role (dashboard/SQL editor), never the app.
-
-`promos` carries a nullable `user_id`: `null` means a shared catalog row (the former D3 design, readable under the authenticated catalog policy, not writable from the client), non-null means a promo the
-user entered manually, visible only to them.
+The quota tables are granted to `authenticated` only; the migration revokes Supabase's default
+`anon` grants on them. `users` has no delete policy (account deletion goes through Supabase Auth,
+which cascades).
 
 Because synced rows stay keyed to `user_id`, everything in this schema is
 **pseudonymized, not anonymized** — use that wording in the manuscript. Only the A4 CSV
@@ -215,11 +282,16 @@ where schemaname = 'public' order by tablename;
 The real check is from the app with two different accounts: user A must not be able to
 read user B's `data_usage` rows.
 
-## Legacy design issues to account for in quota migration planning
+**Local check of the quota migration (2026-11-04).** On a local stack (`supabase db start`, then
+`supabase db reset`, CLI 2.117.0, Postgres 17.6), all five migrations and the seed applied
+cleanly and `supabase db advisors --local` reported no issues. A two-user SQL script that acts as
+`authenticated` with each user's JWT claims passed 34 checks:
+- user B reads, updates and deletes none of user A's rows in any quota table
+- B's insert with A's `user_id` is rejected (`42501`)
+- B cannot attach a cycle or an alert to A's device or cycle (`23503`)
+- `anon` has no grant
+- every check constraint and unique key behaves as listed
+- the device and user delete cascades behave as described
 
-- `associations` is implemented according to the original promo design — one row carrying
-  `user_id`, `device_id`, `provider_id`, `promo_id`, `notification_id`, `data_usage_id`
-  and `total_data_used_gb`. It behaves more like a per-user "active setup" record than a
-  true junction table. The approved quota direction needs explicit cycle relationships instead; define them before D2/D3 persistence and preserve existing data deliberately.
-- `promos.expiry_date` is per-activation, not per-catalog-row, which is why it is
-  nullable. This historical modeling issue does not introduce promo expiry into the new quota flow. Quota lifecycle fields must be designed separately.
+The migration's guard was also shown to abort when a legacy table held a row. This is not a
+substitute for the PostgREST check above on the hosted project.

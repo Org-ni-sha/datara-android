@@ -24,9 +24,10 @@ As of 2026-10-29:
 
 - **Implemented:** D1 authentication (email/username + password, Google, username screen and `NeedsUsername` gate), session routing, official logo/launcher icons and native splash plus session-loading UI.
 - **Implemented as previews:** Home, Create Quota, Quota Details, History, Notifications, Settings and Profile. Sample forecasts, usage, notification preferences and sync states are not production integrations. Sign-out uses real Supabase Auth, and the Profile name and username are read from and saved to `public.users`.
-- **Historically applied:** C2 legacy promo-based Postgres schema, RLS and profile trigger. `supabase/` remains the schema source of truth; never edit applied migrations.
+- **Applied to the hosted project:** C2 legacy promo-based Postgres schema, RLS and profile trigger.
+- **Written, not yet pushed:** the C2 follow-up quota schema (`20261104000001`), which replaces the legacy promo tables. `supabase/` remains the schema source of truth; never edit applied migrations.
 - **Implemented (D4, no persistence yet):** the telemetry foreground service (30 s `TrafficStats`, 10 min `NetworkStatsManager`, 15 min watchdog), signal/network/carrier inputs, the Tracking setup screen and its permissions. Samples go to an in-memory repository until D2 — see [usage telemetry](docs/telemetry.md).
-- **Pending:** quota-schema design/new migrations, Room, durable telemetry storage, durable cycles/history, inference, OS alert delivery, persistent preferences and sync. Do not mark D2–D9 complete just because their UI exists.
+- **Pending:** pushing the quota migration to the hosted project, Room, durable telemetry storage, durable cycles/history, inference, OS alert delivery, persistent preferences and sync. Do not mark D2–D9 complete just because their UI exists.
 
 The current implementation details and limitations are in [quota UI preview](docs/quota-ui-preview.md).
 
@@ -125,27 +126,30 @@ Tests cover auth validation/errors, quota input and sample-state behavior, Histo
 
 ---
 
-## Data model (applied legacy schema; quota design pending)
+## Data model (quota schema, migration `20261104000001`)
 
-The Supabase schema (C2) is written as SQL migrations in [`supabase/`](supabase/) — read
-[`supabase/README.md`](supabase/README.md) for the Postgres↔Kotlin type mapping before writing
-the Room entities. The Room side (D2) does not exist yet. The following describes the seven legacy schema concepts, not existing Room entities or a finalized quota schema:
+The Supabase schema is written as SQL migrations in [`supabase/`](supabase/), built from [`docs/erd-draft.md`](docs/erd-draft.md) — read [`supabase/README.md`](supabase/README.md) for the table rules and the Postgres↔Kotlin type mapping before writing the Room entities. The Room side (D2) does not exist yet; its entities must match these tables column for column. Until the quota migration is pushed, the hosted project still has the legacy promo tables (see ROADMAP "C2 follow-up").
 
-- **User** — id, email, name, created_at (no address field, no raw ID exposed in UI — see Scope Boundaries)
-- **Device** — device_id, device_name, device_model, android_version
-- **DataUsage** — data_usage_id, data_consumed_gb, data_remaining_gb, usage_date, signal_strength
-- **Notification** — notification_id, notification_type, title, message, date_sent, is_read
-- **Provider** — provider_id, provider_name (auto-detected via `TelephonyManager`, not user-entered)
-- **Promo** — promo_id, promo_name, data_amount_gb, promo_price, validity_days, expiry_date, promo_description
-- **Association** — junction table linking user_id, device_id, provider_id, promo_id, notification_id, data_usage_id, total_data_used_gb
+Synced tables (Room entity name in brackets):
 
-Before D2/D3 persistence, design quota/cycle relationships and add new C2 migrations with RLS and compatibility handling. Keep deployed promo tables until an explicit migration handles them; do not create a Promo-based quota model merely to match this historical list.
+- **users** (`User`) — id, email, username, name, phone_number (optional, user-entered, E.164 `+639XXXXXXXXX`), created_at. No address field, no raw ID exposed in UI — see Scope Boundaries.
+- **devices** (`Device`) — device_id (one per install), user_id, device_model, android_sdk_int, device_name, created_at.
+- **tracking_cycles** (`TrackingCycle`) — cycle_id, user_id, device_id, name, quota_bytes, start_at, reached_at, ended_at, status (`active`/`reached`/`ended`), created_at, updated_at. One active cycle per device.
+- **data_usage** (`DataUsage`) — one row per 10-minute window: data_usage_id, user_id, device_id, interval_start_at, interval_end_at, bytes_rx, bytes_tx, measurement_status, network_type, signal_dbm (null when unknown), carrier (detected, never entered), schema_version. Unique `(device_id, interval_start_at)`.
+- **forecasts** (`Forecast`) — one row per active cycle per hour, both models: forecast_id, user_id, device_id, cycle_id, predicted_at, remaining_bytes, active_model, global_next_hour_bytes, global_reach_at, local_next_hour_bytes, local_reach_at, model_version, inputs (jsonb). Unique `(cycle_id, predicted_at)`.
+- **notifications** (`Notification`) — notification_id, user_id, cycle_id, notification_type (`milestone_75`, `milestone_90`, `quota_reached`, `forecast_24h`, `forecast_3h`), title, message, sent_at, read_at (null = unread). Each type once per cycle.
+- **notification_preferences** (`NotificationPreferences`) — user_id (PK), milestones_enabled, forecast_alerts_enabled, updated_at.
+- **user_model_state** (`UserModelState`) — user_id (PK), active_model, parameters (jsonb), device_id, hours_seen, global_recent_mae, local_recent_mae, updated_at.
+
+Phone-only Room tables for D4 telemetry (`usage_samples`, `durable_readings`, `telemetry_checkpoint`, `durable_checkpoint`) are never synced; see the ERD draft. The legacy `providers`, `promos`, `associations` and the old `data_usage`/`notifications` are dropped by the quota migration — do not bring them back.
 
 Rules:
 - Once Room and sync exist, keep persisted fields and mappings aligned with their corresponding Supabase migrations. Do not invent Room entities as part of UI-only work.
-- Every Supabase table carries **Row Level Security scoped to `user_id`**. Don't create a table without its RLS policy. (`providers` is the one documented exception — shared reference data, read-only to the client.)
+- Every Supabase table carries **Row Level Security scoped to `user_id`** (`users` by `id`), granted to `authenticated` only. Don't create a table without its RLS policy. There is no shared reference table.
+- Child rows reference parents with composite `(…_id, user_id)` foreign keys so a row cannot point at another user's device or cycle. Keep that pattern for new tables.
+- Amounts are bytes as `bigint` / `Long`; MB is display-only (1 MB = 1,000,000 bytes).
 - Timestamps are `timestamptz` in Postgres and `Long` epoch millis in Room, converted in the sync mapper.
-- Row primary keys are UUIDs generated client-side so sync retries upsert instead of duplicating.
+- Row primary keys are UUIDs generated client-side so sync retries upsert instead of duplicating. Each synced Room entity adds a local-only `synced_at: Long?`.
 
 ---
 
