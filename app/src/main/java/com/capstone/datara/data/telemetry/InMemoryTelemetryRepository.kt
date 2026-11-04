@@ -11,7 +11,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Process-lifetime stand-in for D2's Room storage. Everything, checkpoints included, is lost when
+ * Process-lifetime telemetry storage: the JVM tests' reference implementation of the contract
+ * that [RoomTelemetryRepository] (the one the app binds) also passes. Everything, checkpoints included, is lost when
  * the process dies: the next tick is then a BASELINE and the bytes in between are not counted.
  * Keeps the most recent day of samples so a long-running service cannot grow it without bound.
  */

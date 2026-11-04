@@ -1,6 +1,6 @@
 package com.capstone.datara.telemetry
 
-import com.capstone.datara.data.telemetry.InMemoryTelemetryRepository
+import com.capstone.datara.data.telemetry.TelemetryRepository
 import com.capstone.datara.telemetry.DurableTick.DAY_MS
 import com.capstone.datara.telemetry.PrimaryTick.Counters
 import kotlinx.coroutines.flow.first
@@ -10,8 +10,16 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The collector against the in-memory repository: what D2's Room repository must also satisfy. */
-class TelemetryCollectorTest {
+/**
+ * The collector against a [TelemetryRepository]: the contract every repository must satisfy. Run
+ * on the JVM against the in-memory repository (TelemetryCollectorTest) and on a device against
+ * Room (RoomTelemetryCollectorTest). Lives in src/sharedTest, which both test source sets include;
+ * test names are camelCase because names with spaces cannot be dexed at minSdk 26.
+ */
+abstract class TelemetryCollectorContract {
+
+    /** A new, empty repository for each test. */
+    protected abstract fun createRepository(): TelemetryRepository
 
     private val boot = 1_793_000_000_000L
 
@@ -34,7 +42,7 @@ class TelemetryCollectorTest {
         override fun queryMobileCumulative(anchor: Long, until: Long) = totals
     }
 
-    private val repository = InMemoryTelemetryRepository()
+    protected val repository = createRepository()
     private val clock = FakeClock(100_000, boot)
     private var counters = Counters(1_000, 100)
     private val radio = FakeRadio()
@@ -42,7 +50,7 @@ class TelemetryCollectorTest {
     private val collector = TelemetryCollector(repository, { counters }, durable, radio, clock)
 
     @Test
-    fun `samples commit with their checkpoint and carry network inputs`() = runBlocking {
+    fun samplesCommitWithTheirCheckpointAndCarryNetworkInputs() = runBlocking {
         val first = collector.collectPrimary(switchedFrom = null, cellularSeen = true)
         assertEquals("BASELINE", first.status)
 
@@ -63,7 +71,7 @@ class TelemetryCollectorTest {
     }
 
     @Test
-    fun `interval closed by a switch from wifi keeps the wifi label when no mobile bytes moved`() = runBlocking {
+    fun intervalClosedByASwitchFromWifiKeepsTheWifiLabelWhenNoMobileBytesMoved() = runBlocking {
         radio.active = "WIFI"
         collector.collectPrimary(switchedFrom = null, cellularSeen = false)
         clock.elapsed += 10_000
@@ -73,7 +81,7 @@ class TelemetryCollectorTest {
     }
 
     @Test
-    fun `mobile bytes under wifi are labelled mobile`() = runBlocking {
+    fun mobileBytesUnderWifiAreLabelledMobile() = runBlocking {
         radio.active = "WIFI"
         collector.collectPrimary(switchedFrom = null, cellularSeen = false)
         clock.elapsed += 30_000
@@ -82,7 +90,7 @@ class TelemetryCollectorTest {
     }
 
     @Test
-    fun `mobile data returning after a baseline read on wifi is not counted as usage`() = runBlocking {
+    fun mobileDataReturningAfterABaselineReadOnWifiIsNotCountedAsUsage() = runBlocking {
         // The phone test: baseline on Wi-Fi with mobile data torn down, then LTE comes back
         radio.active = "WIFI"
         radio.mobileUp = false
@@ -103,14 +111,14 @@ class TelemetryCollectorTest {
     }
 
     @Test
-    fun `durable read without usage access is skipped and stores nothing`() = runBlocking {
+    fun durableReadWithoutUsageAccessIsSkippedAndStoresNothing() = runBlocking {
         durable.access = false
         assertNull(collector.collectDurable())
         assertNull(repository.durableCheckpoint())
     }
 
     @Test
-    fun `durable reads store the difference from the previous read`() = runBlocking {
+    fun durableReadsStoreTheDifferenceFromThePreviousRead() = runBlocking {
         durable.totals = Counters(5_000, 500)
         assertTrue(collector.collectDurable()!!.isEmpty())
 
@@ -125,7 +133,7 @@ class TelemetryCollectorTest {
     }
 
     @Test
-    fun `failed durable query keeps the checkpoint`() = runBlocking {
+    fun failedDurableQueryKeepsTheCheckpoint() = runBlocking {
         durable.totals = Counters(5_000, 500)
         collector.collectDurable()
         val kept = repository.durableCheckpoint()
