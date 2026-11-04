@@ -1,5 +1,6 @@
 package com.capstone.datara.data.cycle
 
+import com.capstone.datara.data.local.dao.TelemetryDao
 import com.capstone.datara.data.telemetry.DurableUsageReading
 import com.capstone.datara.data.telemetry.TelemetryRepository
 import kotlinx.coroutines.flow.Flow
@@ -15,22 +16,34 @@ import javax.inject.Singleton
  */
 interface UsageReadingRepository {
 
-    /**
-     * Readings that end at or after [fromMillis], oldest first, re-emitted whenever a read is
-     * stored. A Room DAO can serve this as
-     * `select * from durable_readings where max(since, until) >= :from order by since`.
-     */
+    /** Readings that end after [fromMillis], oldest first, re-emitted whenever a read is stored. */
     fun observeReadingsFrom(fromMillis: Long): Flow<List<DurableUsageReading>>
 }
 
-/** Reads through the D4 telemetry seam, so it follows [TelemetryRepository]'s binding (in memory until D2). */
+/**
+ * Room `durable_readings` through [TelemetryDao.observeReadingsSince], which the app binds. Unlike
+ * [TelemetryRepository.observeDurableReadings] (the most recent day only), it returns every
+ * reading since the cycle started, however long ago.
+ */
 @Singleton
+class RoomUsageReadingRepository @Inject constructor(
+    private val dao: TelemetryDao
+) : UsageReadingRepository {
+
+    override fun observeReadingsFrom(fromMillis: Long): Flow<List<DurableUsageReading>> =
+        dao.observeReadingsSince(fromMillis).map { rows -> rows.map { it.toDomain() } }.distinctUntilChanged()
+}
+
+/**
+ * Reads through the telemetry seam, for JVM tests against [com.capstone.datara.data.telemetry.InMemoryTelemetryRepository].
+ * Same filter as the DAO query: readings that end after [fromMillis].
+ */
 class TelemetryUsageReadingRepository @Inject constructor(
     private val telemetry: TelemetryRepository
 ) : UsageReadingRepository {
 
     override fun observeReadingsFrom(fromMillis: Long): Flow<List<DurableUsageReading>> =
         telemetry.observeDurableReadings()
-            .map { readings -> readings.filter { maxOf(it.since, it.until) >= fromMillis }.sortedBy { it.since } }
+            .map { readings -> readings.filter { it.until > fromMillis }.sortedBy { it.since } }
             .distinctUntilChanged()
 }

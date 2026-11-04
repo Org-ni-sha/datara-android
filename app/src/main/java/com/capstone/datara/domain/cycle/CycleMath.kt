@@ -14,7 +14,7 @@ import java.math.BigInteger
  * @property measuredThrough end of the latest counted reading (usage is known up to here), or null
  *   when no reading covers the window yet
  * @property unmeasuredMillis time inside `[start_at, measuredThrough)` that no reading covers:
- *   tracking was off, or the process died and the in-memory checkpoint was lost. Bytes used then
+ *   tracking was off, or no checkpoint survived to bridge the gap. Bytes used then
  *   are missing from [usedBytes].
  * @property lostReadings readings whose bytes are unknown: a zero-byte `COUNTER_RESET`,
  *   `COUNTER_JUMP` or `UNSUPPORTED`, or a `CLOCK_ERROR` span that cannot be placed in time

@@ -52,7 +52,7 @@ sealed interface CycleState {
 
 /**
  * The D3 cycle use cases: observe progress, create, end, and restore the latest cycle when the
- * process starts (it reads it back from [TrackingCycleRepository], which is in memory until D2).
+ * process starts (it reads it back from [TrackingCycleRepository], Room in the app).
  *
  * Usage is recomputed whenever a 10-minute reading is stored or the cycle changes. When it
  * reaches the quota the active cycle is marked reached. That happens here, in the app process,
@@ -99,11 +99,9 @@ class QuotaCycleManager @Inject constructor(
         writeLock.withLock {
             val owner = requireOwner()
             val now = clock.now()
-            cycles.latest(owner.userId, owner.deviceId)?.takeIf { it.isCurrent }?.let { previous ->
-                cycles.update(settleAndEnd(previous, now))
-            }
+            val ending = cycles.latest(owner.userId, owner.deviceId)?.takeIf { it.isCurrent }?.let { settleAndEnd(it, now) }
             CycleRules.create(UUID.randomUUID().toString(), owner.userId, owner.deviceId, name, quotaBytes, now)
-                .also { cycles.insert(it) }
+                .also { cycles.insert(it, endingPrevious = ending) }
         }
     }
 

@@ -3,14 +3,13 @@ package com.capstone.datara.data.cycle
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Storage seam for `tracking_cycles`. Bound to [InMemoryTrackingCycleRepository] until D2 adds
- * Room; the shape is meant to map one-to-one onto a DAO:
- * - reads that the UI follows are `Flow`s (Room `@Query` returning `Flow`)
- * - one-shot reads and writes are `suspend` (`@Query`, `@Insert`, `@Update`)
+ * Storage seam for `tracking_cycles`. The app binds [RoomTrackingCycleRepository];
+ * [InMemoryTrackingCycleRepository] is the JVM tests' reference implementation.
+ * - reads that the UI follows are `Flow`s, one-shot reads and writes are `suspend`
  *
  * Callers ([com.capstone.datara.domain.cycle.QuotaCycleManager]) serialize writes and enforce the
- * transition rules; the repository only stores rows. The Room version should still add the
- * partial unique index `(device_id) where status = 'active'` from the migration.
+ * transition rules; the repository only stores rows. Room additionally rejects a second active
+ * cycle per device (`DataraDatabase.ONE_ACTIVE_CYCLE_TRIGGERS`).
  */
 interface TrackingCycleRepository {
 
@@ -28,7 +27,11 @@ interface TrackingCycleRepository {
     /** All of the user's cycles, newest `start_at` first (History, D7). */
     fun observeAll(userId: String): Flow<List<TrackingCycle>>
 
-    suspend fun insert(cycle: TrackingCycle)
+    /**
+     * Inserts [cycle]. When [endingPrevious] is given (the device's current cycle, already ended
+     * or reached), it is updated in the same transaction, before the insert.
+     */
+    suspend fun insert(cycle: TrackingCycle, endingPrevious: TrackingCycle? = null)
 
     /** Replaces the row with the same [TrackingCycle.cycleId]. */
     suspend fun update(cycle: TrackingCycle)

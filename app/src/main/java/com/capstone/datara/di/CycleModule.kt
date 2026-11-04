@@ -1,11 +1,9 @@
 package com.capstone.datara.di
 
 import com.capstone.datara.data.cycle.CycleOwnerProvider
-import com.capstone.datara.data.cycle.DeviceIdProvider
-import com.capstone.datara.data.cycle.InMemoryTrackingCycleRepository
-import com.capstone.datara.data.cycle.PreferencesDeviceIdProvider
 import com.capstone.datara.data.cycle.SessionCycleOwnerProvider
-import com.capstone.datara.data.cycle.TelemetryUsageReadingRepository
+import com.capstone.datara.data.cycle.RoomTrackingCycleRepository
+import com.capstone.datara.data.cycle.RoomUsageReadingRepository
 import com.capstone.datara.data.cycle.TrackingCycleRepository
 import com.capstone.datara.data.cycle.UsageReadingRepository
 import com.capstone.datara.domain.cycle.CycleClock
@@ -29,19 +27,16 @@ annotation class ApplicationScope
 @InstallIn(SingletonComponent::class)
 abstract class CycleModule {
 
-    /** In memory until D2: replace this binding with the Room-backed repository. */
+    /** Room (D2): cycles survive process death. The in-memory version is for JVM tests. */
     @Binds
-    abstract fun bindTrackingCycleRepository(impl: InMemoryTrackingCycleRepository): TrackingCycleRepository
+    abstract fun bindTrackingCycleRepository(impl: RoomTrackingCycleRepository): TrackingCycleRepository
 
-    /** Reads D4's durable readings through TelemetryRepository, so it follows that binding. */
+    /** Every Room `durable_readings` row since a cycle's start. */
     @Binds
-    abstract fun bindUsageReadingRepository(impl: TelemetryUsageReadingRepository): UsageReadingRepository
+    abstract fun bindUsageReadingRepository(impl: RoomUsageReadingRepository): UsageReadingRepository
 
     @Binds
     abstract fun bindCycleOwnerProvider(impl: SessionCycleOwnerProvider): CycleOwnerProvider
-
-    @Binds
-    abstract fun bindDeviceIdProvider(impl: PreferencesDeviceIdProvider): DeviceIdProvider
 
     companion object {
         @Provides

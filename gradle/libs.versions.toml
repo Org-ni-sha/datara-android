@@ -21,7 +21,6 @@ credentials = "1.5.0"
 googleId = "1.1.1"
 work = "2.11.2"
 room = "2.8.5"
-coroutines = "1.11.0"
 
 [libraries]
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
@@ -67,9 +66,6 @@ androidx-room-testing = { group = "androidx.room", name = "room-testing", versio
 
 # Ktor
 ktor-client-android = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
-
-# Coroutines (tests; the runtime comes with supabase-kt and lifecycle)
-kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 
 # Kotlinx Serialization
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }

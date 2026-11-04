@@ -140,7 +140,7 @@ private fun QuotaDetailsContent(
             }
             if (!readOnly) Text(
                 if (state.isSample) "Preview cycles are kept only for this session. Creating another quota replaces these sample details; saved history will come later."
-                else "Cycles are not saved to storage yet, so they are kept only while DATAra is running. Saved history will come later.",
+                else "Cycles are saved on this phone. Past cycles will appear in History in a later update.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
     }

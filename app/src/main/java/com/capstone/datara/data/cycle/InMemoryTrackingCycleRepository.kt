@@ -9,9 +9,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Process-lifetime stand-in for D2's Room table. Cycles survive screen changes and activity
- * recreation, but not the process dying: after that the device has no cycle until the user
- * creates one again.
+ * In-memory [TrackingCycleRepository] for JVM tests (the app binds [RoomTrackingCycleRepository]).
+ * Rejects a second active cycle per device, like Room's trigger and Postgres' partial index.
  */
 @Singleton
 class InMemoryTrackingCycleRepository @Inject constructor() : TrackingCycleRepository {
@@ -28,8 +27,12 @@ class InMemoryTrackingCycleRepository @Inject constructor() : TrackingCycleRepos
         cycles.map { all -> all.filter { it.userId == userId }.sortedByDescending { it.startAt } }
             .distinctUntilChanged()
 
-    override suspend fun insert(cycle: TrackingCycle) = cycles.update { all ->
+    override suspend fun insert(cycle: TrackingCycle, endingPrevious: TrackingCycle?) = cycles.update { before ->
+        val all = endingPrevious?.let { previous -> before.map { if (it.cycleId == previous.cycleId) previous else it } } ?: before
         require(all.none { it.cycleId == cycle.cycleId }) { "Duplicate cycle_id ${cycle.cycleId}" }
+        check(cycle.status != CycleStatus.ACTIVE || all.none { it.deviceId == cycle.deviceId && it.status == CycleStatus.ACTIVE }) {
+            "tracking_cycles_one_active_per_device"
+        }
         all + cycle
     }
 
