@@ -27,7 +27,8 @@ As of 2026-10-29:
 - **Applied to the hosted project:** the C2 quota schema (`20261104000001`, pushed 2026-11-04), which replaced the legacy promo tables, plus the earlier RLS, profile trigger and usernames migrations. `supabase/` remains the schema source of truth; never edit applied migrations.
 - **Implemented (D4):** the telemetry foreground service (30 s `TrafficStats`, 10 min `NetworkStatsManager`, 15 min watchdog), signal/network/carrier inputs, the Tracking setup screen and its permissions — see [usage telemetry](docs/telemetry.md).
 - **Implemented (D2):** Room `DataraDatabase` with the eight synced entities and the four phone-only telemetry tables, DAOs with the upload queue, Room-backed telemetry storage, the 10-minute `data_usage` rollup and device registration. No screen reads it yet, and nothing uploads it (C3).
-- **Pending:** durable cycles/history wired to Room (D3), inference, OS alert delivery, persistent preferences and sync. Do not mark D3–D9 complete just because their UI exists.
+- **Implemented (D3):** quota cycles — `TrackingCycle` domain model and `TrackingCycleRepository` seam (Room-backed via `TrackingCycleDao`), pure cycle math (`domain/cycle/CycleMath`, `CycleRules`) and `QuotaCycleManager` use cases. Create Quota and Quota Details use real, durable cycles; Home stays on fixtures until D5 — see [quota cycles](docs/quota-cycles.md).
+- **Pending:** inference, OS alert delivery, persistent preferences and sync. Do not mark D3–D9 complete just because their UI exists.
 
 The current implementation details and limitations are in [quota UI preview](docs/quota-ui-preview.md).
 

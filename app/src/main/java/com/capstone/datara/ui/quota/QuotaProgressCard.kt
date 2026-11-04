@@ -15,8 +15,8 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 @Composable
-internal fun QuotaProgressCard(state: HomeUiState) {
-    val missing = state.scenario == HomeSampleState.MISSING_PERMISSION
+internal fun QuotaProgressCard(state: QuotaDetailsModel) {
+    val missing = state.usageUnavailable
     val progress by animateFloatAsState(if (missing) 0f else state.progress.coerceIn(0f, 1f), tween(350), label = "Quota gauge")
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -36,7 +36,7 @@ internal fun QuotaProgressCard(state: HomeUiState) {
                 val remaining: @Composable () -> Unit = {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(if (state.isEnded) "Unused at end" else "Remaining quota", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(if (missing) "Unavailable" else formatQuotaData(state.remainingBytes), style = MaterialTheme.typography.headlineLarge)
+                        Text(if (missing) "Unavailable" else formatQuotaData(state.remainingBytes ?: 0), style = MaterialTheme.typography.headlineLarge)
                     }
                 }
                 if (stacked) Column(verticalArrangement = Arrangement.spacedBy(20.dp)) { gauge(); remaining() }
@@ -46,8 +46,8 @@ internal fun QuotaProgressCard(state: HomeUiState) {
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                Value(if (state.isEnded) "Used at end" else "Used", if (missing) "Unavailable" else formatQuotaData(state.usedBytes), Modifier.weight(1f))
-                Value("Starting quota", formatQuotaData(state.amountBytes), Modifier.weight(1f))
+                Value(if (state.isEnded) "Used at end" else "Used", if (missing) "Unavailable" else formatQuotaData(state.usedBytes ?: 0), Modifier.weight(1f))
+                Value("Starting quota", formatQuotaData(state.quotaBytes), Modifier.weight(1f))
             }
         }
     }
