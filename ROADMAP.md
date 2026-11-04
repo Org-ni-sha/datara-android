@@ -112,7 +112,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 
 ### Pending alignment — quota storage and research contract
 
-- [ ] Design quota/cycle persistence and its relationships to usage and notifications before C2 follow-up migrations and D2 entities. Preserve existing deployed data and RLS; do not assume the seven-table promo model is the final quota schema.
+- [ ] Design quota/cycle persistence and its relationships to usage and notifications before C2 follow-up migrations and D2 entities. Preserve existing deployed data and RLS; do not assume the seven-table promo model is the final quota schema. *(Draft for the DB admin's review: [quota schema ERD](docs/erd-draft.md).)*
 - [ ] Align manuscript objectives, diagrams, target labels and evaluation protocol with device-measured quota-reaching time. Define cycle baselines, observation gaps, quota crossings and cycles that end before reaching the quota. Do not score unobserved crossings as known outcomes.
 - [ ] Keep changes to `data-harvester` and `datara-ml` as separately scoped work; this Android documentation update does not implement those changes.
 
@@ -273,7 +273,7 @@ Promo/expiry cards and live network badges are not part of the current UI. Signa
   - *Strict rule:* all **inference** is on-device via ONNX Runtime. No live `/predict` server call, ever.
 - [ ] **PET projection:** starting from the active cycle's remaining quota, predict each following hour (updating time features and lags as it steps) and subtract until the remainder reaches zero; that hour is the PET. Cap the horizon (for example 30 days) and show "beyond 30 days" instead of an unbounded date.
 - [ ] Output predicted PET timestamp and expose via `StateFlow` to the UI.
-- [ ] Log each prediction with its inputs and the observed quota-reaching time (or an explicitly incomplete observation) — E3 cannot be done retroactively without this.
+- [ ] Log each prediction with its inputs and the observed quota-reaching time (or an explicitly incomplete observation) — E3 cannot be done retroactively without this. Each hourly log row holds **both** the global and the local prediction (local in shadow until it takes over) and which one the user saw; see [quota schema ERD](docs/erd-draft.md).
 
 #### Phase D7: Usage History & Analytics (Vico Charts)
 - [x] Vico Compose 3.3.1 through the version catalog.
@@ -286,7 +286,7 @@ Promo/expiry cards and live network badges are not part of the current UI. Signa
 - [x] In-app sample notification center: All/Unread filters, mark-all-read, unread badges, empty preview and read-only sample-cycle links.
 - [x] Sample copy for 50%, 80% and 90% quota milestones, a four-hour forecast reminder and an informational quota-reached event. Reaching a quota does not mean connectivity stops.
 - [ ] Implement OS notification channels, permission handling and delivery.
-- [ ] Connect threshold and forecast triggers to real measurements and user preferences; rate-limit repeated alerts.
+- [ ] Connect threshold and forecast triggers to real measurements and user preferences; rate-limit repeated alerts. *(Decided 2026-11-04: milestones at 75%, 90% and 100% (quota reached), plus forecast alerts when the PET is within 24 h and within 3 h, each once per cycle. The sample copy above still shows 50/80/90% and a four-hour reminder and must be updated; see [quota schema ERD](docs/erd-draft.md).)*
 - [ ] Persist notification history/read flags in Room and integrate agreed sync behavior. Current read flags are SavedStateHandle preview state only.
 
 #### Phase D9: Profile, Settings & Developer ML Diagnostics Screen
@@ -305,7 +305,7 @@ Promo/expiry cards and live network badges are not part of the current UI. Signa
   - **No-network inference:** with the network fully off, confirm PET inference still runs on stored telemetry and the dashboard renders a prediction.
   - **Cellular up, Supabase unreachable:** with mobile data live but sync failing, confirm tracking continues, snapshots persist to Room, the sync queue accumulates, and it drains correctly once connectivity returns.
 - [ ] **Phase E2 — Battery & Overhead Benchmarking:** Profile foreground service and background worker energy usage using Android Studio Energy Profiler. Report measured drain over a fixed window (e.g. %/hour over 8 hours) — panels ask for a number, not a claim of efficiency.
-- [ ] **Phase E3 — Global vs. Local Accuracy Comparison:** Compare PET error (observed vs. predicted quota-reaching time) under Global vs. Local personalization, using the prediction log from D6.
+- [ ] **Phase E3 — Global vs. Local Accuracy Comparison:** Compare PET error (observed vs. predicted quota-reaching time) under Global vs. Local personalization, using the prediction log from D6, which records both models for the same hours.
   - **State the win condition in advance:** the improvement in MAE that makes the personalization layer worth having (e.g. "Local must reduce MAE by ≥ 15% over Global"). Report it honestly if the local layer does not help — a negative result with a clear explanation defends far better than a metric chosen after the fact.
   - Report A3 measurement resolution, gaps and quota-crossing uncertainty separately from model error. State how incomplete/ended cycles are handled; do not use carrier balance depletion as the target.
 - [ ] **Phase E4 — Automated Test Coverage Audit** *(write tests continuously per phase; this phase is the final gap audit, not the first time tests are written — see the testing expectations in [`AGENTS.md`](AGENTS.md))*:
