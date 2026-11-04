@@ -1,6 +1,6 @@
 package com.capstone.datara.di
 
-import com.capstone.datara.data.telemetry.InMemoryTelemetryRepository
+import com.capstone.datara.data.telemetry.RoomTelemetryRepository
 import com.capstone.datara.data.telemetry.TelemetryRepository
 import com.capstone.datara.telemetry.DurableUsageSource
 import com.capstone.datara.telemetry.MobileCounterSource
@@ -19,9 +19,9 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 abstract class TelemetryModule {
 
-    /** In memory until D2: replace this binding with the Room-backed repository. */
+    /** Room (D2): samples and checkpoints survive process death and reboots. */
     @Binds
-    abstract fun bindTelemetryRepository(impl: InMemoryTelemetryRepository): TelemetryRepository
+    abstract fun bindTelemetryRepository(impl: RoomTelemetryRepository): TelemetryRepository
 
     @Binds
     abstract fun bindMobileCounterSource(impl: TrafficStatsCounterSource): MobileCounterSource

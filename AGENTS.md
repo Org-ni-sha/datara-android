@@ -24,10 +24,10 @@ As of 2026-10-29:
 
 - **Implemented:** D1 authentication (email/username + password, Google, username screen and `NeedsUsername` gate), session routing, official logo/launcher icons and native splash plus session-loading UI.
 - **Implemented as previews:** Home, Create Quota, Quota Details, History, Notifications, Settings and Profile. Sample forecasts, usage, notification preferences and sync states are not production integrations. Sign-out uses real Supabase Auth, and the Profile name and username are read from and saved to `public.users`.
-- **Applied to the hosted project:** C2 legacy promo-based Postgres schema, RLS and profile trigger.
-- **Written, not yet pushed:** the C2 follow-up quota schema (`20261104000001`), which replaces the legacy promo tables. `supabase/` remains the schema source of truth; never edit applied migrations.
-- **Implemented (D4, no persistence yet):** the telemetry foreground service (30 s `TrafficStats`, 10 min `NetworkStatsManager`, 15 min watchdog), signal/network/carrier inputs, the Tracking setup screen and its permissions. Samples go to an in-memory repository until D2 — see [usage telemetry](docs/telemetry.md).
-- **Pending:** pushing the quota migration to the hosted project, Room, durable telemetry storage, durable cycles/history, inference, OS alert delivery, persistent preferences and sync. Do not mark D2–D9 complete just because their UI exists.
+- **Applied to the hosted project:** the C2 quota schema (`20261104000001`, pushed 2026-11-04), which replaced the legacy promo tables, plus the earlier RLS, profile trigger and usernames migrations. `supabase/` remains the schema source of truth; never edit applied migrations.
+- **Implemented (D4):** the telemetry foreground service (30 s `TrafficStats`, 10 min `NetworkStatsManager`, 15 min watchdog), signal/network/carrier inputs, the Tracking setup screen and its permissions — see [usage telemetry](docs/telemetry.md).
+- **Implemented (D2):** Room `DataraDatabase` with the eight synced entities and the four phone-only telemetry tables, DAOs with the upload queue, Room-backed telemetry storage, the 10-minute `data_usage` rollup and device registration. No screen reads it yet, and nothing uploads it (C3).
+- **Pending:** durable cycles/history wired to Room (D3), inference, OS alert delivery, persistent preferences and sync. Do not mark D3–D9 complete just because their UI exists.
 
 The current implementation details and limitations are in [quota UI preview](docs/quota-ui-preview.md).
 
@@ -51,13 +51,13 @@ The current implementation details and limitations are in [quota UI preview](doc
 | Testing | JUnit 4, Compose UI Test |
 | Charts | Vico Compose 3.3.1 — sample History UI; real telemetry integration pending |
 | Launch | AndroidX core-splashscreen 1.2.0, native launch theme and Compose session loading |
+| Local DB | Room 2.8.5 (SQLite), compiler via KSP, schemas exported to `app/schemas/` |
 | Background work | `specialUse` foreground service sampling `TrafficStats` every 30 s and `NetworkStatsManager` every 10 min (matching `data-harvester`), plus a 15-min WorkManager 2.11.2 watchdog — ROADMAP Decision 1 |
 
 ### Planned — not yet a dependency
 
 | Layer | Choice | Roadmap phase |
 |---|---|---|
-| Local DB | Room (SQLite), KSP compiler | D2 |
 | On-device inference | ONNX Runtime Mobile (`com.microsoft.onnxruntime:onnxruntime-android`) | D6 |
 
 **Auth OTP note:** password recovery does use a one-time code, but it is an *email* OTP (`verifyEmailOtp(OtpType.Email.RECOVERY)` in `AuthRepository`). That is intended and correct. The banned pattern is *phone/SMS* OTP as a login identifier.
@@ -68,7 +68,7 @@ Package root: `com.capstone.datara`
 
 ## Build rules — easy to get wrong
 
-- **Use KSP, never kapt.** Hilt already uses `ksp(libs.hilt.compiler)`. When Room is added (D2), it must be `ksp(libs.room.compiler)` too.
+- **Use KSP, never kapt.** Hilt already uses `ksp(libs.hilt.compiler)`. Room uses `ksp(libs.androidx.room.compiler)` too.
 - **All dependencies go through the version catalog** at [`gradle/libs.versions.toml`](gradle/libs.versions.toml). Never hardcode a version string in `app/build.gradle.kts`.
 - **SDK levels:** `minSdk = 26` (hard requirement — do not lower), `compileSdk = 37`, `targetSdk = 37`. Java/JVM target 11.
 - **AGP is 9.3.2**, which uses newer DSL syntax already present in `app/build.gradle.kts` — `compileSdk { version = release(37) }` and `release { optimization { enable = false } }`. These are correct for AGP 9; do not "fix" them back to the older `compileSdk = 37` / `isMinifyEnabled` form.
@@ -85,9 +85,12 @@ app/src/main/java/com/capstone/datara/
 ├── DataraApplication.kt              # @HiltAndroidApp
 ├── MainActivity.kt                   # @AndroidEntryPoint, session gate + DataraNavGraph()
 ├── data/
+│   ├── local/                        # Room: DataraDatabase, entity/, dao/, device/DeviceRepository
 │   ├── remote/SupabaseClientProvider.kt
-│   └── repository/AuthRepository.kt
-├── di/SupabaseModule.kt              # Hilt @Module
+│   ├── repository/AuthRepository.kt
+│   ├── session/CurrentUserSource.kt  # signed-in user id for background work
+│   └── telemetry/                    # TelemetryRepository (Room), UsageRollup to data_usage
+├── di/                               # Hilt modules: Supabase, Database, Telemetry
 └── ui/
     ├── auth/
     │   ├── AuthViewModel.kt          # @HiltViewModel
@@ -112,7 +115,7 @@ Tests cover auth validation/errors, quota input and sample-state behavior, Histo
 
 ### Planned infrastructure
 
-`data/local/` (Room), durable telemetry storage, sync and inference are still pending. Telemetry lives in `telemetry/` (service, rules, device readers), `data/telemetry/` (repository seam) and `ui/tracking/` (setup screen). `ui/promos/` is no longer planned: quota setup replaces the former catalog flow.
+Sync (C3) and inference (D6) are still pending. Telemetry lives in `telemetry/` (service, rules, device readers), `data/telemetry/` (Room-backed repository and rollup) and `ui/tracking/` (setup screen). The telemetry repository contract is in `src/sharedTest/` and runs on the JVM (in memory) and on a device (Room; see `src/androidTest/.../data/local/`). `ui/promos/` is no longer planned: quota setup replaces the former catalog flow.
 
 ---
 
@@ -128,7 +131,7 @@ Tests cover auth validation/errors, quota input and sample-state behavior, Histo
 
 ## Data model (quota schema, migration `20261104000001`)
 
-The Supabase schema is written as SQL migrations in [`supabase/`](supabase/), built from [`docs/erd-draft.md`](docs/erd-draft.md) — read [`supabase/README.md`](supabase/README.md) for the table rules and the Postgres↔Kotlin type mapping before writing the Room entities. The Room side (D2) does not exist yet; its entities must match these tables column for column. Until the quota migration is pushed, the hosted project still has the legacy promo tables (see ROADMAP "C2 follow-up").
+The Supabase schema is written as SQL migrations in [`supabase/`](supabase/), built from [`docs/erd-draft.md`](docs/erd-draft.md) — read [`supabase/README.md`](supabase/README.md) for the table rules and the Postgres↔Kotlin type mapping before changing a Room entity. The Room entities in `data/local/entity/` match these tables column for column; a schema change needs both a Supabase migration and a Room `Migration` (bump `DataraDatabase.version`, commit the exported schema).
 
 Synced tables (Room entity name in brackets):
 
@@ -144,7 +147,8 @@ Synced tables (Room entity name in brackets):
 Phone-only Room tables for D4 telemetry (`usage_samples`, `durable_readings`, `telemetry_checkpoint`, `durable_checkpoint`) are never synced; see the ERD draft. The legacy `providers`, `promos`, `associations` and the old `data_usage`/`notifications` are dropped by the quota migration — do not bring them back.
 
 Rules:
-- Once Room and sync exist, keep persisted fields and mappings aligned with their corresponding Supabase migrations. Do not invent Room entities as part of UI-only work.
+- Keep Room entities aligned with their Supabase migrations. Do not invent Room entities as part of UI-only work.
+- Room has no partial indices, so the one-active-cycle-per-device rule is two triggers (`DataraDatabase.ONE_ACTIVE_CYCLE_TRIGGERS`); a migration that rebuilds `tracking_cycles` must recreate them. There are no local foreign keys; Postgres checks ownership on upload.
 - Every Supabase table carries **Row Level Security scoped to `user_id`** (`users` by `id`), granted to `authenticated` only. Don't create a table without its RLS policy. There is no shared reference table.
 - Child rows reference parents with composite `(…_id, user_id)` foreign keys so a row cannot point at another user's device or cycle. Keep that pattern for new tables.
 - Amounts are bytes as `bigint` / `Long`; MB is display-only (1 MB = 1,000,000 bytes).

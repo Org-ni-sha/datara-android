@@ -2,11 +2,12 @@
 
 These files describe the **quota schema** for the approved user-defined quota direction
 (confirmed 2026-10-29), built from [`docs/erd-draft.md`](../docs/erd-draft.md) (lead's decisions
-of 2026-11-04; the DB admin's review is still pending). Room entities (D2) do not exist yet; when
-they land they must match these tables column for column. Never edit an applied migration.
+of 2026-11-04; the DB admin's review is still pending). The D2 Room entities
+(`app/src/main/java/com/capstone/datara/data/local/entity/`) match these tables column for column.
+Never edit an applied migration.
 
-The quota migration (`20261104000001`) replaces the legacy promo-based tables from the first C2
-pass. Until it is pushed, the hosted project still has the legacy schema — see
+The quota migration (`20261104000001`) replaced the legacy promo-based tables from the first C2
+pass. It was applied to the hosted project with `supabase db push` on 2026-11-04 — see
 [Applying the quota migration](#applying-the-quota-migration).
 
 ## Migrations

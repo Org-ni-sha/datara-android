@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.ServiceCompat
+import com.capstone.datara.data.telemetry.UsageRollup
 import com.capstone.datara.telemetry.device.SignalStrengthMonitor
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -41,7 +42,8 @@ import javax.inject.Inject
  *
  * Typed `specialUse`: continuous measurement has no runtime cap and may restart from
  * BOOT_COMPLETED, unlike `dataSync` (6 h/day on Android 15+). [TelemetryWatchdogWorker] restarts
- * it if the system kills it. Samples go to the TelemetryRepository; they are in memory until D2.
+ * it if the system kills it. Samples go to the TelemetryRepository (Room); after each durable read,
+ * [UsageRollup] rolls closed 10-minute windows up into `data_usage`.
  */
 @AndroidEntryPoint
 class TelemetryService : Service() {
@@ -49,6 +51,7 @@ class TelemetryService : Service() {
     @Inject lateinit var collector: TelemetryCollector
     @Inject lateinit var signalMonitor: SignalStrengthMonitor
     @Inject lateinit var controller: TelemetryController
+    @Inject lateinit var rollup: UsageRollup
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var loops: Job? = null
@@ -134,6 +137,13 @@ class TelemetryService : Service() {
             else Log.d(TAG, "Durable read: ${readings.sumOf { it.bytesTotal }} B in ${readings.size} span(s)")
         } catch (e: Exception) {
             Log.e(TAG, "Durable read failed; checkpoint kept for retry", e)
+        }
+        // Independent of the durable read: the rollup only needs the 30-second samples
+        try {
+            val rows = rollup.run()
+            if (rows > 0) Log.d(TAG, "Rolled up $rows data_usage window(s)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Usage rollup failed; it resumes on the next read", e)
         }
     }
 
