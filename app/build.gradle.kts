@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
 }
 
 // Load local.properties
@@ -67,6 +68,17 @@ android {
         compose = true
         buildConfig = true
     }
+    // Tests shared by the JVM and instrumented suites, e.g. the telemetry repository contract
+    sourceSets {
+        getByName("test").kotlin.srcDir("src/sharedTest/java")
+        getByName("androidTest").kotlin.srcDir("src/sharedTest/java")
+    }
+}
+
+// Room writes each schema version here as JSON. Commit these files: migration tests (and
+// reviewers) compare against them.
+room {
+    schemaDirectory("$projectDir/schemas")
 }
 
 dependencies {
@@ -102,6 +114,11 @@ dependencies {
     // Background work (telemetry watchdog)
     implementation(libs.androidx.work.runtime.ktx)
 
+    // Local database (Room). KSP, never kapt.
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+
     // Ktor
     implementation(libs.ktor.client.android)
 
@@ -119,6 +136,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.room.testing)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

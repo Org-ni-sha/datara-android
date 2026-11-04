@@ -11,10 +11,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Process-lifetime stand-in for D2's Room storage. Everything, checkpoints included, is lost when
+ * Process-lifetime telemetry storage: the JVM tests' reference implementation of the contract
+ * that [RoomTelemetryRepository] (the one the app binds) also passes. Everything, checkpoints included, is lost when
  * the process dies: the next tick is then a BASELINE and the bytes in between are not counted.
- * Keeps the most recent day of samples and about a month of 10-minute readings, so a long-running
- * service cannot grow it without bound while a D3 cycle can still sum its readings since start_at.
+ * Keeps the most recent day of samples so a long-running service cannot grow it without bound.
  */
 @Singleton
 class InMemoryTelemetryRepository @Inject constructor() : TelemetryRepository {
@@ -47,10 +47,7 @@ class InMemoryTelemetryRepository @Inject constructor() : TelemetryRepository {
         /** One day of 30-second samples. */
         const val MAX_SAMPLES = 2_880
 
-        /**
-         * About 35 days of 10-minute readings plus switch-triggered extras (a few hundred KB), so a
-         * cycle's "used" does not drop as old readings are trimmed. Room (D2) keeps them all.
-         */
-        const val MAX_DURABLE_READINGS = 6_000
+        /** One day of 10-minute readings, plus switch-triggered extras. */
+        const val MAX_DURABLE_READINGS = 288
     }
 }

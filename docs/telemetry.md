@@ -57,23 +57,22 @@ These are three separate mechanisms. Each manifest entry has a comment saying wh
 
 Some vendor builds (MIUI and others) also need Autostart enabled before background restarts work. Without it, MIUI refused the `MY_PACKAGE_REPLACED` restart on the test phone.
 
-## Storage seam (for D2)
+## Storage (D2)
 
-Samples go through `data/telemetry/TelemetryRepository`. Hilt binds it to `InMemoryTelemetryRepository` in `di/TelemetryModule`.
+Samples go through `data/telemetry/TelemetryRepository`. Hilt binds it to `RoomTelemetryRepository` in `di/TelemetryModule`, so samples, readings and both checkpoints survive process death and reboots. `InMemoryTelemetryRepository` remains as the JVM tests' reference implementation.
 
-- **What the in-memory version loses:** everything, checkpoints included, when the process dies. The next sample is then a `BASELINE`.
-- **What it keeps:** the most recent day of 30-second samples and about 35 days of 10-minute readings (D3 cycles sum the readings since a cycle's start).
-
-For D2, replace the binding with a Room-backed implementation that keeps these rules:
+The Room implementation keeps these rules:
 - `commitPrimary` and `commitDurable` store the rows **and** their checkpoint in one transaction. That way a crash can never count bytes twice (see `crash before commit` in `PrimaryTickTest`).
 - Row ids are client-generated UUIDs (`UsageSample.id`, `DurableUsageReading.id`), so sync retries upsert.
 - Times are epoch millis. Statuses are the strings above.
 
-`TelemetryCollectorTest` runs against the repository interface; point it at the Room implementation too.
+The collector contract (`src/sharedTest/.../TelemetryCollectorContract`) runs against both: `TelemetryCollectorTest` (JVM, in memory) and `RoomTelemetryCollectorTest` (instrumented, in-memory Room).
+
+**Rollup to `data_usage`.** After each durable read the service runs `UsageRollup`, which turns closed 10-minute windows of samples into `data_usage` rows for the signed-in user (rules in `DataUsageRollup`, from the [ERD](erd-draft.md)). A sample belongs to the window its interval ended in. `CLOCK_ERROR`, missing from the ERD's ranking, ranks worst. Row ids are derived from the device and window, so a repeated rollup upserts. Samples are pruned 14 days after rollup; durable readings are kept, since a cycle's used bytes are their sum. While signed out nothing is rolled up.
 
 ## Not done yet
 
-- Durable persistence and cloud sync (D2, C3).
+- Cloud sync (C3).
 - Remaining quota against the active cycle baseline (needs D3 durable cycles).
 - Reconciling `TrafficStats` sums against the durable totals.
 - Behaviour under Doze on a real device.

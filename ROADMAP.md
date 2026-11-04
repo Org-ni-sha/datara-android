@@ -10,7 +10,7 @@
 
 User-defined usage-quota forecasting is the approved product direction. The user chooses an amount in MB or GB to track; PET means the estimated time when device-measured mobile consumption reaches that amount. It does not predict carrier balance depletion, promo expiry or loss of connectivity. Traffic covered by freebies or zero-rating still counts when recorded by the device; the app does not classify carrier billing buckets or reconcile a carrier balance. Quotas inform the user and never block or throttle traffic.
 
-Authentication and the branded launch flow are implemented. Home, Create Quota, Quota Details, History, Notifications, Settings and Profile are implemented as UI previews using sample/session state. Room, real telemetry, quota persistence, inference, OS alert delivery and cloud sync remain pending. Completed UI checkboxes below do not mean their production integrations are complete.
+Authentication and the branded launch flow are implemented. Home, Create Quota, Quota Details, History, Notifications, Settings and Profile are implemented as UI previews using sample/session state. Telemetry (D4) and the Room database (D2) are built; quota persistence, inference, OS alert delivery and cloud sync remain pending. Completed UI checkboxes below do not mean their production integrations are complete.
 
 The applied C2 schema still contains legacy promo tables. Quota schema design and new migrations are pending; this direction does not authorize deleting deployed tables. The manuscript, data labels and evaluation protocol must be aligned before research implementation proceeds. The original title above is historical, not a newly approved thesis title.
 
@@ -179,8 +179,8 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 - [x] **Phase C2 — Original Database Schema Definition:** *(Historical verification: applied schema and RLS checked against two live accounts on 2026-09-17. See "RLS verification" in [`supabase/README.md`](supabase/README.md) to re-run it.)*
   - Tables: `users`, `devices`, `providers`, `promos`, `data_usage`, `notifications`, `associations`.
   - Enforce Row Level Security (RLS) policies per `user_id`. No table ships without its policy.
-  - Room is not implemented. Future entities and sync mappers must match the agreed schema. Convention: Postgres is `snake_case` plural (`data_usage`), Room entities are `PascalCase` singular (`DataUsage`) — the mapping is naming-only, types must match exactly.
-- [ ] **C2 follow-up — Quota schema:** design and apply new migrations for quota/cycle persistence, relationships and RLS. Legacy `promos`/`associations` remain deployed until an explicit migration handles compatibility.
+  - Room entities (D2) match the agreed quota schema; sync mappers (C3) must too. Convention: Postgres is `snake_case` plural (`data_usage`), Room entities are `PascalCase` singular (`DataUsage`) — the mapping is naming-only, types must match exactly.
+- [x] **C2 follow-up — Quota schema:** design and apply new migrations for quota/cycle persistence, relationships and RLS. *(`20261104000001`, from the [quota schema ERD](docs/erd-draft.md); applied to the hosted project with `supabase db push` on 2026-11-04. It dropped the legacy promo tables.)*
 - [ ] **Phase C3 — Telemetry Sync:**
   - Batched background sync of usage records from the Android client.
   - **Implementation note:** this is a batched Postgrest insert from `supabase-kt`, not a custom HTTP endpoint. Only introduce a Supabase Edge Function if server-side validation or aggregation is genuinely needed — otherwise there is no endpoint to build.
@@ -206,12 +206,16 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 - [x] Official DATAra logo in authentication, session loading and Home; adaptive/monochrome launcher assets and AndroidX native splash. No forced video or minimum startup delay. See [brand assets](docs/brand-assets.md).
 
 #### Phase D2: Room Local Database & Hardware Detection
-- [ ] Add Room dependencies and KSP compiler (`ksp`, never `kapt` — matches the existing Hilt setup).
-- [ ] Create Room entities and sync mappings after the C2 quota-schema follow-up is designed. Do not blindly mirror the legacy promo model into new quota persistence.
-- [ ] Implement `DataraDatabase` and DAOs.
-- [ ] Auto-detect SIM/Carrier via `TelephonyManager` (*strictly no SMS reading, no manual carrier entry*).
+*Status (2026-11-04): built. Telemetry now persists in Room; nothing uploads yet (C3) and no screen reads Room yet (D3, D5, D7, D8).*
+
+- [x] Add Room dependencies and KSP compiler (`ksp`, never `kapt` — matches the existing Hilt setup). *(Room 2.8.5; schemas exported to `app/schemas/`.)*
+- [ ] Create Room entities and sync mappings after the C2 quota-schema follow-up is designed. Do not blindly mirror the legacy promo model into new quota persistence. *(Entities done: the eight synced tables column for column, each with a local `synced_at` upload queue, plus the four phone-only D4 tables. The Supabase sync mappers belong to C3.)*
+- [x] Implement `DataraDatabase` and DAOs. *(Includes the queries D3, D6, D7 and D8 need: readings in a time window, the active cycle as a Flow, the unsynced queue. One active cycle per device is enforced by triggers. Instrumented tests: `app/src/androidTest/.../data/local/`.)*
+- [x] Room-backed telemetry repository, swapped in `TelemetryModule`; it passes the same collector contract as the in-memory one. Each checkpoint commits in one transaction with its rows. *(Checked on a POCO F3 on 2026-11-05: after a force-stop the next sample continued from the saved checkpoint, and the closed window rolled up into `data_usage`.)*
+- [x] 10-minute `data_usage` rollup from `usage_samples`, per the ERD's rules (`UsageRollup`, run after each durable read). Samples are kept 14 days after rollup.
+- [x] Auto-detect SIM/Carrier via `TelephonyManager` (*strictly no SMS reading, no manual carrier entry*). *(Built in D4's `RadioInfoSource` with `getSimOperatorName()`, no permission; recorded on every sample and `data_usage` row, not on `devices`.)*
   - Try `getSimOperatorName()` / `getSimOperator()` first — these need **no permission**. Only request `READ_PHONE_STATE` if a specific value genuinely requires it; it is a dangerous permission and needs a justification you can defend.
-- [ ] Extract hardware metadata (`Build.MODEL`, `Build.VERSION.SDK_INT`).
+- [x] Extract hardware metadata (`Build.MODEL`, `Build.VERSION.SDK_INT`). *(`DeviceRepository` registers a `devices` row with a `device_id` generated once per install and account; the database and ids are excluded from Auto Backup.)*
 
 #### Phase D3: User-Defined Quota & Cycle Setup
 - [x] Create Quota UI: decimal MB/GB amount, optional name, validation, draft restoration and cancel/submit navigation. Units: 1 MB = 1,000,000 bytes; 1 GB = 1,000 MB.
@@ -246,7 +250,7 @@ The former promo catalog, promo entry and expiry setup are superseded. A chosen 
 - [x] **Mirror the harvester's measurement rules** (intervals, gap thresholds, network-switch handling, reboot re-baselining) from `data-harvester`'s `MeasurementRules` rather than re-deriving them, so recorded intervals mean the same thing in training and in the app. *(Mirrors v1.6.7, plus one approved deviation found on device. A baseline read while mobile data was down is re-baselined when mobile data returns. 1.6.7 counted 1.2 GB in 29 s there, so the harvester's data likely has the same spikes; see [usage telemetry](docs/telemetry.md).)*
 - [x] **Signal Strength Monitor:** *(on device: LTE RSRP −79 dBm, carrier GLOBE)*
   - `TelephonyCallback` on API 31+, `PhoneStateListener` below it (deprecated at 31). With `minSdk 26` **both** paths are required — pick by `Build.VERSION.SDK_INT`.
-- [ ] Persist snapshots to local Room database and queue for cloud sync. *(Blocked by: D2, C3.)*
+- [ ] Persist snapshots to local Room database and queue for cloud sync. *(Room done in D2: samples, readings and `data_usage` rows persist and `data_usage` is queued by `synced_at`. Upload blocked by C3.)*
 - [ ] Verify behavior under Doze and battery optimization on a real device, not just the emulator.
 
 #### Phase D5: Home & Floating Navigation

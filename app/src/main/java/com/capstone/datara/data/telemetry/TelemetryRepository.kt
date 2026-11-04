@@ -53,9 +53,9 @@ data class DurableUsageReading(
 }
 
 /**
- * Storage seam for telemetry. Bound to [InMemoryTelemetryRepository] until D2 adds Room; the Room
- * implementation must commit each sample and its checkpoint in ONE transaction, so a crash leaves
- * either both or neither and no bytes are counted twice.
+ * Storage seam for telemetry, bound to [RoomTelemetryRepository]. Each sample is committed with its
+ * checkpoint in ONE transaction, so a crash leaves either both or neither and no bytes are counted
+ * twice.
  */
 interface TelemetryRepository {
 
