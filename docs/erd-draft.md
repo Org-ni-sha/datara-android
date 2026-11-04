@@ -17,7 +17,7 @@ This builds on the "database requirements" tab of the team's review doc and upda
 
 ## Diagram
 
-Synced to Supabase:
+Stored on the phone (Room) and synced to Supabase. Every table carries `user_id` for RLS:
 
 ```mermaid
 erDiagram
@@ -25,10 +25,15 @@ erDiagram
     users ||--o{ tracking_cycles : sets
     devices ||--o{ tracking_cycles : "is tracked through"
     devices ||--o{ data_usage : records
+    users ||--o{ data_usage : owns
     tracking_cycles ||--o{ forecasts : "is forecast by"
+    users ||--o{ forecasts : owns
+    devices ||--o{ forecasts : "is forecast on"
     tracking_cycles ||--o{ notifications : triggers
+    users ||--o{ notifications : receives
     users ||--o| notification_preferences : has
     users ||--o| user_model_state : "personalizes with"
+    devices |o--o{ user_model_state : "learned on"
 
     users {
         uuid id PK "same as auth.users.id"
@@ -42,7 +47,7 @@ erDiagram
         uuid device_id PK
         uuid user_id FK
         text device_model
-        int android_version
+        int android_sdk_int "API level, e.g. 34"
         text device_name "optional"
         timestamptz created_at
     }
@@ -60,16 +65,16 @@ erDiagram
         timestamptz updated_at
     }
     data_usage {
-        uuid data_usage_id PK
+        uuid data_usage_id PK "one row per 10-minute window"
         uuid user_id FK
         uuid device_id FK
         timestamptz interval_start_at
         timestamptz interval_end_at
         bigint bytes_rx
         bigint bytes_tx
-        text measurement_status
+        text measurement_status "check: harvester statuses"
         text network_type
-        int signal_dbm
+        int signal_dbm "null when unknown"
         text carrier
         int schema_version
     }
@@ -80,9 +85,11 @@ erDiagram
         uuid cycle_id FK
         timestamptz predicted_at
         bigint remaining_bytes
-        bigint predicted_next_hour_bytes
-        timestamptz predicted_reach_at "PET, null beyond horizon"
-        text model_type "global | local"
+        text active_model "global | local, the one shown"
+        bigint global_next_hour_bytes
+        timestamptz global_reach_at "PET, null beyond horizon"
+        bigint local_next_hour_bytes "null until local has learned"
+        timestamptz local_reach_at "null until local has learned"
         text model_version
         jsonb inputs
     }
@@ -106,7 +113,7 @@ erDiagram
         uuid user_id PK
         text active_model "global | local"
         jsonb parameters
-        uuid device_id "learned on, not a key"
+        uuid device_id FK "learned on, nullable"
         int hours_seen
         double global_recent_mae
         double local_recent_mae
@@ -114,7 +121,7 @@ erDiagram
     }
 ```
 
-On the phone only (Room), never synced:
+Phone-only telemetry tables (Room), never synced. They are an implementation detail of D4 and can go in a thesis appendix rather than the main ERD:
 
 ```mermaid
 erDiagram
@@ -174,9 +181,10 @@ Created by the `on_auth_user_created` trigger. `username` already exists (migrat
   - **The carrier shown beside it** is the `carrier` of the user's latest `data_usage` row (detected, never entered).
   - **Existing rows:** the column exists already, so this is only a new `check` constraint. Check that no current value violates it first.
 
-### devices (existing, no structural change)
+### devices (existing, one column renamed)
 
-- `device_id` is generated once per install and stored on the phone.
+- `device_id` is generated once per install and stored on the phone. A reinstall therefore creates a new `device_id` (and a new `devices` row) for the same phone.
+- **Rename `android_version` to `android_sdk_int`:** it holds the API level (`Build.VERSION.SDK_INT`, e.g. 34), not the marketing version ("14"). The legacy column is already an `integer`, so this is a plain rename.
 - The carrier is **not** stored here. It is recorded on every usage row, so SIM changes are covered.
 
 ### tracking_cycles (new)
@@ -186,11 +194,13 @@ One quota the user set, and how it ended.
 - **status**, one of:
   - `active`
   - `reached`: measured usage crossed `quota_bytes`, and `reached_at` is set
-  - `ended`: the user ended the cycle first; it is not scored as a known outcome
+  - `ended`: the user ended the cycle before it reached the quota; it is not scored as a known outcome
+- **Reached, then ended:** when the user ends a cycle that already reached its quota, `status` stays `reached` and `ended_at` is set. Scoring uses `reached_at is not null`, so such cycles still count as known outcomes.
 - **Constraints:**
   - `check (quota_bytes > 0)`
   - `check (status <> 'reached' or reached_at is not null)`
   - `check (reached_at is null or reached_at >= start_at)`
+  - `check (ended_at is null or ended_at >= start_at)`
 - **Rule:** at most one active cycle per device, enforced by the partial unique index `(device_id) where status = 'active'`.
 - **Changed from the requirements tab: no `baseline_bytes`.** The D4 counters re-baseline on every reboot and when mobile data returns, so one counter reading at cycle start cannot define usage in the cycle. Instead:
   - **Used in cycle** = the sum of the 10-minute NetworkStatsManager readings in `[start_at, now)`. NetworkStatsManager is ROADMAP's source of truth for durable totals.
@@ -207,9 +217,10 @@ Usage history that outlives a reinstall (D7), and the observed side of the E3 ev
   - `bytes_rx` and `bytes_tx`: summed.
   - `measurement_status`: the worst status in the window, in the order `COUNTER_JUMP` > `COUNTER_RESET` > `UNSUPPORTED` > `GAP` > `INTERRUPTED` > `BASELINE` > `OK`.
   - `network_type`: the cellular label that carried the most bytes, otherwise the most common label.
-  - `signal_dbm`: the median of the known values, or -999 when there are none.
+  - `signal_dbm`: the median of the known values, or **null** when there are none. The phone's `-999` sentinel is never uploaded, so it cannot skew averages in training or charts.
   - `carrier`: the last one seen.
 - **Unique key:** `(device_id, interval_start_at)`, so a re-upload upserts.
+- **Allowed statuses:** `check (measurement_status in ('OK', 'BASELINE', 'COUNTER_RESET', 'COUNTER_JUMP', 'UNSUPPORTED', 'GAP', 'INTERRUPTED', 'CLOCK_ERROR'))`, the harvester's values (schema version 3).
 - **No `cycle_id`:** cycles are found by time window, and a window can straddle a cycle start.
 - **Removed:** `data_remaining_gb` and any stored daily totals. They can be computed from the rows, and a stored copy drifts.
 - **Decided: 10-minute windows.** They match the harvester and NetworkStatsManager, keep D7's 24-hour chart fine, and add up exactly to the model's hours.
@@ -217,11 +228,19 @@ Usage history that outlives a reinstall (D7), and the observed side of the E3 ev
 
 ### forecasts (new): the prediction log
 
-D6 logs every prediction so E3 can compare global and local accuracy. The log cannot be rebuilt later. A row stores:
+D6 logs every prediction so E3 can compare global and local accuracy. The log cannot be rebuilt later.
+
+**Both models are logged in every row:** one row per `(cycle_id, predicted_at)`, not one row per model.
+- **Why it's cheap:** local = global + the user's residual, from the same `inputs`, so computing both costs almost nothing.
+- **Why it matters:** logging local "in shadow" before the switch is the data behind `user_model_state.local_recent_mae`, and it lets E3 compare the two models on exactly the same hours.
+
+A row stores:
 - `remaining_bytes`: the input to the projection.
-- `predicted_next_hour_bytes`: what Decision 2's model outputs. Its actual value comes from `data_usage`, and the local layer's residual is learned from the difference.
-- `predicted_reach_at`: the PET from the hour-by-hour projection, or null when the projection passes the 30-day cap.
-- `model_type`, `model_version` (the ONNX file) and `inputs` (the feature values as JSON), so every prediction can be checked later.
+- `active_model`: `global` or `local`, the one the user was shown.
+- `global_next_hour_bytes` and `local_next_hour_bytes`: what each model predicts for the next hour (Decision 2). The actual value comes from `data_usage`, and the local residual is learned from the global error.
+- `global_reach_at` and `local_reach_at`: each model's PET from the hour-by-hour projection, or null when the projection passes the 30-day cap.
+- **Before the local layer has learned enough,** both `local_*` columns are null.
+- `model_version` (the ONNX file) and `inputs` (the feature values as JSON), so every prediction can be checked later.
 
 The actual quota-reaching time is `tracking_cycles.reached_at` and is not stored twice.
 - **Decided: one logged forecast per hour per active cycle, and every one is synced** (about 24 rows a day). The model predicts by the hour and the local layer learns once per hour, so the log has the same cadence. Home may refresh the PET more often without logging it.
@@ -274,8 +293,9 @@ One row per user (`user_id` is the primary key), matching the two Settings switc
    ```
    If any count is not 0, stop and plan a data copy instead.
 2. **Drop the legacy tables:** `associations` first (it references the others), then `promos`, `providers` and the legacy `data_usage` and `notifications`. Drop the carrier seed from `seed.sql`.
-3. **Create the new tables** with their constraints, indexes, RLS policies and grants: `tracking_cycles`, `data_usage`, `forecasts`, `notifications`, `notification_preferences`, `user_model_state`. Policies use `(select auth.uid())`, as in `20260917000002`.
-4. **Update docs:** `supabase/README.md`, and the AGENTS.md "Data model" section.
+3. **Alter the kept tables:** rename `devices.android_version` to `android_sdk_int`, and add the `users.phone_number` format check.
+4. **Create the new tables** with their constraints, indexes, RLS policies and grants: `tracking_cycles`, `data_usage`, `forecasts`, `notifications`, `notification_preferences`, `user_model_state`. Policies use `(select auth.uid())`, as in `20260917000002`.
+5. **Update docs:** `supabase/README.md`, and the AGENTS.md "Data model" section.
 
 ## Decisions (lead, 2026-11-04)
 
