@@ -1,15 +1,15 @@
 # Quota cycles (ROADMAP D3)
 
-A cycle is one quota the user set: `tracking_cycles` in [the ERD](erd-draft.md). This page covers how usage in a cycle is measured, the status rules, and the storage seam D2 replaces.
+A cycle is one quota the user set: `tracking_cycles` in [the ERD](erd-draft.md). This page covers how usage in a cycle is measured, the status rules, and how cycles are stored.
 
 ## Code
 
 | Piece | Where | What |
 |---|---|---|
 | `TrackingCycle`, `CycleStatus` | `data/cycle/TrackingCycle.kt` | The row, field for field with `tracking_cycles`. Times are epoch millis and amounts are bytes. |
-| `TrackingCycleRepository` | `data/cycle/` | Storage seam. Bound to `InMemoryTrackingCycleRepository` in `di/CycleModule`. |
-| `UsageReadingRepository` | `data/cycle/` | The 10-minute readings a cycle is measured from. It reads D4's `durable_readings` through `TelemetryRepository`. |
-| `CycleOwnerProvider`, `DeviceIdProvider` | `data/cycle/CycleOwnerProvider.kt` | The signed-in user id (Supabase session) and this install's `device_id`. |
+| `TrackingCycleRepository` | `data/cycle/` | Storage seam. `di/CycleModule` binds `RoomTrackingCycleRepository` (D2's `TrackingCycleDao`); `InMemoryTrackingCycleRepository` is for JVM tests. |
+| `UsageReadingRepository` | `data/cycle/` | The 10-minute readings a cycle is measured from: `RoomUsageReadingRepository` reads every `durable_readings` row since `start_at` (`TelemetryDao.observeReadingsSince`). |
+| `CycleOwnerProvider` | `data/cycle/CycleOwnerProvider.kt` | The signed-in user id (Supabase session) and this install's `device_id` for that account, from D2's `DeviceRepository`. |
 | `CycleMath` | `domain/cycle/` | Pure usage arithmetic. |
 | `CycleRules` | `domain/cycle/` | Pure status transitions and the table's check constraints. |
 | `QuotaCycleManager` | `domain/cycle/` | The use cases: observe progress (`StateFlow<CycleState>`), create, end, and restore the latest cycle on start. |
@@ -34,7 +34,7 @@ How each `measurement_status` counts:
 | `COUNTER_RESET`, `COUNTER_JUMP`, `UNSUPPORTED` | 0 bytes, as recorded | yes (`lostReadings`) |
 | `CLOCK_ERROR`, or `until < since` | skipped: it cannot be placed in the window | yes (`lostReadings`) |
 
-Time inside the cycle that no reading covers is reported as `unmeasuredMillis`. That happens when tracking was off, or when the process died and the in-memory checkpoint was lost. Details then says usage may be missing and offers **Check tracking**. Once D2 persists the checkpoint, the next read covers such a hole as a `GAP` span instead.
+Time inside the cycle that no reading covers is reported as `unmeasuredMillis`. That happens when tracking was off before the first reading of the cycle, or when no durable checkpoint bridged a stop. Details then says usage may be missing and offers **Check tracking**. Since D2 persists the checkpoint, a restart or a stop is normally covered by the next read as one `GAP` span, with exact bytes.
 
 ## Status rules
 
@@ -50,37 +50,33 @@ reached --user ends----------->   reached   (status kept, ended_at = now)
 - **Creating a cycle:** this ends the current one at the same instant (an active cycle becomes `ended`; a reached one keeps `reached` and gets `ended_at`). A device therefore never has two active cycles, matching the partial unique index.
 - **Writes:** all writes go through one mutex.
 
-## Storage seam (for D2)
+## Storage
 
 The interfaces follow DAO conventions: streams the UI follows are `Flow`, and one-shot reads and writes are `suspend`.
 
 ```kotlin
 interface TrackingCycleRepository {
-    fun observeLatest(userId: String, deviceId: String): Flow<TrackingCycle?> // order by start_at desc limit 1
+    fun observeLatest(userId: String, deviceId: String): Flow<TrackingCycle?> // TrackingCycleDao.observeLatest
     suspend fun latest(userId: String, deviceId: String): TrackingCycle?
     fun observeAll(userId: String): Flow<List<TrackingCycle>>                 // newest first (History, D7)
-    suspend fun insert(cycle: TrackingCycle)
-    suspend fun update(cycle: TrackingCycle)                                  // by cycle_id
+    suspend fun insert(cycle: TrackingCycle, endingPrevious: TrackingCycle? = null) // TrackingCycleDao.replace, one transaction
+    suspend fun update(cycle: TrackingCycle)
 }
 
 interface UsageReadingRepository {
-    fun observeReadingsFrom(fromMillis: Long): Flow<List<DurableUsageReading>> // max(since, until) >= from, by since
+    fun observeReadingsFrom(fromMillis: Long): Flow<List<DurableUsageReading>> // TelemetryDao.observeReadingsSince
 }
 ```
 
-For D2:
-- **Cycles:** bind a Room-backed `TrackingCycleRepository` in `CycleModule`. `status` is stored as `CycleStatus.value` (`active`/`reached`/`ended`), which needs a type converter or a mapper. Add the local-only `synced_at`.
-- **Index:** add the partial unique index `(device_id) where status = 'active'`.
-- **Readings:** `TelemetryUsageReadingRepository` filters `TelemetryRepository.observeDurableReadings()` in memory. With Room, a range query on `durable_readings` is cheaper.
-- **Contract:** `QuotaCycleManagerTest` runs against the in-memory repositories. Point it at the Room versions too.
-
-The in-memory telemetry repository now keeps about 35 days of 10-minute readings (previously one day), so a cycle's used total does not drop as old readings are trimmed.
+- **Domain model vs entity:** `data/cycle/TrackingCycle` (status as the `CycleStatus` enum) maps to the Room entity `data/local/entity/TrackingCycle` (status as text) in `RoomTrackingCycleRepository`. Every write clears `synced_at`, queueing the row for upload (C3).
+- **One active cycle:** replacing a cycle updates the old row and inserts the new one in one transaction, so Room's one-active-cycle trigger never fires and a crash cannot leave half a replacement.
+- **Readings:** not `TelemetryRepository.observeDurableReadings()`, which shows only the most recent day; a cycle can be longer.
+- **Contract:** `QuotaCycleManagerContract` (src/sharedTest) runs on the JVM against the in-memory repositories (`QuotaCycleManagerTest`) and on a device against in-memory Room (`RoomQuotaCycleManagerTest`).
 
 ## Not done yet
 
-- **Durable storage:** cycles are lost on process death, and past cycles are not kept. Blocked by D2.
+- **History:** past cycles are stored but not listed yet (D7).
 - **Home:** it still shows preview fixtures (D5); Create and End keep those fixtures in step.
 - **Forecast:** Details says it is not available yet (D6).
 - **Alerts:** 75/90/100% and forecast alerts (D8).
-- **Sync** (C3): `devices` row registration is part of it.
-- **Device check:** not yet checked on a phone.
+- **Sync** (C3): cycles are queued for upload (`synced_at` null), but nothing uploads yet.
