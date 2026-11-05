@@ -9,6 +9,7 @@ import com.capstone.datara.data.local.dao.NotificationDao
 import com.capstone.datara.data.local.dao.TelemetryDao
 import com.capstone.datara.data.local.dao.TrackingCycleDao
 import com.capstone.datara.data.local.dao.UserDao
+import com.capstone.datara.data.local.dao.UserModelStateDao
 import com.capstone.datara.data.local.device.DeviceIdStore
 import com.capstone.datara.data.local.device.HardwareInfo
 import com.capstone.datara.data.local.device.BuildHardwareInfo
@@ -38,6 +39,7 @@ object DatabaseModule {
     @Provides fun provideDataUsageDao(db: DataraDatabase): DataUsageDao = db.dataUsageDao()
     @Provides fun provideForecastDao(db: DataraDatabase): ForecastDao = db.forecastDao()
     @Provides fun provideNotificationDao(db: DataraDatabase): NotificationDao = db.notificationDao()
+    @Provides fun provideUserModelStateDao(db: DataraDatabase): UserModelStateDao = db.userModelStateDao()
 }
 
 @Module

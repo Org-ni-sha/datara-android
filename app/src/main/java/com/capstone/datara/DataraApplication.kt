@@ -2,6 +2,7 @@ package com.capstone.datara
 
 import android.app.Application
 import com.capstone.datara.domain.cycle.QuotaCycleManager
+import com.capstone.datara.forecast.ForecastEngine
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -14,4 +15,13 @@ class DataraApplication : Application() {
      */
     @Inject
     lateinit var quotaCycles: QuotaCycleManager
+
+    /** Forecasts (D6) follow the active cycle from process start, so a new cycle gets its PET at once. */
+    @Inject
+    lateinit var forecasts: ForecastEngine
+
+    override fun onCreate() {
+        super.onCreate()
+        forecasts.start()
+    }
 }

@@ -28,7 +28,8 @@ As of 2026-10-29:
 - **Implemented (D4):** the telemetry foreground service (30 s `TrafficStats`, 10 min `NetworkStatsManager`, 15 min watchdog), signal/network/carrier inputs, the Tracking setup screen and its permissions — see [usage telemetry](docs/telemetry.md).
 - **Implemented (D2):** Room `DataraDatabase` with the eight synced entities and the four phone-only telemetry tables, DAOs with the upload queue, Room-backed telemetry storage, the 10-minute `data_usage` rollup and device registration. No screen reads it yet, and nothing uploads it (C3).
 - **Implemented (D3):** quota cycles — `TrackingCycle` domain model and `TrackingCycleRepository` seam (Room-backed via `TrackingCycleDao`), pure cycle math (`domain/cycle/CycleMath`, `CycleRules`) and `QuotaCycleManager` use cases. Create Quota and Quota Details use real, durable cycles; Home stays on fixtures until D5 — see [quota cycles](docs/quota-cycles.md).
-- **Pending:** inference, OS alert delivery, persistent preferences and sync. Do not mark D3–D9 complete just because their UI exists.
+- **Implemented (D6):** on-device forecasting — ONNX Runtime runs the bundled Global model (`assets/models/global_xgboost.onnx`, currently the synthetic placeholder `dev-synthetic-v1`), `FeatureExtractor` reproduces datara-ml's feature contract v1 (parity-tested), the local residual layer and reversible GLOBAL/LOCAL switch live in `user_model_state`, the PET projection logs one `forecasts` row per active cycle per hour, and Home's hero and Quota Details show the real PET — see [forecast](docs/forecast.md).
+- **Pending:** a trained model (B3–B5, a file swap), OS alert delivery, persistent preferences and sync. Do not mark D5, D7–D9 complete just because their UI exists.
 
 The current implementation details and limitations are in [quota UI preview](docs/quota-ui-preview.md).
 
@@ -54,12 +55,7 @@ The current implementation details and limitations are in [quota UI preview](doc
 | Launch | AndroidX core-splashscreen 1.2.0, native launch theme and Compose session loading |
 | Local DB | Room 2.8.5 (SQLite), compiler via KSP, schemas exported to `app/schemas/` |
 | Background work | `specialUse` foreground service sampling `TrafficStats` every 30 s and `NetworkStatsManager` every 10 min (matching `data-harvester`), plus a 15-min WorkManager 2.11.2 watchdog — ROADMAP Decision 1 |
-
-### Planned — not yet a dependency
-
-| Layer | Choice | Roadmap phase |
-|---|---|---|
-| On-device inference | ONNX Runtime Mobile (`com.microsoft.onnxruntime:onnxruntime-android`) | D6 |
+| On-device inference | ONNX Runtime 1.31.1 (`onnxruntime-android`; JVM `onnxruntime` for unit tests only) — D6 |
 
 **Auth OTP note:** password recovery does use a one-time code, but it is an *email* OTP (`verifyEmailOtp(OtpType.Email.RECOVERY)` in `AuthRepository`). That is intended and correct. The banned pattern is *phone/SMS* OTP as a login identifier.
 
@@ -116,7 +112,7 @@ Tests cover auth validation/errors, quota input and sample-state behavior, Histo
 
 ### Planned infrastructure
 
-Sync (C3) and inference (D6) are still pending. Telemetry lives in `telemetry/` (service, rules, device readers), `data/telemetry/` (Room-backed repository and rollup) and `ui/tracking/` (setup screen). The telemetry repository contract is in `src/sharedTest/` and runs on the JVM (in memory) and on a device (Room; see `src/androidTest/.../data/local/`). `ui/promos/` is no longer planned: quota setup replaces the former catalog flow.
+Sync (C3) is still pending. Forecasting (D6) lives in `forecast/` (feature contract, extractor, projector, ONNX model, local layer, `ForecastEngine`). Telemetry lives in `telemetry/` (service, rules, device readers), `data/telemetry/` (Room-backed repository and rollup) and `ui/tracking/` (setup screen). The telemetry repository contract is in `src/sharedTest/` and runs on the JVM (in memory) and on a device (Room; see `src/androidTest/.../data/local/`). `ui/promos/` is no longer planned: quota setup replaces the former catalog flow.
 
 ---
 
@@ -192,9 +188,10 @@ If a task description conflicts with this list, ask before proceeding rather tha
 
 ## Prediction logic — do not oversimplify
 
-- **PET** means predicted quota-reaching time in the approved direction. Make it prominent on Home when available; show collecting/unavailable states honestly. Current displayed forecasts are fixtures, not inference.
+- **PET** means predicted quota-reaching time in the approved direction. Make it prominent on Home when available; show collecting/unavailable states honestly. Home's hero and Quota Details show the on-device forecast for a real active cycle; the other Home preview scenarios are fixtures.
 - **Decided (ROADMAP Decision 2):** the Global model predicts **next-hour mobile usage**; the app computes the PET by projecting hourly predictions against the remaining quota. Do not train or wire a model that outputs the PET directly.
 - Planned D6 behavior: new users with sufficient valid inputs get predictions from the **Global model**. Once a user has enough local usage history (roughly 7 days of telemetry), the app switches to the **Local personalization layer**. Don't hardcode "always use global" or "always use local" — this is a conditional, reversible switch (see the thesis's Fig. 1 data flow and ROADMAP D6).
+- **The feature list is frozen** by datara-ml `docs/feature-contract.md` (v1). `FeatureContract`/`FeatureExtractor`/`PetProjector` must match `datara_ml/features.py`; `FeatureParityTest` replays its golden fixture. A new model trained on the same contract is a file swap (model + fixture), never a code change.
 - **On-device _inference_ is non-negotiable; on-device _training_ is not a given.** ONNX Runtime does inference only for tree ensembles — there is no on-device XGBoost retraining path. ROADMAP §2 (Decision 2) holds the options; don't write code that assumes local XGBoost training works.
 - Planned predictions run **on-device via ONNX Runtime**, not via a live network call to a prediction server. If a task asks you to add a `/predict` API call, confirm that's actually intended first — it would contradict the offline-first design already documented. (Downloading an updated *model file* from Supabase Storage is not a `/predict` call and doesn't violate this.)
 - Network factors (signal strength, internet speed) are model inputs, not just display metadata — don't drop them when refactoring the prediction pipeline.

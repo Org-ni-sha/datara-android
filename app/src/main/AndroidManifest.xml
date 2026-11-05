@@ -63,6 +63,13 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+        <!-- ONNX Runtime 1.31's AAR adds a telemetry uploader that starts with the app. DATAra's
+             inference is offline and sends nothing to third parties (RA 10173), so it is removed;
+             OnnxNextHourModel also turns ONNX Runtime telemetry off before creating a session. -->
+        <provider
+            android:name="ai.onnxruntime.TelemetryInitializer"
+            android:authorities="${applicationId}.onnxruntime_telemetry_initializer"
+            tools:node="remove" />
     </application>
 
 </manifest>

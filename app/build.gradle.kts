@@ -72,6 +72,8 @@ android {
     sourceSets {
         getByName("test").kotlin.srcDir("src/sharedTest/java")
         getByName("androidTest").kotlin.srcDir("src/sharedTest/java")
+        // The D6 golden parity fixture, so DeviceParityTest runs it on the Android ONNX Runtime
+        getByName("androidTest").assets.srcDir("src/test/resources")
     }
 }
 
@@ -80,6 +82,11 @@ android {
 room {
     schemaDirectory("$projectDir/schemas")
 }
+
+// JVM unit tests use onnxruntime (desktop natives) instead of the Android AAR: both ship the
+// ai.onnxruntime classes, and the AAR's native libraries cannot load on the JVM.
+configurations.matching { it.name.endsWith("UnitTestRuntimeClasspath") || it.name.endsWith("UnitTestCompileClasspath") }
+    .configureEach { exclude(group = "com.microsoft.onnxruntime", module = "onnxruntime-android") }
 
 dependencies {
     // Compose BOM
@@ -119,6 +126,9 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    // On-device inference (D6): ONNX Runtime runs the bundled Global XGBoost model
+    implementation(libs.onnxruntime.android)
+
     // Ktor
     implementation(libs.ktor.client.android)
 
@@ -131,6 +141,8 @@ dependencies {
 
     // Test
     testImplementation(libs.junit)
+    // The desktop build of the same ONNX Runtime API, so the parity test runs the real model on the JVM
+    testImplementation(libs.onnxruntime.jvm)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

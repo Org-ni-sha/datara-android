@@ -12,6 +12,7 @@ import com.capstone.datara.data.local.dao.NotificationDao
 import com.capstone.datara.data.local.dao.TelemetryDao
 import com.capstone.datara.data.local.dao.TrackingCycleDao
 import com.capstone.datara.data.local.dao.UserDao
+import com.capstone.datara.data.local.dao.UserModelStateDao
 import com.capstone.datara.data.local.entity.DataUsage
 import com.capstone.datara.data.local.entity.Device
 import com.capstone.datara.data.local.entity.DurableCheckpointEntity
@@ -64,6 +65,7 @@ abstract class DataraDatabase : RoomDatabase() {
     abstract fun dataUsageDao(): DataUsageDao
     abstract fun forecastDao(): ForecastDao
     abstract fun notificationDao(): NotificationDao
+    abstract fun userModelStateDao(): UserModelStateDao
 
     companion object {
         /** Excluded from Auto Backup and device transfer (res/xml backup rules). */

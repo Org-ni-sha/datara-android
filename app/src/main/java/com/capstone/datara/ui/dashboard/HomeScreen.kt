@@ -60,7 +60,7 @@ fun DashboardScreen(
     } else if (creating) {
         CreateQuotaScreen(onBack = { cycleViewModel.clearError(); creating = false }, onCreateQuota = { bytes, name ->
             cycleViewModel.createQuota(bytes, name) {
-                // Home still shows preview fixtures until D5; keep it in step with the real cycle
+                // Home's hero shows the real cycle; keep the preview fixtures in step for its other parts
                 viewModel.createQuota(bytes, name)
                 creating = false
                 details = false
@@ -68,7 +68,7 @@ fun DashboardScreen(
         }, isSaving = cycleAction.isSaving, errorMessage = cycleAction.errorMessage,
             replacingName = cycleDetails.takeIf { it.hasQuota && !it.isEnded }?.name)
     } else if (details) {
-        // Quota Details shows the real cycle (D3); its forecast stays unavailable until D6
+        // Quota Details shows the real cycle (D3) and its on-device forecast (D6)
         QuotaDetailsScreen(cycleDetails, onBack = { cycleViewModel.clearError(); details = false },
             onEndCycle = { cycleViewModel.endCycle { viewModel.endCycle() } }, onCreateQuota = { creating = true },
             onTrackingSetup = { tracking = true }, actionError = cycleAction.errorMessage)
@@ -105,7 +105,8 @@ fun DashboardScreen(
             onViewQuota = { details = true }, onHistory = { history = true },
             onNotifications = { notifications = true }, unreadCount = notificationState.unreadCount,
             onSettings = { settings = true; history = false },
-            onTrackingSetup = { tracking = true })
+            onTrackingSetup = { tracking = true },
+            live = cycleDetails.takeIf { it.hasQuota && !it.isSample })
     }
 }
 
@@ -114,8 +115,8 @@ fun HomeScreen(state: HomeUiState, onCreateQuota: () -> Unit,
     onSelectScenario: (HomeSampleState) -> Unit, onSignOut: () -> Unit,
     modifier: Modifier = Modifier, onViewQuota: () -> Unit = {}, onHistory: () -> Unit = {},
     onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {},
-    onTrackingSetup: () -> Unit = {}) {
-    QuotaTheme { HomeContent(state, onCreateQuota, onSelectScenario, onSignOut, modifier, onViewQuota, onHistory, onNotifications, unreadCount, onSettings, onTrackingSetup) }
+    onTrackingSetup: () -> Unit = {}, live: QuotaDetailsModel? = null) {
+    QuotaTheme { HomeContent(state, onCreateQuota, onSelectScenario, onSignOut, modifier, onViewQuota, onHistory, onNotifications, unreadCount, onSettings, onTrackingSetup, live) }
 }
 
 @Preview(name = "No quota", widthDp = 360, heightDp = 800)
