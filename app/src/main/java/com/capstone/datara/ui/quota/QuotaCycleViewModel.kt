@@ -2,13 +2,17 @@ package com.capstone.datara.ui.quota
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.capstone.datara.data.cycle.CycleStatus
+import com.capstone.datara.domain.cycle.CycleState
 import com.capstone.datara.domain.cycle.QuotaCycleManager
+import com.capstone.datara.forecast.ForecastEngine
+import com.capstone.datara.forecast.ForecastStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -18,15 +22,18 @@ import javax.inject.Inject
 data class QuotaActionState(val isSaving: Boolean = false, val errorMessage: String? = null)
 
 /**
- * Create Quota and Quota Details against the real cycle use cases ([QuotaCycleManager]).
- * Home still runs on [QuotaDemoViewModel] fixtures until D5 connects it.
+ * Create Quota and Quota Details against the real cycle use cases ([QuotaCycleManager]), with the
+ * live D6 forecast ([ForecastEngine]) of the active cycle. Home's hero shows the same real cycle
+ * and forecast; its other preview scenarios stay on [QuotaDemoViewModel] fixtures.
  */
 @HiltViewModel
-class QuotaCycleViewModel @Inject constructor(private val manager: QuotaCycleManager) : ViewModel() {
+class QuotaCycleViewModel @Inject constructor(
+    private val manager: QuotaCycleManager,
+    private val forecasts: ForecastEngine
+) : ViewModel() {
 
-    val details: StateFlow<QuotaDetailsModel> = manager.state
-        .map(QuotaDetailsModel::fromCycleState)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), QuotaDetailsModel.fromCycleState(manager.state.value))
+    val details: StateFlow<QuotaDetailsModel> = combine(manager.state, forecasts.status, ::detailsWithForecast)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), detailsWithForecast(manager.state.value, forecasts.status.value))
 
     private val mutableAction = MutableStateFlow(QuotaActionState())
     val action: StateFlow<QuotaActionState> = mutableAction.asStateFlow()
@@ -39,6 +46,16 @@ class QuotaCycleViewModel @Inject constructor(private val manager: QuotaCycleMan
     fun endCycle(onEnded: () -> Unit = {}) = run(onEnded) { manager.end() }
 
     fun clearError() = mutableAction.update { it.copy(errorMessage = null) }
+
+    companion object {
+        /** The cycle's details plus the live forecast text while it is active. */
+        fun detailsWithForecast(state: CycleState, status: ForecastStatus, now: Long = System.currentTimeMillis()): QuotaDetailsModel {
+            val details = QuotaDetailsModel.fromCycleState(state)
+            val cycle = (state as? CycleState.Tracked)?.progress?.cycle ?: return details
+            if (cycle.status != CycleStatus.ACTIVE || cycle.endedAt != null) return details
+            return details.copy(forecast = PetForecastUi.from(status, cycle.cycleId, now, ::formatCycleDate))
+        }
+    }
 
     private fun run(onSuccess: () -> Unit, block: suspend () -> Result<*>) {
         if (mutableAction.value.isSaving) return

@@ -38,7 +38,9 @@ data class QuotaDetailsModel(
     /** The preview scenario, for sample cycles only. */
     val sampleScenario: HomeSampleState? = null,
     /** True while the session or the latest cycle is still loading. */
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    /** The live D6 forecast of a real active cycle; null for samples, reached or ended cycles. */
+    val forecast: PetForecastUi? = null
 ) {
     val isEnded: Boolean get() = endedAtMillis != null
     val isSample: Boolean get() = sampleScenario != null

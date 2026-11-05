@@ -75,6 +75,7 @@ private fun forecastTitle(state: QuotaDetailsModel): String = when {
     state.sampleScenario == HomeSampleState.MISSING_PERMISSION -> "Waiting for Usage Access"
     state.sampleScenario == HomeSampleState.COLLECTING -> "Getting to know your usage"
     state.sampleScenario != null -> "About 12 hours"
+    state.forecast != null -> state.forecast.title
     else -> "Forecast not available yet"
 }
 
@@ -85,7 +86,8 @@ private fun forecastBody(state: QuotaDetailsModel): String = when {
     state.sampleScenario == HomeSampleState.MISSING_PERMISSION -> "Usage is unavailable until access is restored. No current balance is assumed."
     state.sampleScenario == HomeSampleState.COLLECTING -> "A forecast will appear once there’s enough usage."
     state.sampleScenario != null -> "Illustrative estimate based on sample usage, not a live prediction."
-    else -> "Forecasts come in a later update. Used and remaining amounts are measured on this device."
+    state.forecast != null -> state.forecast.body
+    else -> "The forecast is calculated on this device from your measured usage, once an hour."
 }
 
 @Composable

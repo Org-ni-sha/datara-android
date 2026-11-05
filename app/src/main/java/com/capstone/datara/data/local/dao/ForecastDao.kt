@@ -15,6 +15,10 @@ interface ForecastDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(forecast: Forecast): Long
 
+    /** The forecast logged for [predictedAt] (an hour start), or null. */
+    @Query("SELECT * FROM forecasts WHERE cycle_id = :cycleId AND predicted_at = :predictedAt")
+    suspend fun at(cycleId: String, predictedAt: Long): Forecast?
+
     /** The cycle's most recent forecast, or null before the first one. */
     @Query("SELECT * FROM forecasts WHERE cycle_id = :cycleId ORDER BY predicted_at DESC LIMIT 1")
     fun observeLatest(cycleId: String): Flow<Forecast?>

@@ -149,6 +149,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
     - **Resolution constraint:** `NetworkStatsManager` is coarsely bucketed (roughly 2-hour granularity for detailed queries), so on-device features are running totals, not true 10-minute resolution. Engineer features the client can actually reproduce at inference time — a feature the app cannot compute is useless no matter how well it trains.
   - `time_features`: hour of day (cyclical sine/cosine), day of week, is_weekend.
   - `network_features`: signal strength (dBm/bars), network type (LTE/5G), and measured speed. Confirm the speed field, units and availability in the research contract before training; the earlier A4 export list is not a finalized quota dataset schema.
+  - **Contract frozen (2026-11-06):** datara-ml `docs/feature-contract.md` (v1) fixes 12 features: hour sin/cos, day of week, is_weekend, last-1 h bytes, 3 h and 24 h average, same hour yesterday and last week (all log1p), last-hour signal median, radio generation and share of readings on cellular. **Measured speed is excluded:** the harvester has no speed column. Reference implementation `datara_ml/features.py`; the app reproduces it (D6 parity test).
   - **Target (decided, see Decision 2):** mobile bytes used in the **next hour** per device, built by summing the harvester's 30-second rows into hourly totals. Train on `log1p(bytes)`, since hourly usage is skewed with many near-zero hours. The PET is not a training label; the app derives it by projecting hourly predictions against the remaining quota.
   - Every feature must be computable on the phone from the same 30 s and 10 min readings at the start of the hour, using the same definitions as the app (lags such as last hour, last 24 h average, same hour yesterday).
 - [ ] **Phase B3 — Global XGBoost Model Training & Hyperparameter Tuning:**
@@ -265,19 +266,19 @@ Promo/expiry cards and live network badges are not part of the current UI. Signa
 #### Phase D6: On-Device Machine Learning & Dual-Model Execution
 *Blocked by: B5 (needs `global_xgboost.onnx`), D2, D4. See ⚠️ DECISION 2 — written below against the residual-correction option.*
 
-- [ ] Add `com.microsoft.onnxruntime:onnxruntime-android`.
-- [ ] Bundle `global_xgboost.onnx` (from B5) in `app/src/main/assets/models/`.
-- [ ] Build on-device Feature Extractor from Room `DataUsage` entries, producing one hourly feature row in exactly B2's definitions.
-  - Must reproduce B2's feature order, shapes, and dtypes **exactly**. Add a parity test against a known input/output pair captured from the Python pipeline — silent feature-order mismatch produces plausible-looking wrong predictions, which is the worst possible failure mode for a defense demo.
-- [ ] **Dual-Model Conditional Switch:**
+- [x] Add `com.microsoft.onnxruntime:onnxruntime-android`. *(1.31.1 via the version catalog; unit tests run the same model on the JVM artifact.)*
+- [x] Bundle `global_xgboost.onnx` in `app/src/main/assets/models/`. *(Currently the synthetic placeholder `dev-synthetic-v1` from datara-ml `export_dev_model.py`; B5's trained model replaces it as a file swap, see [forecast](docs/forecast.md).)*
+- [x] Build on-device Feature Extractor producing one hourly feature row in exactly B2's definitions. *(From the 30-second `usage_samples`, not `DataUsage`: the 10-minute rows keep only the worst status and one network label, so the training data's counting rule could not be reproduced from them.)*
+  - Must reproduce B2's feature order, shapes, and dtypes **exactly**. Add a parity test against a known input/output pair captured from the Python pipeline — silent feature-order mismatch produces plausible-looking wrong predictions, which is the worst possible failure mode for a defense demo. *(`FeatureParityTest` replays datara-ml's golden fixture: features, ONNX output and PET.)*
+- [x] **Dual-Model Conditional Switch:** *(`LocalLayer`, `ModelSwitch`: per-time-of-day residual correction in log space; LOCAL after 168 learned hours when its recent MAE is ≥ 5% below global, back to GLOBAL when it is no better.)*
   - `ModelType.GLOBAL`: baseline pre-trained ONNX model, used for new users.
   - `ModelType.LOCAL`: global ONNX output multiplied (or offset) by the per-user correction learned from hourly prediction errors (Decision 2).
   - Switch to LOCAL once the user has ≥ 7 days of telemetry **and** the corrected predictions' recent error is lower than the global model's; switch back automatically if it becomes worse.
   - The switch is conditional and reversible — never hardcode one mode.
   - *Strict rule:* all **inference** is on-device via ONNX Runtime. No live `/predict` server call, ever.
-- [ ] **PET projection:** starting from the active cycle's remaining quota, predict each following hour (updating time features and lags as it steps) and subtract until the remainder reaches zero; that hour is the PET. Cap the horizon (for example 30 days) and show "beyond 30 days" instead of an unbounded date.
-- [ ] Output predicted PET timestamp and expose via `StateFlow` to the UI.
-- [ ] Log each prediction with its inputs and the observed quota-reaching time (or an explicitly incomplete observation) — E3 cannot be done retroactively without this. Each hourly log row holds **both** the global and the local prediction (local in shadow until it takes over) and which one the user saw; see [quota schema ERD](docs/erd-draft.md).
+- [x] **PET projection:** starting from the active cycle's remaining quota, predict each following hour (updating time features and lags as it steps) and subtract until the remainder reaches zero; that hour is the PET. Cap the horizon (for example 30 days) and show "beyond 30 days" instead of an unbounded date.
+- [x] Output predicted PET timestamp and expose via `StateFlow` to the UI. *(`ForecastEngine.status`; Home's hero and Quota Details show it for a real active cycle, with collecting/unavailable states.)*
+- [x] Log each prediction with its inputs and the observed quota-reaching time (or an explicitly incomplete observation) — E3 cannot be done retroactively without this. Each hourly log row holds **both** the global and the local prediction (local in shadow until it takes over) and which one the user saw; see [quota schema ERD](docs/erd-draft.md). *(One `forecasts` row per active cycle per hour; the observed reach is `tracking_cycles.reached_at`.)*
 
 #### Phase D7: Usage History & Analytics (Vico Charts)
 - [x] Vico Compose 3.3.1 through the version catalog.
