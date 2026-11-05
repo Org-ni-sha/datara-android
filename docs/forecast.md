@@ -58,6 +58,10 @@ Decision 2's option (a): a residual correction on top of the global model, learn
 
 Forecasts from a model whose version starts with `dev-` add "Test model: not yet trained on study data."
 
+## The bundled model
+
+`v0-2026-11-06`, from datara-ml `train_v0.py`: an interim, untuned model trained on the harvester data collected so far (841 usable hours from 17 devices, 2026-10-28 to 11-05). With 5-fold cross-validation that holds out whole devices, its next-hour MAE is 65.0 MB, against 72.1 MB for "same as the last 24 h average" and 73.5 MB for "same as the last hour". Most devices had less than a week of data, so `log_bytes_same_hour_last_week` was missing in 96% of rows. The final model, trained on 14 days, replaces it as a file swap. Forecast rows record the version in `model_version`.
+
 ## Swapping in a trained model
 
 The app has no model-specific code. For a model trained on contract v1 (see datara-ml `docs/feature-contract.md`, "Swapping in a trained model"):
