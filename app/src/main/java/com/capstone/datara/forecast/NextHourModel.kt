@@ -24,7 +24,8 @@ interface NextHourModel {
  */
 class OnnxNextHourModel(modelBytes: ByteArray) : NextHourModel, AutoCloseable {
 
-    private val env = OrtEnvironment.getEnvironment()
+    // No usage telemetry to Microsoft: inference is fully offline (see AndroidManifest.xml)
+    private val env = OrtEnvironment.getEnvironment().also { it.setTelemetry(false) }
     private val session: OrtSession = env.createSession(modelBytes, OrtSession.SessionOptions())
 
     override val version: String

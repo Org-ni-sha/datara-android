@@ -69,6 +69,10 @@ The app has no model-specific code. For a model trained on contract v1 (see data
 
 A model for another contract version is refused at load ("Forecast unavailable"), never silently used.
 
+## No third-party telemetry
+
+The `onnxruntime-android` 1.31 AAR ships a Microsoft telemetry uploader (`ai.onnxruntime.TelemetryInitializer`) that starts with the app. DATAra removes its provider in `AndroidManifest.xml` (`tools:node="remove"`) and calls `OrtEnvironment.setTelemetry(false)` before creating a session, so the forecast sends nothing off the phone. Check the merged manifest still has no `TelemetryInitializer` after an ONNX Runtime upgrade.
+
 ## Tests
 
 - `FeatureParityTest`: the golden fixture (features, ONNX output, PETs) against the bundled model, on the JVM ONNX Runtime.
@@ -77,4 +81,8 @@ A model for another contract version is refused at load ("Forecast unavailable")
 - `ForecastEngineTest`: the hourly job with in-memory storage — collecting, logging once per hour, beyond 30 days, learning without a cycle, shadow then LOCAL takeover, missing model.
 - `PetForecastUiTest`: the wording and when a forecast is shown.
 
-Not covered: an instrumented run of the Android ONNX Runtime AAR on a device (the JVM build of the same version runs the parity test), and battery cost (E2).
+- `DeviceParityTest` (instrumented): the same fixture through the Android AAR on a phone. Verified on a POCO F3 (Android, arm64) on 2026-11-06.
+
+Running `connectedDebugAndroidTest` **uninstalls the app afterwards**, wiping its local data (samples, cycles, sign-in). On a phone with real data, install the test APKs and use `adb shell am instrument -w -e class com.capstone.datara.forecast.DeviceParityTest com.capstone.datara.test/androidx.test.runner.AndroidJUnitRunner` instead.
+
+Not covered: battery cost (E2).

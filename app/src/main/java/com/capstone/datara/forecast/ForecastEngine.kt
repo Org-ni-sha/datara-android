@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -131,13 +132,15 @@ class ForecastEngine(
     /** (hour, active cycle id) of the last completed run, so repeated calls in an hour are free. */
     @Volatile private var lastRun: Pair<Long, String?>? = null
 
-    /** Starts following the active cycle: a new or ended cycle gets its forecast at once. */
+    /**
+     * Starts following the signed-in user and the active cycle: signing in, or a new or ended
+     * cycle, gets its forecast at once instead of at the next telemetry read.
+     */
     fun start() {
         scope.launch {
-            cycles.state
-                .map { activeCycleId(it) to (it !is CycleState.Loading) }
+            combine(owners.owner, cycles.state) { owner, state -> Triple(owner, activeCycleId(state), state !is CycleState.Loading) }
                 .distinctUntilChanged()
-                .collect { (_, loaded) -> if (loaded) runCatching { runIfDue() }.onFailure { Log.e(TAG, "Forecast failed", it) } }
+                .collect { (_, _, loaded) -> if (loaded) runCatching { run() }.onFailure { Log.e(TAG, "Forecast failed", it) } }
         }
     }
 

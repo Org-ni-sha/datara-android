@@ -72,6 +72,8 @@ android {
     sourceSets {
         getByName("test").kotlin.srcDir("src/sharedTest/java")
         getByName("androidTest").kotlin.srcDir("src/sharedTest/java")
+        // The D6 golden parity fixture, so DeviceParityTest runs it on the Android ONNX Runtime
+        getByName("androidTest").assets.srcDir("src/test/resources")
     }
 }
 
