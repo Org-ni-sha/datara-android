@@ -92,11 +92,13 @@ class FeatureParityTest {
     }
 
     @Test
-    fun `a contract 1 model is refused`() {
-        val v1 = FeatureParityTest::class.java.getResource("/forecast/contract1_model.onnx")!!.readBytes()
-        val error = runCatching { OnnxNextHourModel(v1) }.exceptionOrNull()
-        assertTrue(error is IllegalArgumentException)
-        assertTrue(error!!.message!!.contains("contract 1"))
+    fun `models for earlier contracts are refused`() {
+        for (version in 1..2) {
+            val bytes = FeatureParityTest::class.java.getResource("/forecast/contract${version}_model.onnx")!!.readBytes()
+            val error = runCatching { OnnxNextHourModel(bytes) }.exceptionOrNull()
+            assertTrue(error is IllegalArgumentException)
+            assertTrue(error!!.message!!.contains("contract $version"))
+        }
     }
 
     @Test

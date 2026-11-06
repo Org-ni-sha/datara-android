@@ -1,7 +1,7 @@
 package com.capstone.datara.forecast
 
 /**
- * Feature contract v2 of the Global XGBoost next-hour model (datara-ml
+ * Feature contract v3 of the Global XGBoost next-hour model (datara-ml
  * `docs/feature-contract.md`, reference implementation `datara_ml/features.py`).
  *
  * The model reads [N_FEATURES] float32 values in exactly the order of [FEATURE_NAMES] and returns
@@ -11,9 +11,10 @@ package com.capstone.datara.forecast
  * v2 (2026-11-06): hourly mobile bytes come from NetworkStatsManager readings instead of the
  * 30-second TrafficStats samples ([HourlyUsage]); the features and their order are unchanged. A
  * contract-1 model is refused at load.
+ * v3: a reading with 0 bytes is usable at any length (every hour inside it is a measured zero).
  */
 object FeatureContract {
-    const val CONTRACT_VERSION = 2
+    const val CONTRACT_VERSION = 3
 
     val FEATURE_NAMES = listOf(
         "hour_sin",                       // 0
@@ -46,7 +47,7 @@ object FeatureContract {
     /** PET projection cap (30 days); past it the PET is "beyond 30 days". */
     const val PROJECTION_HORIZON_HOURS = 30 * 24
 
-    /** NSM readings longer than this can't place their bytes in hours: the hours are unobserved. */
+    /** NSM readings with bytes longer than this can't place them in hours: the hours are unobserved. */
     const val MAX_WINDOW_MS = 2 * HOUR_MS
 
     /** Uncovered time an hour may have and still be observed. */

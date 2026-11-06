@@ -6,7 +6,7 @@ Code: `app/src/main/java/com/capstone/datara/forecast/`.
 
 ## The feature contract
 
-The model's 12 inputs are fixed by **feature contract v2** in datara-ml (`docs/feature-contract.md`, reference implementation `datara_ml/features.py`):
+The model's 12 inputs are fixed by **feature contract v3** in datara-ml (`docs/feature-contract.md`, reference implementation `datara_ml/features.py`):
 
 | # | Feature | # | Feature |
 |---|---|---|---|
@@ -22,12 +22,12 @@ Input `features`, float32 `[1, 12]`; output `variable` = log1p(next-hour mobile 
 | Class | Role |
 |---|---|
 | `FeatureContract` | names, order, constants (lookback 168 h, collecting threshold, 30-day horizon) |
-| `HourlyUsage` | hourly mobile bytes from the NetworkStatsManager `durable_readings` (contract v2); network stats from the 30-second `usage_samples` |
+| `HourlyUsage` | hourly mobile bytes from the NetworkStatsManager `durable_readings` (contract v3); network stats from the 30-second `usage_samples` |
 | `FeatureExtractor` | one feature row in contract order; time features in the phone's zone (participants: Asia/Manila, as in training) |
 | `PetProjector` | hour-by-hour projection, predictions fed back as lags, linear interpolation inside the reaching hour, 30-day cap |
 | `OnnxNextHourModel` | loads `assets/models/global_xgboost.onnx`, refuses a model whose `contract_version`, feature order or width differs |
 
-**Hourly bytes (contract v2).** Each 10-minute NetworkStatsManager reading's bytes are spread evenly over its span and summed per clock hour. An hour is measured only when every reading touching it is `OK` or `GAP` and at most 2 hours long (`MAX_WINDOW_MS`), the readings don't overlap, and they cover the hour within a minute. Other hours are missing: not used for lags or learning. The 30-second samples are not used for bytes: they stop while the phone keeps the app asleep, and on some phones `TrafficStats` misses traffic. See [measurement gaps](https://github.com/Org-ni-sha/datara-ml/blob/main/docs/measurement-gaps.md).
+**Hourly bytes (contract v3).** Each 10-minute NetworkStatsManager reading's bytes are spread evenly over its span and summed per clock hour. An hour is measured only when every reading touching it is `OK` or `GAP` and either at most 2 hours long (`MAX_WINDOW_MS`) or with 0 bytes (a zero is exact at any length, for example overnight on Wi-Fi), the readings don't overlap, and they cover the hour within a minute. Other hours are missing: not used for lags or learning. The 30-second samples are not used for bytes: they stop while the phone keeps the app asleep, and on some phones `TrafficStats` misses traffic. See [measurement gaps](https://github.com/Org-ni-sha/datara-ml/blob/main/docs/measurement-gaps.md).
 
 **Network statistics** (signal, radio generation, cellular share) still come from the 30-second samples ending in the hour. They are missing for a measured hour without samples. `data_usage` is not used: its 10-minute rows keep only one network label. Samples are kept 14 days and the features read 8; durable readings are never pruned.
 
@@ -64,18 +64,18 @@ Forecasts from a model whose version starts with `dev-` add "Test model: not yet
 
 ## The bundled model
 
-`v0-nsm-2026-11-06b` (contract v2), from datara-ml `train_v0.py`: an interim, untuned model trained on the harvester data collected so far (538 measured hours from 15 devices). With 5-fold cross-validation that holds out whole devices, its next-hour MAE is 75.3 MB, against 77.6 MB for "same as the last hour" and 79.0 MB for "same as the last 24 h average": barely better than naive. The contract-1 `v0-2026-11-06` it replaces was trained on undercounted 30-second totals. The final model, trained on 14 days, replaces it as a file swap. Forecast rows record the version in `model_version`.
+`v0-nsm-2026-11-06c` (contract v3), from datara-ml `train_v0.py`: an interim, untuned model trained on the harvester data collected so far (689 measured hours from 17 devices). With 5-fold cross-validation that holds out whole devices, its next-hour MAE is 59.1 MB, against 62.3 MB for "same as the last hour" and 65.8 MB for "same as the last 24 h average". **Its predictions add up to only 43% of actual usage** (the baselines are near 100%), so its PETs come out late; the training objective for the final model is an open decision (datara-ml README). The final model, trained on 14 days, replaces it as a file swap. Forecast rows record the version in `model_version`.
 
 ## Swapping in a trained model
 
-The app has no model-specific code. For a model trained on contract v2 (see datara-ml `docs/feature-contract.md`, "Swapping in a trained model"):
+The app has no model-specific code. For a model trained on contract v3 (see datara-ml `docs/feature-contract.md`, "Swapping in a trained model"):
 
 1. In datara-ml, export it with `export_onnx(model, Path("artifacts/global_xgboost.onnx"), model_version="v0-…")`.
 2. Regenerate the parity fixture against it: `python -m datara_ml.export_dev_model --fixture-only --model artifacts/global_xgboost.onnx --out artifacts`.
 3. Copy `artifacts/global_xgboost.onnx` to `app/src/main/assets/models/global_xgboost.onnx` and `artifacts/golden_parity.json` to `app/src/test/resources/forecast/golden_parity.json`.
 4. Run `gradlew test assembleDebug`. `FeatureParityTest` checks that the bundled model and fixture agree with the app.
 
-A model for another contract version (such as the contract-1 `v0-2026-11-06`) is refused at load ("Forecast unavailable"), never silently used. `FeatureParityTest` checks this with a stored contract-1 model.
+A model for another contract version (such as the contract-1 `v0-2026-11-06` or the contract-2 `v0-nsm-2026-11-06b`) is refused at load ("Forecast unavailable"), never silently used. `FeatureParityTest` checks this with stored copies of both.
 
 ## No third-party telemetry
 

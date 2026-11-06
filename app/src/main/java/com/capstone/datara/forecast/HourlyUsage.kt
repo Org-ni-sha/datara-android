@@ -16,7 +16,7 @@ import com.capstone.datara.forecast.FeatureContract.USABLE_WINDOW_STATUSES
  * - **Mobile bytes** come from the 10-minute NetworkStatsManager `durable_readings`
  *   (datara-ml `nsm_hourly.hourly_from_windows`): each usable reading's bytes are spread evenly
  *   over its span and summed per clock hour. An hour is observed only when every reading touching
- *   it is usable (OK or GAP, at most 2 hours), they do not overlap, and they cover the hour
+ *   it is usable (OK or GAP, and at most 2 hours or 0 bytes), they do not overlap, and they cover the hour
  *   within a minute. NSM keeps counting while the app sleeps; the 30-second TrafficStats samples
  *   miss that time (datara-ml `docs/measurement-gaps.md`).
  * - **Network statistics** (readings, cellular share, signal, radio generation) come from the
@@ -27,7 +27,9 @@ object HourlyUsage {
 
     /** One NSM window for the hourly rule. */
     data class Window(val start: Long, val end: Long, val mobileBytes: Double, val status: String) {
-        val usable: Boolean get() = status in USABLE_WINDOW_STATUSES && end - start in 1..MAX_WINDOW_MS
+        /** At most 2 hours, or any length with 0 bytes: a zero is exact however long (contract v3). */
+        val usable: Boolean get() = status in USABLE_WINDOW_STATUSES && end > start &&
+            (end - start <= MAX_WINDOW_MS || mobileBytes == 0.0)
     }
 
     fun window(r: DurableUsageReading) = Window(r.since, r.until, r.bytesTotal.toDouble(), r.status)
