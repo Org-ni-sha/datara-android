@@ -5,16 +5,6 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SettingsPreviewViewModelTest {
-    @Test fun preferencesSurviveRecreation() {
-        val saved = SavedStateHandle()
-        val model = SettingsPreviewViewModel(saved)
-        model.setMilestones(false)
-        model.setForecasts(false)
-        val restored = SettingsPreviewViewModel(saved).uiState.value
-        assertFalse(restored.milestonesEnabled)
-        assertFalse(restored.forecastsEnabled)
-    }
-
     @Test fun offlinePreviewRetainsPendingItemsAndRetryCanSucceed() {
         val saved = SavedStateHandle()
         val model = SettingsPreviewViewModel(saved)

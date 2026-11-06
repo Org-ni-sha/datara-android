@@ -290,14 +290,16 @@ Promo/expiry cards and live network badges are not part of the current UI. Signa
 #### Phase D8: Proactive Alerts & Notification System
 *Production delivery depends on D4 measurements/access and D6 forecasts.*
 
-- [x] In-app sample notification center: All/Unread filters, mark-all-read, unread badges, empty preview and read-only sample-cycle links.
-- [x] Sample copy for 50%, 80% and 90% quota milestones, a four-hour forecast reminder and an informational quota-reached event. Reaching a quota does not mean connectivity stops.
-- [ ] Implement OS notification channels, permission handling and delivery.
-- [ ] Connect threshold and forecast triggers to real measurements and user preferences; rate-limit repeated alerts. *(Decided 2026-11-04: milestones at 75%, 90% and 100% (quota reached), plus forecast alerts when the PET is within 24 h and within 3 h, each once per cycle. The sample copy above still shows 50/80/90% and a four-hour reminder and must be updated; see [quota schema ERD](docs/erd-draft.md).)*
-- [ ] Persist notification history/read flags in Room and integrate agreed sync behavior. Current read flags are SavedStateHandle preview state only.
+*Status (2026-11-06): built. See [quota alerts](docs/notifications.md).*
+
+- [x] In-app notification center: All/Unread filters, mark-all-read, unread badges and an empty state, over Room `notifications`. Opening an alert offers its cycle: Quota Details for the current cycle, read-only details for a past one.
+- [x] Copy for the 75%, 90% and 100% milestones and the 24-hour and 3-hour forecast alerts, with the figures at sending time. Reaching a quota does not mean connectivity stops; every alert says nothing is blocked. The sample 50/80/90% and four-hour copy is gone.
+- [x] Implement OS notification channels, permission handling and delivery. *(Channels "Quota milestones" and "Forecast alerts". `POST_NOTIFICATIONS` is the D4 permission, no new one; when it is denied the alert stays in the in-app inbox and Settings offers "Allow notifications". Tapping an alert opens its cycle.)*
+- [x] Connect threshold and forecast triggers to real measurements and user preferences; rate-limit repeated alerts. *(Decided 2026-11-04: milestones at 75%, 90% and 100% (quota reached), plus forecast alerts when the PET is within 24 h and within 3 h, each once per cycle. Usage from D3, PET from D6's latest forecast only; never while collecting or beyond 30 days; highest level only, and never a lower level after a higher one. Evaluated on the telemetry and forecast cadence with no extra wake-ups. The Settings switches persist in `notification_preferences`.)*
+- [ ] Persist notification history/read flags in Room and integrate agreed sync behavior. *(Room done: once per cycle is enforced by the unique `(cycle_id, notification_type)` index, `read_at` is real, and rows are queued by `synced_at`. Upload blocked by C3.)*
 
 #### Phase D9: Profile, Settings & Developer ML Diagnostics Screen
-- [x] Settings/Profile UI: display name loaded from and saved to `public.users.name` (with the `@username` shown read-only), preview notification switches, simulated sync states, Usage Access guidance, version/privacy information and signed-in email.
+- [x] Settings/Profile UI: display name loaded from and saved to `public.users.name` (with the `@username` shown read-only), notification switches (persisted in Room since D8), simulated sync states, Usage Access guidance, version/privacy information and signed-in email.
 - [x] Confirmed sign-out through existing Supabase Auth, pending/error handling and navigation only after success.
 - [ ] Persist profile name and preferences; connect actual permission/status checks and cloud sync. No phone field is required by the current UI.
 - [ ] **Developer ML Diagnostics Screen (Hidden):** gated behind a secret gesture; expose active model mode, MAE/RMSE/R², inputs and latency only when the real pipeline exists.

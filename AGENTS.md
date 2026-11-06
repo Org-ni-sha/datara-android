@@ -23,13 +23,14 @@ This repo is the Android client only. The GitHub repo is `Org-ni-sha/datara-andr
 As of 2026-10-29:
 
 - **Implemented:** D1 authentication (email/username + password, Google, username screen and `NeedsUsername` gate), session routing, official logo/launcher icons and native splash plus session-loading UI.
-- **Implemented as previews:** Home, Create Quota, Quota Details, History, Notifications, Settings and Profile. Sample forecasts, usage, notification preferences and sync states are not production integrations. Sign-out uses real Supabase Auth, and the Profile name and username are read from and saved to `public.users`.
+- **Implemented as previews:** Home, Create Quota, Quota Details, History, Settings and Profile. Sample forecasts, usage and sync states are not production integrations. Sign-out uses real Supabase Auth, and the Profile name and username are read from and saved to `public.users`.
 - **Applied to the hosted project:** the C2 quota schema (`20261104000001`, pushed 2026-11-04), which replaced the legacy promo tables, plus the earlier RLS, profile trigger and usernames migrations. `supabase/` remains the schema source of truth; never edit applied migrations.
 - **Implemented (D4):** the telemetry foreground service (30 s `TrafficStats`, 10 min `NetworkStatsManager`, 15 min watchdog), signal/network/carrier inputs, the Tracking setup screen and its permissions — see [usage telemetry](docs/telemetry.md).
 - **Implemented (D2):** Room `DataraDatabase` with the eight synced entities and the four phone-only telemetry tables, DAOs with the upload queue, Room-backed telemetry storage, the 10-minute `data_usage` rollup and device registration. No screen reads it yet, and nothing uploads it (C3).
 - **Implemented (D3):** quota cycles — `TrackingCycle` domain model and `TrackingCycleRepository` seam (Room-backed via `TrackingCycleDao`), pure cycle math (`domain/cycle/CycleMath`, `CycleRules`) and `QuotaCycleManager` use cases. Create Quota and Quota Details use real, durable cycles; Home stays on fixtures until D5 — see [quota cycles](docs/quota-cycles.md).
 - **Implemented (D6):** on-device forecasting — ONNX Runtime runs the bundled Global model (`assets/models/global_xgboost.onnx`, currently the interim `v0-tweedie-2026-11-06`, a Tweedie model trained on about a week of harvester data from 17 devices), `FeatureExtractor` reproduces datara-ml's feature contract v4 (parity-tested; hourly bytes from NetworkStatsManager `durable_readings`, not the 30-second samples — see datara-ml `docs/measurement-gaps.md`), the local residual layer and reversible GLOBAL/LOCAL switch live in `user_model_state`, the PET projection logs one `forecasts` row per active cycle per hour, and Home's hero and Quota Details show the real PET — see [forecast](docs/forecast.md).
-- **Pending:** a trained model (B3–B5, a file swap), OS alert delivery, persistent preferences and sync. Do not mark D5, D7–D9 complete just because their UI exists.
+- **Implemented (D8):** quota alerts — `alerts/` (`AlertRules`, `QuotaAlertEngine`, channels and delivery in `QuotaAlertNotifications`): 75%, 90% and 100% milestones and 24 h / 3 h forecast alerts, each once per cycle (Room unique index), evaluated on the telemetry/forecast cadence, never while the forecast is collecting or beyond 30 days. The notification center reads Room `notifications` with real `read_at`; the Settings switches persist in `notification_preferences` — see [quota alerts](docs/notifications.md).
+- **Pending:** a trained model (B3–B5, a file swap), History on real data (D7), the diagnostics screen (D9) and sync (C3). Do not mark D5, D7–D9 complete just because their UI exists.
 
 The current implementation details and limitations are in [quota UI preview](docs/quota-ui-preview.md).
 
@@ -101,7 +102,7 @@ app/src/main/java/com/capstone/datara/
     ├── dashboard/                    # Home, signed-in shell and sample usage bars
     ├── quota/                        # Create/Details, sample state and navigation
     ├── history/                      # Vico sample charts and cycle details
-    ├── notifications/                # Sample alerts and read state
+    ├── notifications/                # Alert inbox over Room notifications (D8)
     ├── settings/, profile/           # Preview preferences; real profile name/username and sign-out
     ├── components/                   # Theme-aware shared Material 3 wrappers
     ├── navigation/NavGraph.kt        # DataraRoute constants + start destination
@@ -112,7 +113,7 @@ Tests cover auth validation/errors, quota input and sample-state behavior, Histo
 
 ### Planned infrastructure
 
-Sync (C3) is still pending. Forecasting (D6) lives in `forecast/` (feature contract, extractor, projector, ONNX model, local layer, `ForecastEngine`). Telemetry lives in `telemetry/` (service, rules, device readers), `data/telemetry/` (Room-backed repository and rollup) and `ui/tracking/` (setup screen). The telemetry repository contract is in `src/sharedTest/` and runs on the JVM (in memory) and on a device (Room; see `src/androidTest/.../data/local/`). `ui/promos/` is no longer planned: quota setup replaces the former catalog flow.
+Sync (C3) is still pending. Quota alerts (D8) live in `alerts/` (rules, wording, engine, Room stores, Android channels and tap navigation). Forecasting (D6) lives in `forecast/` (feature contract, extractor, projector, ONNX model, local layer, `ForecastEngine`). Telemetry lives in `telemetry/` (service, rules, device readers), `data/telemetry/` (Room-backed repository and rollup) and `ui/tracking/` (setup screen). The telemetry repository contract is in `src/sharedTest/` and runs on the JVM (in memory) and on a device (Room; see `src/androidTest/.../data/local/`). `ui/promos/` is no longer planned: quota setup replaces the former catalog flow.
 
 ---
 
@@ -221,7 +222,7 @@ The short version: branch off `main` as `<type>/<short-description>` (`feature/`
 
 ## Known current state / traps
 
-- The `"dashboard"` route renders `DashboardScreen` in `ui/dashboard/HomeScreen.kt`, which hosts the signed-in quota flow. The old placeholder is gone. Preview state uses SavedStateHandle; it is not a durable quota database. History and alert fixtures are independent of Home actions.
+- The `"dashboard"` route renders `DashboardScreen` in `ui/dashboard/HomeScreen.kt`, which hosts the signed-in quota flow. The old placeholder is gone. Preview state uses SavedStateHandle; it is not a durable quota database. History fixtures are independent of Home actions; alerts are real (D8).
 - Routes are constants on `DataraRoute`, not string literals. Login and register clear the whole back stack on success (`popUpTo(0)`), so back from the dashboard exits the app rather than returning to a login screen with a live session.
 - Auto-login is live: `MainActivity` gates on `SessionViewModel.sessionState` and shows `SplashScreen` while Supabase restores a persisted session. `SessionStatus.RefreshFailure` is deliberately treated as unauthenticated — a stale refresh token means signing in again, not landing on a dashboard whose requests all 401.
 - The `public.users` row is created by the `on_auth_user_created` Postgres trigger, not by a client insert. `AuthRepository.signUp` passes the name as auth metadata (`raw_user_meta_data`) so the trigger can populate it — if you change the sign-up call, keep that metadata key or `users.name` silently becomes null.

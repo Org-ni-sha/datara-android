@@ -31,6 +31,17 @@ interface NotificationDao {
     )
     suspend fun markRead(notificationId: String, readAt: Long)
 
+    /** Mark all as read: only unread rows change, so read times already set are kept. */
+    @Query(
+        "UPDATE notifications SET read_at = :readAt, synced_at = NULL " +
+            "WHERE user_id = :userId AND read_at IS NULL"
+    )
+    suspend fun markAllRead(userId: String, readAt: Long)
+
+    /** The alert types already recorded for [cycleId]. */
+    @Query("SELECT notification_type FROM notifications WHERE cycle_id = :cycleId")
+    suspend fun typesForCycle(cycleId: String): List<String>
+
     @Query("SELECT * FROM notifications WHERE synced_at IS NULL ORDER BY sent_at")
     suspend fun unsynced(): List<Notification>
 
