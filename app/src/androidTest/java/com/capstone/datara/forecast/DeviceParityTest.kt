@@ -47,6 +47,18 @@ class DeviceParityTest {
         val offset = ZoneOffset.ofTotalSeconds((fixture["utc_offset_ms"]!!.jsonPrimitive.long / 1000).toInt())
         OnnxNextHourModel(bytes).use { model ->
             assertEquals(fixture["model_version"]!!.jsonPrimitive.content, model.version)
+            for (case in fixture["nsm_cases"]!!.jsonArray.map { it.jsonObject }) {
+                val windows = case["windows"]!!.jsonArray.map { it.jsonObject }.map {
+                    HourlyUsage.Window(it["start_ms"]!!.jsonPrimitive.long, it["end_ms"]!!.jsonPrimitive.long,
+                        it["mobile_bytes"]!!.jsonPrimitive.double, it["status"]!!.jsonPrimitive.content)
+                }
+                val got = HourlyUsage.hourlyFromWindows(windows)
+                for (h in case["expected_hours"]!!.jsonArray.map { it.jsonObject }) {
+                    val hour = h["hour_start_ms"]!!.jsonPrimitive.long
+                    val e = num(h["mobile_bytes"])
+                    if (e.isNaN()) assertTrue(got.getValue(hour).isNaN()) else assertEquals(e, got.getValue(hour), 1e-6)
+                }
+            }
             for (case in fixture["cases"]!!.jsonArray.map { it.jsonObject }) {
                 val name = case["name"]!!.jsonPrimitive.content
                 val t = case["forecast_hour_ms"]!!.jsonPrimitive.long

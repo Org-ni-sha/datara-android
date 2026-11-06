@@ -7,6 +7,7 @@ import com.capstone.datara.data.cycle.TrackingCycle
 import com.capstone.datara.data.local.entity.ActiveModel
 import com.capstone.datara.data.local.entity.Forecast
 import com.capstone.datara.data.local.entity.UserModelState
+import com.capstone.datara.data.telemetry.DurableUsageReading
 import com.capstone.datara.data.telemetry.UsageSample
 import com.capstone.datara.domain.cycle.CycleProgress
 import com.capstone.datara.domain.cycle.CycleState
@@ -37,7 +38,10 @@ class ForecastEngineTest {
         val states = mutableMapOf<String, UserModelState>()
         val forecasts = mutableMapOf<Pair<String, Long>, Forecast>()
         var stateWrites = 0
+        val readings = mutableListOf<DurableUsageReading>()
         override suspend fun samplesEndingIn(from: Long, until: Long) = samples.filter { it.intervalEnd in from until until }
+        override suspend fun durableReadingsOverlapping(from: Long, until: Long) =
+            readings.filter { it.until > from && it.since < until }
         override suspend fun modelState(userId: String) = states[userId]
         override suspend fun saveModelState(state: UserModelState) { stateWrites++; states[state.userId] = state }
         override suspend fun forecastAt(cycleId: String, predictedAt: Long) = forecasts[cycleId to predictedAt]
@@ -66,7 +70,10 @@ class ForecastEngineTest {
         compute = Dispatchers.Unconfined
     )
 
+    /** The hour as the phone records it: one NSM reading covering it and a 30-second sample. */
     private fun usage(hour: Long, bytes: Long) {
+        store.readings += DurableUsageReading(since = hour, until = hour + HOUR_MS, bytesRx = bytes, bytesTx = 0,
+            status = "OK", schemaVersion = 4)
         store.samples += UsageSample(intervalStart = hour + 1_000, intervalEnd = hour + 31_000, elapsedMs = 30_000,
             bytesRx = bytes, bytesTx = 0, status = "OK", networkType = "LTE", activeNetworkAtSample = "LTE",
             signalDbm = -90, carrier = "Globe", utcOffsetMinutes = 480, schemaVersion = 4)
@@ -169,6 +176,21 @@ class ForecastEngineTest {
         assertEquals(ActiveModel.LOCAL, state.activeModel)
         assertEquals(ActiveModel.LOCAL, lastRow!!.activeModel)
         assertEquals(2.0 * oneMb, lastRow.localNextHourBytes!!.toDouble(), 0.05 * oneMb)
+    }
+
+    @Test
+    fun `waits for the read that completes the last hour`() = runBlocking {
+        activeCycle(quota = 100 * oneMb, used = 0)
+        (2..24).forEach { usage(start - it * HOUR_MS, oneMb) }
+        store.readings += DurableUsageReading(since = start - HOUR_MS, until = start - 5 * 60_000, bytesRx = oneMb,
+            bytesTx = 0, status = "OK", schemaVersion = 4)
+        now = start + 60_000
+        assertEquals(ForecastStatus.Pending, engine.run())
+        assertTrue(store.forecasts.isEmpty())
+
+        store.readings += DurableUsageReading(since = start - 5 * 60_000, until = start + 5 * 60_000, bytesRx = 0,
+            bytesTx = 0, status = "OK", schemaVersion = 4)
+        assertTrue(engine.run() is ForecastStatus.Ready)
     }
 
     @Test

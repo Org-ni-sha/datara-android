@@ -19,6 +19,16 @@ The user starts tracking on the **Tracking setup** screen (`ui/tracking`). They 
 
 **Mobile data coming up:** the service also takes a sample the moment a cellular data network comes up (see the deviation below).
 
+## Which measurement the forecast uses
+
+The 30-second TrafficStats samples and the 10-minute NetworkStatsManager readings measure the same mobile data in two ways. **The forecast's hourly usage comes from NetworkStatsManager** (feature contract v2, [forecast](forecast.md)):
+
+- **Sleep.** Phone makers suspend background apps, and the 30-second timer stops; Android keeps counting, so the next NetworkStatsManager read covers the pause. In the harvester data 45–66% of tracked time was in such gaps.
+- **Undercounting.** Over hours both methods measured, the harvester's 30-second readings captured 77.8% of what NetworkStatsManager recorded, and under 2% on some phones.
+- **Gap bytes are not usable.** Bytes recorded when a gap ends are mostly the phantom counter jump (below), so they can't fill the gap.
+
+On a POCO F3, a 36-hour pause of the 30-second timer was fully covered by NetworkStatsManager (908 MB), and the two agreed within 2–6% while the app was awake. The 30-second samples still provide signal, radio generation and the share of time on mobile data. Full explanation, numbers and queries: [measurement gaps](https://github.com/Org-ni-sha/datara-ml/blob/main/docs/measurement-gaps.md).
+
 ## Measurement rules
 
 `MeasurementRules` and `PrimaryTick` mirror data-harvester's files of the same names (schema version 3, harvester v1.6.7 rules). `MeasurementRulesTest` and `PrimaryTickTest` repeat the harvester's cases. If a rule changes, change it in both repositories together.
