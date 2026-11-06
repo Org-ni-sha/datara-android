@@ -3,7 +3,6 @@ package com.capstone.datara.forecast
 import com.capstone.datara.forecast.FeatureContract.HOUR_MS
 import com.capstone.datara.forecast.FeatureContract.PROJECTION_HORIZON_HOURS
 import java.time.ZoneId
-import kotlin.math.expm1
 import kotlin.math.floor
 
 /** Next-hour bytes and the PET of one projection; [reachAt] is null past the 30-day cap. */
@@ -19,11 +18,8 @@ data class Projection(val nextHourBytes: Double, val reachAt: Long?)
  */
 object PetProjector {
 
-    /** Model output (log1p bytes) to bytes, never negative. */
-    fun predictedBytes(logPrediction: Double): Double = maxOf(0.0, expm1(logPrediction))
-
     /**
-     * @param predictLog log1p prediction for one feature row (global, or global + local correction),
+     * @param predictBytes next-hour bytes for one feature row (global, or global × local factor),
      *   with the forecast hour of that row
      */
     fun project(
@@ -32,7 +28,7 @@ object PetProjector {
         remainingBytes: Double,
         zone: ZoneId,
         horizonHours: Int = PROJECTION_HORIZON_HOURS,
-        predictLog: (features: FloatArray, hour: Long) -> Double
+        predictBytes: (features: FloatArray, hour: Long) -> Double
     ): Projection {
         val hist = HashMap(history)
         val pooled = FeatureExtractor.pooledNetwork(history, forecastHour)
@@ -41,7 +37,7 @@ object PetProjector {
         for (k in 0 until horizonHours) {
             val t = forecastHour + k * HOUR_MS
             val x = FeatureExtractor.featureVector(hist, t, zone, if (k == 0) null else pooled)
-            val b = predictedBytes(predictLog(x, t))
+            val b = maxOf(0.0, predictBytes(x, t))
             if (k == 0) {
                 first = b
                 if (remainingBytes <= 0) return Projection(first, forecastHour)

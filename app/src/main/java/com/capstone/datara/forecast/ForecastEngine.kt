@@ -202,12 +202,12 @@ class ForecastEngine(
             }
         } else {
             val x = FeatureExtractor.featureVector(history, hour, zoneId)
-            val globalLog = model.predictLog(x).toDouble()
+            val globalBytes = model.predictBytes(x)
             val localReady = params.isReady
-            val localLog = if (localReady) globalLog + params.correction(localHour(hour, zoneId)) else null
+            val localBytes = if (localReady) globalBytes * params.factor(localHour(hour, zoneId)) else null
             if (params.pendingHour != hour) {
                 params = params.copy(pendingHour = hour, pendingLocalHour = localHour(hour, zoneId),
-                    pendingGlobalLog = globalLog, pendingLocalLog = localLog)
+                    pendingGlobalBytes = globalBytes, pendingLocalBytes = localBytes)
             }
             activeModel = ModelSwitch.decide(activeModel, scores, localReady)
             result = if (active == null) ForecastStatus.NoActiveCycle
@@ -240,9 +240,9 @@ class ForecastEngine(
     ): ForecastStatus {
         val row = store.forecastAt(cycleId, hour) ?: run {
             val remaining = remainingBytes.toDouble()
-            val global = PetProjector.project(history, hour, remaining, zoneId) { x, _ -> model.predictLog(x).toDouble() }
+            val global = PetProjector.project(history, hour, remaining, zoneId) { x, _ -> model.predictBytes(x) }
             val local = if (params.isReady) PetProjector.project(history, hour, remaining, zoneId) { x, t ->
-                model.predictLog(x).toDouble() + params.correction(localHour(t, zoneId))
+                model.predictBytes(x) * params.factor(localHour(t, zoneId))
             } else null
             val forecast = Forecast(
                 forecastId = forecastId(cycleId, hour),

@@ -6,25 +6,25 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.ln1p
 
 class LocalLayerTest {
 
     private val noScores = LayerScores(0, null, null)
 
-    private fun pending(hour: Long, globalLog: Double, localLog: Double? = null, localHour: Int = 20) =
-        LocalLayerParameters(pendingHour = hour, pendingLocalHour = localHour, pendingGlobalLog = globalLog, pendingLocalLog = localLog)
+    private fun pending(hour: Long, global: Double, local: Double? = null, localHour: Int = 20) =
+        LocalLayerParameters(pendingHour = hour, pendingLocalHour = localHour, pendingGlobalBytes = global, pendingLocalBytes = local)
 
     @Test
-    fun `learns the log residual and the global error`() {
-        val (p, s) = LocalLayer.learn(pending(100, ln1p(1_000_000.0)), noScores, 2_000_000.0)
-        assertEquals(ln1p(2_000_000.0) - ln1p(1_000_000.0), p.overallBias, 1e-12)
+    fun `learns actual and predicted bytes and the global error`() {
+        val (p, s) = LocalLayer.learn(pending(100, 1_000_000.0), noScores, 2_000_000.0)
+        assertEquals(2_000_000.0, p.overallActual, 0.0)
+        assertEquals(1_000_000.0, p.overallPredicted, 0.0)
         assertEquals(1, p.overallHours)
         assertEquals(1, p.blockHours[3]) // 20:00 is the evening block
         assertNull(p.pendingHour)
         assertEquals(100L, p.lastLearnedHour)
         assertEquals(1, s.hoursSeen)
-        assertEquals(1_000_000.0, s.globalRecentMae!!, 1.0)
+        assertEquals(1_000_000.0, s.globalRecentMae!!, 0.0)
         assertNull(s.localRecentMae) // no local prediction was made yet
     }
 
@@ -37,24 +37,34 @@ class LocalLayerTest {
     }
 
     @Test
-    fun `correction uses the block once it has enough hours`() {
+    fun `factor is the ratio of actual to predicted, per block once it has enough hours`() {
         var p = LocalLayerParameters()
         var s = noScores
         repeat(30) { i ->
-            val (np, ns) = LocalLayer.learn(p.copy(pendingHour = i.toLong(), pendingLocalHour = 20, pendingGlobalLog = ln1p(1e6)), s, 4e6)
+            val (np, ns) = LocalLayer.learn(p.copy(pendingHour = i.toLong(), pendingLocalHour = 20, pendingGlobalBytes = 1e6), s, 3e6)
             p = np; s = ns
         }
         assertTrue(p.isReady)
-        assertEquals(ln1p(4e6) - ln1p(1e6), p.correction(20), 1e-9) // evening block
-        assertEquals(p.overallBias, p.correction(3), 0.0)          // night block has no hours
+        assertEquals(3.0, p.factor(20), 1e-9)                     // evening block: uses 3x more
+        assertEquals(p.factor(20), p.factor(3), 0.0)              // night block has no hours: overall ratio
     }
 
     @Test
-    fun `parameters survive json and bad json resets`() {
-        val p = pending(5, 1.5, 2.5).copy(overallBias = 0.3, overallHours = 40)
+    fun `factor is clamped and neutral without predictions`() {
+        assertEquals(LocalLayerParameters.MAX_FACTOR, LocalLayerParameters.ratio(1e9, 1.0), 0.0)
+        assertEquals(LocalLayerParameters.MIN_FACTOR, LocalLayerParameters.ratio(0.0, 1e6), 0.0)
+        assertEquals(1.0, LocalLayerParameters.ratio(5.0, 0.0), 0.0)
+        assertEquals(1.0, LocalLayerParameters().factor(12), 0.0)
+    }
+
+    @Test
+    fun `parameters survive json, and old or bad json resets`() {
+        val p = pending(5, 1.5e6, 2.5e6).copy(overallActual = 3e6, overallPredicted = 2e6, overallHours = 40)
         assertEquals(p, LocalLayerParameters.fromJson(p.toJson()))
         assertEquals(LocalLayerParameters(), LocalLayerParameters.fromJson("{}"))
         assertEquals(LocalLayerParameters(), LocalLayerParameters.fromJson("not json"))
+        // The log-space correction of contracts 1-3 (version 1) is discarded
+        assertEquals(LocalLayerParameters(), LocalLayerParameters.fromJson("{\"version\":1,\"overall_bias\":0.4,\"overall_hours\":90}"))
     }
 
     @Test

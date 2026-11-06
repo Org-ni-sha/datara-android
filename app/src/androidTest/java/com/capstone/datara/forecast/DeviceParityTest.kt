@@ -67,10 +67,13 @@ class DeviceParityTest {
                 case["expected_features"]!!.jsonArray.map { num(it) }.forEachIndexed { i, e ->
                     if (e.isNaN()) assertTrue("$name $i", x[i].isNaN()) else assertEquals("$name $i", e.toFloat(), x[i], 1e-6f)
                 }
-                assertEquals(name, case["expected_log_prediction"]!!.jsonPrimitive.double, model.predictLog(x).toDouble(), 1e-5)
+                val raw = case["expected_output"]!!.jsonPrimitive.double
+                assertEquals(name, raw, model.rawOutput(x).toDouble(), abs(raw) * 1e-6)
+                val bytes = case["expected_bytes"]!!.jsonPrimitive.double
+                assertEquals(name, bytes, model.predictBytes(x), bytes * 1e-6 + 1e-6)
                 for (p in case["projections"]!!.jsonArray.map { it.jsonObject }) {
                     val got = PetProjector.project(h, t, p["remaining_bytes"]!!.jsonPrimitive.double, offset) { f, _ ->
-                        model.predictLog(f).toDouble()
+                        model.predictBytes(f)
                     }
                     val expected = p["reach_at_ms"]!!.jsonPrimitive.longOrNull
                     if (expected == null) assertEquals(name, null, got.reachAt)

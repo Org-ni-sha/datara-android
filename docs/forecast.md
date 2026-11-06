@@ -6,7 +6,7 @@ Code: `app/src/main/java/com/capstone/datara/forecast/`.
 
 ## The feature contract
 
-The model's 12 inputs are fixed by **feature contract v3** in datara-ml (`docs/feature-contract.md`, reference implementation `datara_ml/features.py`):
+The model's 12 inputs are fixed by **feature contract v4** in datara-ml (`docs/feature-contract.md`, reference implementation `datara_ml/features.py`):
 
 | # | Feature | # | Feature |
 |---|---|---|---|
@@ -17,17 +17,17 @@ The model's 12 inputs are fixed by **feature contract v3** in datara-ml (`docs/f
 | 4 | `log_bytes_last_1h` | 10 | `radio_gen_last_hour` (2–5) |
 | 5 | `log_avg_bytes_last_3h` | 11 | `cellular_share_last_hour` |
 
-Input `features`, float32 `[1, 12]`; output `variable` = log1p(next-hour mobile bytes). Missing history is NaN, which XGBoost (and its ONNX export) treats as missing. Internet speed is not a feature: the harvester never recorded it.
+Input `features`, float32 `[1, 12]`; output `variable`, turned into next-hour bytes by the model's `output_transform` and `output_scale` metadata (`OutputTransform`): `identity` for the Tweedie model, whose output is already the expected bytes, or `expm1` × scale for a log1p model. An unknown transform is refused. Missing history is NaN, which XGBoost (and its ONNX export) treats as missing. Internet speed is not a feature: the harvester never recorded it.
 
 | Class | Role |
 |---|---|
 | `FeatureContract` | names, order, constants (lookback 168 h, collecting threshold, 30-day horizon) |
-| `HourlyUsage` | hourly mobile bytes from the NetworkStatsManager `durable_readings` (contract v3); network stats from the 30-second `usage_samples` |
+| `HourlyUsage` | hourly mobile bytes from the NetworkStatsManager `durable_readings` (contract v3+); network stats from the 30-second `usage_samples` |
 | `FeatureExtractor` | one feature row in contract order; time features in the phone's zone (participants: Asia/Manila, as in training) |
 | `PetProjector` | hour-by-hour projection, predictions fed back as lags, linear interpolation inside the reaching hour, 30-day cap |
 | `OnnxNextHourModel` | loads `assets/models/global_xgboost.onnx`, refuses a model whose `contract_version`, feature order or width differs |
 
-**Hourly bytes (contract v3).** Each 10-minute NetworkStatsManager reading's bytes are spread evenly over its span and summed per clock hour. An hour is measured only when every reading touching it is `OK` or `GAP` and either at most 2 hours long (`MAX_WINDOW_MS`) or with 0 bytes (a zero is exact at any length, for example overnight on Wi-Fi), the readings don't overlap, and they cover the hour within a minute. Other hours are missing: not used for lags or learning. The 30-second samples are not used for bytes: they stop while the phone keeps the app asleep, and on some phones `TrafficStats` misses traffic. See [measurement gaps](https://github.com/Org-ni-sha/datara-ml/blob/main/docs/measurement-gaps.md).
+**Hourly bytes (contract v3+).** Each 10-minute NetworkStatsManager reading's bytes are spread evenly over its span and summed per clock hour. An hour is measured only when every reading touching it is `OK` or `GAP` and either at most 2 hours long (`MAX_WINDOW_MS`) or with 0 bytes (a zero is exact at any length, for example overnight on Wi-Fi), the readings don't overlap, and they cover the hour within a minute. Other hours are missing: not used for lags or learning. The 30-second samples are not used for bytes: they stop while the phone keeps the app asleep, and on some phones `TrafficStats` misses traffic. See [measurement gaps](https://github.com/Org-ni-sha/datara-ml/blob/main/docs/measurement-gaps.md).
 
 **Network statistics** (signal, radio generation, cellular share) still come from the 30-second samples ending in the hour. They are missing for a measured hour without samples. `data_usage` is not used: its 10-minute rows keep only one network label. Samples are kept 14 days and the features read 8; durable readings are never pruned.
 
@@ -37,7 +37,7 @@ Input `features`, float32 `[1, 12]`; output `variable` = log1p(next-hour mobile 
 
 `ForecastEngine.runIfDue()` runs after every 10-minute durable read in the telemetry service, and when the active cycle changes (it is started by `DataraApplication`). It does work once per hour, so there is no extra alarm or worker. Each run:
 
-1. **Learns** from the hour it predicted last time, now measured: the log residual updates the local layer, and the absolute errors update each model's recent MAE.
+1. **Learns** from the hour it predicted last time, now measured: the actual and predicted bytes update the local layer's usage ratio, and the absolute errors update each model's recent MAE.
 2. **Collecting** if fewer than 6 of the last 24 hours are measured (the same rule the training set uses). No forecast is shown or logged.
 3. **Predicts** the current hour with the Global model, plus the local correction once the local layer has 24 hours of learning (in shadow until it takes over).
 4. **Switches** (`ModelSwitch`): LOCAL once it has learned 168 hours (7 days) and its recent MAE is at least 5% below global; back to GLOBAL as soon as it is no better. In between, the current mode stays, so it does not flap.
@@ -48,7 +48,7 @@ Inference runs on `Dispatchers.Default`. A projection is at most 720 model runs 
 
 ## The local layer
 
-Decision 2's option (a): a residual correction on top of the global model, learned in plain Kotlin (`LocalLayer`). The correction is an exponentially weighted mean (α = 0.05) of `log1p(actual) − global_log`, per 6-hour block of the local day (night, morning, afternoon, evening) once a block has 12 hours, otherwise overall. It is stored as JSON in `user_model_state.parameters`, with the pending prediction for the current hour. Recent MAE is an exponentially weighted mean over about a week (α = 1/168), in bytes.
+Decision 2's option (a): a correction on top of the global model, learned in plain Kotlin (`LocalLayer`). The Global model predicts mean bytes (Tweedie), so the correction is a **usage ratio**: exponentially weighted means (α = 0.05) of the actual and the globally predicted bytes, and local = global × actual/predicted. It is kept per 6-hour block of the local day (night, morning, afternoon, evening) once a block has 12 hours, otherwise overall, and clamped to 0.2–5×. Parameters from the earlier log-space correction (contracts 1–3) are discarded. It is stored as JSON in `user_model_state.parameters`, with the pending prediction for the current hour. Recent MAE is an exponentially weighted mean over about a week (α = 1/168), in bytes.
 
 ## What the user sees
 
@@ -64,18 +64,18 @@ Forecasts from a model whose version starts with `dev-` add "Test model: not yet
 
 ## The bundled model
 
-`v0-nsm-2026-11-06c` (contract v3), from datara-ml `train_v0.py`: an interim, untuned model trained on the harvester data collected so far (689 measured hours from 17 devices). With 5-fold cross-validation that holds out whole devices, its next-hour MAE is 59.1 MB, against 62.3 MB for "same as the last hour" and 65.8 MB for "same as the last 24 h average". **Its predictions add up to only 43% of actual usage** (the baselines are near 100%), so its PETs come out late; the training objective for the final model is an open decision (datara-ml README). The final model, trained on 14 days, replaces it as a file swap. Forecast rows record the version in `model_version`.
+`v0-tweedie-2026-11-06` (contract v4), from datara-ml `train_v0.py`: Tweedie objective on raw bytes, tuned by nested grouped-by-device cross-validation, trained on 689 measured hours from 17 devices. Held out by device, its next-hour MAE is 59.8 MB (RMSE 113.2) against 62.3 MB (124.8) for "same as the last hour" and 65.8 MB (113.9) for the 24 h average. Its predictions sum to 79% of actual usage, against 43% for the earlier log1p model, whose PETs came out late; the local layer's usage ratio corrects the rest per user. The final model, trained on 14 days, replaces it as a file swap. Forecast rows record the version in `model_version`.
 
 ## Swapping in a trained model
 
-The app has no model-specific code. For a model trained on contract v3 (see datara-ml `docs/feature-contract.md`, "Swapping in a trained model"):
+The app has no model-specific code. For a model trained on contract v4 (see datara-ml `docs/feature-contract.md`, "Swapping in a trained model"):
 
-1. In datara-ml, export it with `export_onnx(model, Path("artifacts/global_xgboost.onnx"), model_version="v0-…")`.
+1. In datara-ml, `python -m datara_ml.train_v0 --train data/train.csv --model-version <name>` trains, exports and writes the fixture (or `export_onnx(..., output_transform=...)` for your own model).
 2. Regenerate the parity fixture against it: `python -m datara_ml.export_dev_model --fixture-only --model artifacts/global_xgboost.onnx --out artifacts`.
 3. Copy `artifacts/global_xgboost.onnx` to `app/src/main/assets/models/global_xgboost.onnx` and `artifacts/golden_parity.json` to `app/src/test/resources/forecast/golden_parity.json`.
 4. Run `gradlew test assembleDebug`. `FeatureParityTest` checks that the bundled model and fixture agree with the app.
 
-A model for another contract version (such as the contract-1 `v0-2026-11-06` or the contract-2 `v0-nsm-2026-11-06b`) is refused at load ("Forecast unavailable"), never silently used. `FeatureParityTest` checks this with stored copies of both.
+A model for another contract version (such as the contract-1 `v0-2026-11-06`, the contract-2 `v0-nsm-2026-11-06b` or the contract-3 `v0-nsm-2026-11-06c`) is refused at load ("Forecast unavailable"), never silently used. `FeatureParityTest` checks this with stored copies of all three.
 
 ## No third-party telemetry
 
