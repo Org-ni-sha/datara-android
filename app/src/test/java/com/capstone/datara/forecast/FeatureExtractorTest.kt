@@ -141,13 +141,13 @@ class FeatureExtractorTest {
     fun `projection interpolates, caps, and feeds predictions back`() {
         val t = monMidnight + 48 * HOUR_MS
         val h = (1..29).associate { t - it * HOUR_MS to stats(10.0) }
-        val tenMb = ln1p(10 * mb)
+        val tenMb = 10 * mb
         val p = PetProjector.project(h, t, 25 * mb, manila) { _, _ -> tenMb }
         assertEquals(t + 2.5 * HOUR_MS, p.reachAt!!.toDouble(), 2.0)
         assertNull(PetProjector.project(h, t, 10 * mb * 721, manila) { _, _ -> tenMb }.reachAt)
         assertEquals(t, PetProjector.project(h, t, 0.0, manila) { _, _ -> tenMb }.reachAt)
         val seen = mutableListOf<Float>()
-        PetProjector.project(h, t, 5 * mb, manila) { x, _ -> seen += x[idx("log_bytes_last_1h")]; ln1p(2 * mb) }
+        PetProjector.project(h, t, 5 * mb, manila) { x, _ -> seen += x[idx("log_bytes_last_1h")]; 2 * mb }
         assertEquals(ln1p(10 * mb).toFloat(), seen[0], 1e-4f)
         assertEquals(ln1p(2 * mb).toFloat(), seen[1], 1e-4f)
     }

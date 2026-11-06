@@ -25,7 +25,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.ZoneId
-import kotlin.math.ln1p
 
 /** The hourly D6 job end to end against in-memory storage and a constant model. */
 class ForecastEngineTest {
@@ -52,7 +51,7 @@ class ForecastEngineTest {
     private class ConstantModel(val bytes: Double) : NextHourModel {
         var calls = 0
         override val version = "dev-test"
-        override fun predictLog(features: FloatArray): Float { calls++; return ln1p(bytes).toFloat() }
+        override fun predictBytes(features: FloatArray): Double { calls++; return bytes }
     }
 
     private val store = FakeStore()
@@ -149,7 +148,7 @@ class ForecastEngineTest {
         val params = LocalLayerParameters.fromJson(state.parameters)
         assertEquals(1, state.hoursSeen)
         assertEquals(2.0 * oneMb, state.globalRecentMae!!, 2.0)
-        assertEquals(ln1p(3e6) - ln1p(1e6), params.overallBias, 1e-6)
+        assertEquals(3.0, params.overallActual / params.overallPredicted, 1e-6)
         assertEquals(start + HOUR_MS, params.pendingHour)
         assertEquals(ActiveModel.GLOBAL, state.activeModel)
     }

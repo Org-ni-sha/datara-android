@@ -93,7 +93,7 @@ class FeatureParityTest {
 
     @Test
     fun `models for earlier contracts are refused`() {
-        for (version in 1..2) {
+        for (version in 1..3) {
             val bytes = FeatureParityTest::class.java.getResource("/forecast/contract${version}_model.onnx")!!.readBytes()
             val error = runCatching { OnnxNextHourModel(bytes) }.exceptionOrNull()
             assertTrue(error is IllegalArgumentException)
@@ -117,12 +117,26 @@ class FeatureParityTest {
     }
 
     @Test
-    fun `onnx output matches the Python reference`() {
+    fun `onnx output and bytes match the Python reference`() {
+        assertEquals(OutputTransform.IDENTITY, model.outputTransform)
         for (case in cases) {
+            val name = case["name"]!!.jsonPrimitive.content
             val x = FeatureExtractor.featureVector(history(case), case["forecast_hour_ms"]!!.jsonPrimitive.long, offset)
-            assertEquals(case["name"]!!.jsonPrimitive.content,
-                case["expected_log_prediction"]!!.jsonPrimitive.double, model.predictLog(x).toDouble(), 1e-5)
+            val raw = case["expected_output"]!!.jsonPrimitive.double
+            assertEquals(name, raw, model.rawOutput(x).toDouble(), abs(raw) * 1e-6)
+            val bytes = case["expected_bytes"]!!.jsonPrimitive.double
+            assertEquals(name, bytes, model.predictBytes(x), bytes * 1e-6 + 1e-6)
         }
+    }
+
+    @Test
+    fun `output transforms turn outputs into bytes`() {
+        assertEquals(2_000_000.0, OutputTransform.IDENTITY.toBytes(2_000_000f, 1.0), 0.0)
+        assertEquals(0.0, OutputTransform.IDENTITY.toBytes(-5f, 1.0), 0.0)
+        assertEquals(kotlin.math.expm1(10.0) * 2.5, OutputTransform.EXPM1.toBytes(10f, 2.5), 1e-6)
+        assertEquals(OutputTransform.EXPM1, OutputTransform.of("expm1"))
+        assertTrue(runCatching { OutputTransform.of("log") }.exceptionOrNull() is IllegalArgumentException)
+        assertTrue(runCatching { OutputTransform.of(null) }.exceptionOrNull() is IllegalArgumentException)
     }
 
     @Test
@@ -132,7 +146,7 @@ class FeatureParityTest {
             val h = history(case)
             for (p in case["projections"]!!.jsonArray.map { it.jsonObject }) {
                 val remaining = p["remaining_bytes"]!!.jsonPrimitive.double
-                val got = PetProjector.project(h, t, remaining, offset) { x, _ -> model.predictLog(x).toDouble() }
+                val got = PetProjector.project(h, t, remaining, offset) { x, _ -> model.predictBytes(x) }
                 val label = "${case["name"]!!.jsonPrimitive.content} remaining=$remaining"
                 val expectedBytes = p["next_hour_bytes"]!!.jsonPrimitive.double
                 assertEquals(label, expectedBytes, got.nextHourBytes, expectedBytes * 1e-5)

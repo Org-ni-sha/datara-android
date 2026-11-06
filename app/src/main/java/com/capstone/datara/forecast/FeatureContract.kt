@@ -1,20 +1,22 @@
 package com.capstone.datara.forecast
 
 /**
- * Feature contract v3 of the Global XGBoost next-hour model (datara-ml
+ * Feature contract v4 of the Global XGBoost next-hour model (datara-ml
  * `docs/feature-contract.md`, reference implementation `datara_ml/features.py`).
  *
  * The model reads [N_FEATURES] float32 values in exactly the order of [FEATURE_NAMES] and returns
- * log1p(mobile bytes in the next hour). Changing anything here needs a new [CONTRACT_VERSION], the
+ * the expected mobile bytes of the next hour (see [OutputTransform]). Changing anything here needs a new [CONTRACT_VERSION], the
  * same change in datara-ml, and a regenerated parity fixture (`FeatureParityTest`).
  *
  * v2 (2026-11-06): hourly mobile bytes come from NetworkStatsManager readings instead of the
  * 30-second TrafficStats samples ([HourlyUsage]); the features and their order are unchanged. A
  * contract-1 model is refused at load.
  * v3: a reading with 0 bytes is usable at any length (every hour inside it is a measured zero).
+ * v4: the model's output becomes bytes through its `output_transform` / `output_scale` metadata
+ * ([OutputTransform]); the Tweedie model outputs the expected bytes directly.
  */
 object FeatureContract {
-    const val CONTRACT_VERSION = 3
+    const val CONTRACT_VERSION = 4
 
     val FEATURE_NAMES = listOf(
         "hour_sin",                       // 0
