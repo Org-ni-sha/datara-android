@@ -131,7 +131,7 @@ private fun QuotaDetailsContent(
             }
             actionError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
             if (readOnly) {
-                Text("Sample past cycle · Read-only details", style = MaterialTheme.typography.labelLarge)
+                Text(if (state.isSample) "Sample past cycle · Read-only details" else "Opened from an alert · Read-only details", style = MaterialTheme.typography.labelLarge)
             } else if (empty || state.isEnded || state.isReached) {
                 if (!state.isLoading) DataraActionButton(if (empty) "Create a quota" else "Create another quota", onCreateQuota)
             } else {

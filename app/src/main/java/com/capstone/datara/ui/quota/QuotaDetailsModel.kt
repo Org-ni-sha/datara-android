@@ -40,7 +40,9 @@ data class QuotaDetailsModel(
     /** True while the session or the latest cycle is still loading. */
     val isLoading: Boolean = false,
     /** The live D6 forecast of a real active cycle; null for samples, reached or ended cycles. */
-    val forecast: PetForecastUi? = null
+    val forecast: PetForecastUi? = null,
+    /** The real cycle's id (alerts open it); null for samples and when there is no cycle. */
+    val cycleId: String? = null
 ) {
     val isEnded: Boolean get() = endedAtMillis != null
     val isSample: Boolean get() = sampleScenario != null
@@ -62,6 +64,7 @@ data class QuotaDetailsModel(
                 val cycle = progress.cycle
                 QuotaDetailsModel(
                     hasQuota = true,
+                    cycleId = cycle.cycleId,
                     name = cycle.name ?: DEFAULT_NAME,
                     quotaBytes = cycle.quotaBytes,
                     usedBytes = progress.usedBytes,

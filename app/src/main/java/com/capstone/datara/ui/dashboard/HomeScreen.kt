@@ -34,14 +34,19 @@ fun DashboardScreen(
     viewModel: QuotaDemoViewModel = hiltViewModel(),
     cycleViewModel: QuotaCycleViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel(),
-    notificationsViewModel: NotificationPreviewViewModel = hiltViewModel(),
+    notificationsViewModel: NotificationCenterViewModel = hiltViewModel(),
     settingsViewModel: SettingsPreviewViewModel = hiltViewModel(),
+    preferencesViewModel: NotificationPreferencesViewModel = hiltViewModel(),
+    alertNavigationViewModel: AlertNavigationViewModel = hiltViewModel(),
     profileViewModel: ProfileViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val cycleDetails by cycleViewModel.details.collectAsState()
     val cycleAction by cycleViewModel.action.collectAsState()
     val notificationState by notificationsViewModel.uiState.collectAsState()
+    val openedCycle by notificationsViewModel.openedCycle.collectAsState()
+    val alertPreferences by preferencesViewModel.preferences.collectAsState()
+    val alertTap by alertNavigationViewModel.tap.collectAsState()
     val settingsState by settingsViewModel.uiState.collectAsState()
     val profileState by profileViewModel.uiState.collectAsState()
     val authState by authViewModel.uiState.collectAsState()
@@ -52,6 +57,24 @@ fun DashboardScreen(
     var notifications by rememberSaveable { mutableStateOf(false) }
     var tracking by rememberSaveable { mutableStateOf(false) }
     val screenStates = rememberSaveableStateHolder()
+    // An alert's cycle: the current one opens Quota Details, a past one opens read-only from the inbox
+    val openAlertCycle: (String) -> Unit = { cycleId ->
+        if (cycleId == cycleDetails.cycleId) {
+            notificationsViewModel.closeCycle()
+            notifications = false; tracking = false; creating = false; details = true
+        } else {
+            notificationsViewModel.openCycle(cycleId)
+            tracking = false; creating = false; details = false; notifications = true
+        }
+    }
+    // A tapped Android notification: mark it read and open its cycle (or the inbox)
+    LaunchedEffect(alertTap, cycleDetails.isLoading) {
+        val tap = alertTap ?: return@LaunchedEffect
+        if (cycleDetails.isLoading) return@LaunchedEffect
+        notificationsViewModel.markRead(tap.notificationId)
+        tap.cycleId?.let(openAlertCycle) ?: run { notifications = true }
+        alertNavigationViewModel.consume()
+    }
     BackHandler(tracking || creating || details || notifications || history || settings) {
         if (tracking) tracking = false else if (creating) creating = false else if (details) details = false else if (notifications) notifications = false else { history = false; settings = false }
     }
@@ -73,15 +96,16 @@ fun DashboardScreen(
             onEndCycle = { cycleViewModel.endCycle { viewModel.endCycle() } }, onCreateQuota = { creating = true },
             onTrackingSetup = { tracking = true }, actionError = cycleAction.errorMessage)
     } else if (notifications) {
-        NotificationsScreen(notificationState, notificationsViewModel.sampleCycle,
+        NotificationsScreen(notificationState,
             onBack = { notifications = false }, onMarkRead = notificationsViewModel::markRead,
-            onMarkAllRead = notificationsViewModel::markAllRead)
+            onMarkAllRead = notificationsViewModel::markAllRead, onOpenCycle = openAlertCycle,
+            openedCycle = openedCycle, onCloseCycle = notificationsViewModel::closeCycle)
     } else if (settings) {
         screenStates.SaveableStateProvider("settings") {
             SettingsScreen(settingsState, authViewModel.currentUserEmail,
                 onSaveName = profileViewModel::saveName,
-                onMilestonesChange = settingsViewModel::setMilestones,
-                onForecastsChange = settingsViewModel::setForecasts,
+                onMilestonesChange = preferencesViewModel::setMilestones,
+                onForecastsChange = preferencesViewModel::setForecasts,
                 onSelectSync = settingsViewModel::selectSync,
                 onPreviewSync = settingsViewModel::previewSync,
                 onHome = { settings = false; history = false },
@@ -91,7 +115,8 @@ fun DashboardScreen(
                 signOutError = (authState as? AuthUiState.Error)?.message,
                 profile = profileState,
                 onNameEdited = profileViewModel::onNameEdited,
-                onTrackingSetup = { tracking = true })
+                onTrackingSetup = { tracking = true },
+                alertPreferences = alertPreferences)
         }
     } else if (history) {
         screenStates.SaveableStateProvider("history") {

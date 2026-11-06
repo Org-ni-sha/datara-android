@@ -3,6 +3,7 @@ package com.capstone.datara
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.runtime.mutableStateOf
+import com.capstone.datara.alerts.AlertPreferences
 import com.capstone.datara.ui.profile.ProfileScreen
 import com.capstone.datara.ui.profile.ProfileUiState
 import com.capstone.datara.ui.settings.SettingsPreviewState
@@ -42,6 +43,22 @@ class SettingsScreenTest {
         compose.onNode(hasSetTextAction()).performScrollTo().performTextInput("Student")
         compose.onNodeWithText("Save name").performClick()
         compose.runOnIdle { assertEquals(1, saves) }
+    }
+
+    @Test fun notificationSwitchesShowStoredPreferencesAndReportChanges() {
+        val prefs = mutableStateOf(AlertPreferences(milestones = true, forecasts = false))
+        compose.setContent {
+            SettingsScreen(SettingsPreviewState(), "student@example.com", { null },
+                { prefs.value = prefs.value.copy(milestones = it) }, { prefs.value = prefs.value.copy(forecasts = it) },
+                {}, {}, {}, {}, {}, alertPreferences = prefs.value)
+        }
+        compose.onNodeWithText("At 75%, 90% and 100% of your quota").assertExists()
+        compose.onNodeWithText("Forecast reminders").performScrollTo()
+        compose.onNode(hasText("Quota milestones") and isToggleable(), useUnmergedTree = false).assertIsOn()
+        compose.onNode(hasText("Forecast reminders") and isToggleable()).assertIsOff().performClick()
+        compose.onNode(hasText("Quota milestones") and isToggleable()).performClick()
+        compose.runOnIdle { assertEquals(AlertPreferences(milestones = false, forecasts = true), prefs.value) }
+        compose.onNodeWithText("50%", substring = true).assertDoesNotExist()
     }
 
     @Test fun profileReportsSaveOutcome() {

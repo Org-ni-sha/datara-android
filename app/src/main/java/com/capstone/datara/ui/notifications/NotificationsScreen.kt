@@ -24,8 +24,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.capstone.datara.ui.auth.components.DataraIcons
-import com.capstone.datara.ui.quota.HomeSampleState
-import com.capstone.datara.ui.quota.HomeUiState
+import com.capstone.datara.ui.quota.QuotaDetailsModel
 import com.capstone.datara.ui.quota.QuotaDetailsScreen
 import com.capstone.datara.ui.theme.QuotaTheme
 import com.capstone.datara.ui.components.*
@@ -41,43 +40,43 @@ import java.time.format.FormatStyle
 private fun alertTime(time: Long): String = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
     .format(Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()))
 
+/**
+ * The alert inbox (Room `notifications`). Tapping an alert marks it read and shows it; its button
+ * opens the cycle ([onOpenCycle]). A past cycle comes back as [openedCycle] and is shown read-only.
+ */
 @Composable
-fun NotificationsScreen(state: NotificationPreviewState, sampleCycle: HomeUiState,
-    onBack: () -> Unit, onMarkRead: (String) -> Unit, onMarkAllRead: () -> Unit,
-    modifier: Modifier = Modifier) {
-    QuotaTheme { NotificationsContent(state, sampleCycle, onBack, onMarkRead, onMarkAllRead, modifier) }
+fun NotificationsScreen(state: NotificationCenterState, onBack: () -> Unit, onMarkRead: (String) -> Unit,
+    onMarkAllRead: () -> Unit, onOpenCycle: (String) -> Unit = {}, openedCycle: QuotaDetailsModel? = null,
+    onCloseCycle: () -> Unit = {}, modifier: Modifier = Modifier) {
+    QuotaTheme { NotificationsContent(state, onBack, onMarkRead, onMarkAllRead, onOpenCycle, openedCycle, onCloseCycle, modifier) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NotificationsContent(state: NotificationPreviewState, sampleCycle: HomeUiState,
-    onBack: () -> Unit, onMarkRead: (String) -> Unit, onMarkAllRead: () -> Unit, modifier: Modifier) {
+private fun NotificationsContent(state: NotificationCenterState, onBack: () -> Unit, onMarkRead: (String) -> Unit,
+    onMarkAllRead: () -> Unit, onOpenCycle: (String) -> Unit, openedCycle: QuotaDetailsModel?, onCloseCycle: () -> Unit,
+    modifier: Modifier) {
     var unreadOnly by rememberSaveable { mutableStateOf(false) }
-    var emptyPreview by rememberSaveable { mutableStateOf(false) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
-    var showingCycle by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    BackHandler(showingCycle) { showingCycle = false }
-    if (showingCycle) {
-        QuotaDetailsScreen(sampleCycle, onBack = { showingCycle = false }, onEndCycle = {}, onCreateQuota = {}, readOnly = true)
+    BackHandler(openedCycle != null) { onCloseCycle() }
+    if (openedCycle != null) {
+        QuotaDetailsScreen(openedCycle, onBack = onCloseCycle, onEndCycle = {}, onCreateQuota = {}, readOnly = true)
         return
     }
-    val visible = if (emptyPreview) emptyList() else state.alerts.filter { !unreadOnly || !it.isRead }
+    val visible = state.alerts.filter { !unreadOnly || !it.isRead }
     Scaffold(modifier = modifier, containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = { DataraAppBar("Notifications", onBack, actions = {
-            PreviewMenu(listOf((if (emptyPreview) "Show sample alerts" else "Preview empty notifications") to { emptyPreview = !emptyPreview }))
-        }) }) { insets ->
+        topBar = { DataraAppBar("Notifications", onBack) }) { insets ->
         LazyColumn(Modifier.fillMaxSize().padding(insets), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Your updates", style = MaterialTheme.typography.headlineMedium)
-                    Text(if (emptyPreview) "A quiet moment." else if (state.unreadCount == 0) "You’re all caught up." else "${state.unreadCount} unread ${if (state.unreadCount == 1) "update" else "updates"}",
+                    Text(if (state.alerts.isEmpty()) "A quiet moment." else if (state.unreadCount == 0) "You’re all caught up." else "${state.unreadCount} unread ${if (state.unreadCount == 1) "update" else "updates"}",
                         style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-                    SampleLabel("Sample alerts · Completed cycle")
                     Spacer(Modifier.height(4.dp))
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         SegmentedButton(selected = !unreadOnly, onClick = { unreadOnly = false },
@@ -86,15 +85,16 @@ private fun NotificationsContent(state: NotificationPreviewState, sampleCycle: H
                             shape = SegmentedButtonDefaults.itemShape(1, 2), icon = {}) { Text("Unread") }
                     }
                     TextButton(onClick = { onMarkAllRead(); scope.launch { snackbar.showSnackbar("All notifications marked as read") } },
-                        enabled = !emptyPreview && state.unreadCount > 0) { Text("Mark all as read") }
+                        enabled = state.unreadCount > 0) { Text("Mark all as read") }
                 }
             }
-            if (visible.isEmpty()) item {
+            if (visible.isEmpty() && !state.isLoading) item {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         TonalIcon(DataraIcons.Bell, positive = true)
-                        Text(if (unreadOnly && !emptyPreview) "No unread notifications" else "No notifications yet", style = MaterialTheme.typography.headlineMedium)
-                        Text(if (unreadOnly && !emptyPreview) "Your read updates are still available under All." else "Quota updates will appear here when they’re available.",
+                        Text(if (unreadOnly && state.alerts.isNotEmpty()) "No unread notifications" else "No notifications yet", style = MaterialTheme.typography.headlineMedium)
+                        Text(if (unreadOnly && state.alerts.isNotEmpty()) "Your read updates are still available under All."
+                            else "You’ll be told here at 75%, 90% and 100% of your quota, and when it’s likely to be reached within 24 hours and within 3 hours.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (unreadOnly) TextButton(onClick = { unreadOnly = false }) { Text("View all notifications") }
                     }
@@ -129,9 +129,9 @@ private fun NotificationsContent(state: NotificationPreviewState, sampleCycle: H
                 Text(alert.title, style = MaterialTheme.typography.headlineMedium)
                 Text(alertTime(alert.receivedAtMillis), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(alert.message, style = MaterialTheme.typography.bodyLarge)
-                Text("This alert describes an earlier point in the sample cycle. Cycle details show its final totals.",
+                Text("The figures are from when this alert was sent. Quota details show the latest totals. DATAra never blocks your data.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-                DataraActionButton("View sample quota", { selectedId = null; showingCycle = true })
+                alert.cycleId?.let { cycleId -> DataraActionButton("View quota details", { selectedId = null; onOpenCycle(cycleId) }) }
                 TextButton(onClick = { selectedId = null }) { Text("Close") }
                 Spacer(Modifier.navigationBarsPadding())
             }
@@ -159,6 +159,6 @@ internal fun NotificationBell(unreadCount: Int, onClick: () -> Unit) {
 @Preview(name = "Notifications landscape", widthDp = 800, heightDp = 360)
 @Composable
 private fun NotificationsPreview() {
-    NotificationsScreen(NotificationPreviewState(listOf(PreviewAlert("example", "90% of your quota used", "9 GB of a 10 GB sample quota had been used.",
-        AlertCategory.QUOTA, 1_793_232_000_000, false))), HomeUiState(HomeSampleState.QUOTA_REACHED), {}, {}, {})
+    NotificationsScreen(NotificationCenterState(listOf(AlertItem("example", "90% of your quota used",
+        "9 GB of 10 GB used on “Everyday”. Only 1 GB left. Nothing is blocked.", AlertCategory.QUOTA, 1_793_232_000_000, false, "c1"))), {}, {}, {})
 }

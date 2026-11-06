@@ -1,6 +1,18 @@
 package com.capstone.datara.ui.settings
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.capstone.datara.alerts.AlertPreferences
+import com.capstone.datara.alerts.QuotaAlertNotifications
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -30,10 +42,12 @@ fun SettingsScreen(state: SettingsPreviewState, email: String?, onSaveName: (Str
     onSelectSync: (SyncPreview) -> Unit, onPreviewSync: () -> Unit,
     onHome: () -> Unit, onHistory: () -> Unit, onSignOut: () -> Unit,
     isSigningOut: Boolean = false, signOutError: String? = null,
-    profile: ProfileUiState = ProfileUiState(), onNameEdited: () -> Unit = {}, onTrackingSetup: () -> Unit = {}) {
+    profile: ProfileUiState = ProfileUiState(), onNameEdited: () -> Unit = {}, onTrackingSetup: () -> Unit = {},
+    alertPreferences: AlertPreferences = AlertPreferences()) {
     QuotaTheme {
         SettingsContent(state, email, onSaveName, onMilestonesChange, onForecastsChange, onSelectSync,
-            onPreviewSync, onHome, onHistory, onSignOut, isSigningOut, signOutError, profile, onNameEdited, onTrackingSetup)
+            onPreviewSync, onHome, onHistory, onSignOut, isSigningOut, signOutError, profile, onNameEdited, onTrackingSetup,
+            alertPreferences)
     }
 }
 
@@ -43,7 +57,8 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
     onSelectSync: (SyncPreview) -> Unit, onPreviewSync: () -> Unit,
     onHome: () -> Unit, onHistory: () -> Unit, onSignOut: () -> Unit,
     isSigningOut: Boolean, signOutError: String?,
-    profileState: ProfileUiState, onNameEdited: () -> Unit, onTrackingSetup: () -> Unit) {
+    profileState: ProfileUiState, onNameEdited: () -> Unit, onTrackingSetup: () -> Unit,
+    alertPreferences: AlertPreferences) {
     var profile by rememberSaveable { mutableStateOf(false) }
     var dialog by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(profile) { profile = false }
@@ -72,10 +87,12 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
                 }
             }
             SettingsCard("Notification preferences") {
-                PreferenceSwitch("Quota milestones", "50%, 80% and 90% reminders", state.milestonesEnabled, onMilestonesChange)
-                PreferenceSwitch("Forecast reminders", "A heads-up when your quota is approaching", state.forecastsEnabled, onForecastsChange)
-                Text("Preview preferences do not change the sample inbox or deliver system notifications.",
+                PreferenceSwitch("Quota milestones", "At 75%, 90% and 100% of your quota", alertPreferences.milestones, onMilestonesChange)
+                PreferenceSwitch("Forecast reminders", "When your quota is likely to be reached within 24 hours and within 3 hours",
+                    alertPreferences.forecasts, onForecastsChange)
+                Text("Each alert is sent once per quota. Reaching a quota never cuts your connection.",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                SystemNotificationStatus()
             }
             SettingsCard("Tracking status") {
                 Text("Usage Access and permissions", style = MaterialTheme.typography.titleMedium)
@@ -103,7 +120,7 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
                 Text("Forecast when mobile usage reaches a quota you choose.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = { dialog = "Privacy and tracking" }) { Text("Privacy and tracking") }
             }
-            SampleLabel("Session-only preview")
+            SampleLabel("Cloud sync status is a preview")
             OutlinedButton(onClick = { dialog = "Sign out" }, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Sign out") }
         }
@@ -113,8 +130,8 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
         AlertDialog(onDismissRequest = { if (!isSigningOut) dialog = null }, title = { Text(if (signingOut) "Sign out of DATAra?" else title) },
             text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(when (title) {
-                    "Sign out" -> "You’ll need to sign in again to access your account. Preview settings are not saved to the cloud."
-                    else -> "This preview uses illustrative usage, history and alerts. Profile name edits and preferences are session-only. Signing in uses Supabase Auth. DATAra does not read SMS or block internet access. Data retention, deletion and real sync controls will be documented when storage is connected."
+                    "Sign out" -> "You’ll need to sign in again to access your account. Settings stay on this phone; cloud sync is not connected yet."
+                    else -> "Usage, quotas, forecasts and alerts are measured and kept on this phone; History and sync are still previews. Signing in uses Supabase Auth. DATAra does not read SMS or block internet access. Data retention, deletion and real sync controls will be documented when storage is connected."
                 })
                 if (signingOut && signOutError != null) Text(signOutError, color = MaterialTheme.colorScheme.error)
             } }, confirmButton = {
@@ -123,6 +140,35 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
                 }
             }, dismissButton = { if (signingOut) TextButton(onClick = { dialog = null }, enabled = !isSigningOut) { Text("Cancel") } })
     }
+}
+
+/** Whether Android shows the alerts; they stay in the in-app inbox either way. */
+@Composable
+private fun SystemNotificationStatus() {
+    val context = LocalContext.current
+    var allowed by remember { mutableStateOf(QuotaAlertNotifications.canPost(context)) }
+    // The grant changes in Android Settings, outside the app: re-check when the screen returns
+    LifecycleResumeEffect(Unit) {
+        allowed = QuotaAlertNotifications.canPost(context)
+        onPauseOrDispose { }
+    }
+    // After a denial Android may stop showing the dialog; then only the app's notification settings can allow it
+    var asked by rememberSaveable { mutableStateOf(false) }
+    val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        asked = true
+        allowed = QuotaAlertNotifications.canPost(context)
+    }
+    if (allowed) return
+    Text("Android notifications are off for DATAra. Alerts still appear in the in-app inbox.",
+        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+    OutlinedButton(onClick = {
+        val canAsk = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !asked &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        if (canAsk) request.launch(Manifest.permission.POST_NOTIFICATIONS)
+        else runCatching {
+            context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
+        }
+    }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Allow notifications") }
 }
 
 @Composable

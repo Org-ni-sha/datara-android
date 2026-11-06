@@ -1,6 +1,8 @@
 package com.capstone.datara
 
 import android.app.Application
+import com.capstone.datara.alerts.QuotaAlertEngine
+import com.capstone.datara.alerts.QuotaAlertNotifications
 import com.capstone.datara.domain.cycle.QuotaCycleManager
 import com.capstone.datara.forecast.ForecastEngine
 import dagger.hilt.android.HiltAndroidApp
@@ -20,8 +22,15 @@ class DataraApplication : Application() {
     @Inject
     lateinit var forecasts: ForecastEngine
 
+    /** Quota alerts (D8) follow usage and the PET from process start, including a service-only restart. */
+    @Inject
+    lateinit var alerts: QuotaAlertEngine
+
     override fun onCreate() {
         super.onCreate()
+        // Channels exist from the first launch, so they show in Android's settings before any alert
+        QuotaAlertNotifications.ensureChannels(this)
         forecasts.start()
+        alerts.start()
     }
 }
