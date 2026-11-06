@@ -64,7 +64,7 @@ Forecasts from a model whose version starts with `dev-` add "Test model: not yet
 
 ## The bundled model
 
-`v0-tweedie-2026-11-06` (contract v4), from datara-ml `train_v0.py`: Tweedie objective on raw bytes, tuned by nested grouped-by-device cross-validation, trained on 689 measured hours from 17 devices. Held out by device, its next-hour MAE is 59.8 MB (RMSE 113.2) against 62.3 MB (124.8) for "same as the last hour" and 65.8 MB (113.9) for the 24 h average. Its predictions sum to 79% of actual usage, against 43% for the earlier log1p model, whose PETs came out late; the local layer's usage ratio corrects the rest per user. The final model, trained on 14 days, replaces it as a file swap. Forecast rows record the version in `model_version`.
+`v0-tweedie-pet-2026-11-07` (contract v4), from datara-ml `train_v0.py`: Tweedie objective on raw bytes (power 1.3, depth 2, 150 trees), with hyperparameters chosen by PET error on simulated quota cycles, trained on 689 measured hours from 17 devices. Held out by device (nested), its PET MAE is 15.6 h (median 4.7 h, 78% within ±24 h, about 10 h early on average, none beyond 30 days) against 47.1 h for the repeated 24 h average and 246 h for the repeated last hour; its next-hour MAE is about 59 MB against 62.3 MB and 65.8 MB. It replaces `v0-tweedie-2026-11-06`, which was tuned on next-hour error and whose projections could settle near 0 MB/h (PET MAE 101 h). See datara-ml `artifacts/eval/`. The final model, trained on 14 days, replaces it as a file swap. Forecast rows record the version in `model_version`.
 
 ## Swapping in a trained model
 
