@@ -64,7 +64,7 @@ Forecasts from a model whose version starts with `dev-` add "Test model: not yet
 
 ## The bundled model
 
-`v0-nsm-2026-11-06` (contract v2), from datara-ml `train_v0.py`: an interim, untuned model trained on the harvester data collected so far (476 measured hours from 13 devices, 2026-10-28 to 11-05). With 5-fold cross-validation that holds out whole devices, its next-hour MAE is 78.5 MB, against 79.8 MB for "same as the last hour" and 81.7 MB for "same as the last 24 h average": barely better than naive. The contract-1 `v0-2026-11-06` it replaces was trained on undercounted 30-second totals. The final model, trained on 14 days, replaces it as a file swap. Forecast rows record the version in `model_version`.
+`v0-nsm-2026-11-06b` (contract v2), from datara-ml `train_v0.py`: an interim, untuned model trained on the harvester data collected so far (538 measured hours from 15 devices). With 5-fold cross-validation that holds out whole devices, its next-hour MAE is 75.3 MB, against 77.6 MB for "same as the last hour" and 79.0 MB for "same as the last 24 h average": barely better than naive. The contract-1 `v0-2026-11-06` it replaces was trained on undercounted 30-second totals. The final model, trained on 14 days, replaces it as a file swap. Forecast rows record the version in `model_version`.
 
 ## Swapping in a trained model
 
