@@ -71,6 +71,35 @@ class FeatureParityTest {
     }
 
     @Test
+    fun `nsm hourly bytes match the Python reference`() {
+        val cases = fixture["nsm_cases"]!!.jsonArray.map { it.jsonObject }
+        assertTrue(cases.size >= 5)
+        for (case in cases) {
+            val name = case["name"]!!.jsonPrimitive.content
+            val windows = case["windows"]!!.jsonArray.map { it.jsonObject }.map {
+                HourlyUsage.Window(it["start_ms"]!!.jsonPrimitive.long, it["end_ms"]!!.jsonPrimitive.long,
+                    it["mobile_bytes"]!!.jsonPrimitive.double, it["status"]!!.jsonPrimitive.content)
+            }
+            val got = HourlyUsage.hourlyFromWindows(windows)
+            val expected = case["expected_hours"]!!.jsonArray.map { it.jsonObject }
+                .associate { it["hour_start_ms"]!!.jsonPrimitive.long to num(it["mobile_bytes"]) }
+            assertEquals(name, expected.keys, got.keys)
+            expected.forEach { (hour, bytes) ->
+                if (bytes.isNaN()) assertTrue("$name $hour should be unobserved", got.getValue(hour).isNaN())
+                else assertEquals("$name $hour", bytes, got.getValue(hour), 1e-6)
+            }
+        }
+    }
+
+    @Test
+    fun `a contract 1 model is refused`() {
+        val v1 = FeatureParityTest::class.java.getResource("/forecast/contract1_model.onnx")!!.readBytes()
+        val error = runCatching { OnnxNextHourModel(v1) }.exceptionOrNull()
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error!!.message!!.contains("contract 1"))
+    }
+
+    @Test
     fun `feature vectors match the Python reference`() {
         for (case in cases) {
             val name = case["name"]!!.jsonPrimitive.content

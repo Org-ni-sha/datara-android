@@ -6,6 +6,7 @@ import com.capstone.datara.data.cycle.CycleStatus
 import com.capstone.datara.data.local.entity.ActiveModel
 import com.capstone.datara.data.local.entity.Forecast
 import com.capstone.datara.data.local.entity.UserModelState
+import com.capstone.datara.data.telemetry.DurableUsageReading
 import com.capstone.datara.data.telemetry.UsageSample
 import com.capstone.datara.di.ApplicationScope
 import com.capstone.datara.domain.cycle.CycleClock
@@ -70,6 +71,9 @@ sealed interface ForecastStatus {
 interface ForecastStore {
     /** 30-second samples whose interval ended in [from, until). */
     suspend fun samplesEndingIn(from: Long, until: Long): List<UsageSample>
+
+    /** 10-minute NetworkStatsManager readings overlapping [from, until). */
+    suspend fun durableReadingsOverlapping(from: Long, until: Long): List<DurableUsageReading>
     suspend fun modelState(userId: String): UserModelState?
     suspend fun saveModelState(state: UserModelState)
     suspend fun forecastAt(cycleId: String, predictedAt: Long): Forecast?
@@ -162,8 +166,13 @@ class ForecastEngine(
         val owner = owners.owner.first() ?: return ForecastStatus.NoActiveCycle.also { lastRun = hour to null }
         val zoneId = zone.zone()
 
-        val samples = store.samplesEndingIn(hour - (FeatureContract.LOOKBACK_HOURS + 1) * HOUR_MS, hour)
-        val history = HourlyUsage.aggregate(samples)
+        val from = hour - (FeatureContract.LOOKBACK_HOURS + 1) * HOUR_MS
+        val readings = store.durableReadingsOverlapping(from, hour)
+        // The last hour isn't fully read yet (a run between the hour and the next 10-minute
+        // read): wait for that read instead of treating the hour as unmeasured
+        val readUntil = readings.maxOfOrNull { it.until }
+        if (readUntil != null && readUntil < hour && hour - readUntil <= READ_WAIT_MS) return status.value
+        val history = HourlyUsage.aggregate(readings, store.samplesEndingIn(from, hour))
 
         // 1. Learn from the hour predicted last time, if it is over
         val stored = store.modelState(owner.userId)
@@ -261,6 +270,9 @@ class ForecastEngine(
 
     companion object {
         private const val TAG = "ForecastEngine"
+
+        /** How long after the hour a run waits for the durable read that completes it. */
+        const val READ_WAIT_MS = 20 * 60_000L
 
         /** The same id for the same cycle and hour, so sync retries upsert. */
         fun forecastId(cycleId: String, hour: Long): String =

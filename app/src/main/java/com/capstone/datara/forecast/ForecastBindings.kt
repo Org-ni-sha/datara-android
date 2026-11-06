@@ -7,6 +7,7 @@ import com.capstone.datara.data.local.dao.TelemetryDao
 import com.capstone.datara.data.local.dao.UserModelStateDao
 import com.capstone.datara.data.local.entity.Forecast
 import com.capstone.datara.data.local.entity.UserModelState
+import com.capstone.datara.data.telemetry.DurableUsageReading
 import com.capstone.datara.data.telemetry.UsageSample
 import com.capstone.datara.domain.cycle.CycleState
 import com.capstone.datara.domain.cycle.QuotaCycleManager
@@ -25,6 +26,9 @@ class RoomForecastStore @Inject constructor(
 ) : ForecastStore {
     override suspend fun samplesEndingIn(from: Long, until: Long): List<UsageSample> =
         telemetry.samplesEndingIn(from, until).map { it.toDomain() }
+
+    override suspend fun durableReadingsOverlapping(from: Long, until: Long): List<DurableUsageReading> =
+        telemetry.readingsOverlapping(from, until).map { it.toDomain() }
 
     override suspend fun modelState(userId: String): UserModelState? = modelStates.get(userId)
     override suspend fun saveModelState(state: UserModelState) = modelStates.upsert(state)

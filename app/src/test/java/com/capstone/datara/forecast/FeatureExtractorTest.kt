@@ -1,5 +1,6 @@
 package com.capstone.datara.forecast
 
+import com.capstone.datara.data.telemetry.DurableUsageReading
 import com.capstone.datara.data.telemetry.UsageSample
 import com.capstone.datara.forecast.FeatureContract.HOUR_MS
 import org.junit.Assert.assertEquals
@@ -88,26 +89,52 @@ class FeatureExtractorTest {
         assertEquals(0.5, n.cellularShare, 1e-12)
     }
 
+    private fun reading(since: Long, until: Long, bytes: Long, status: String = "OK") =
+        DurableUsageReading(since = since, until = until, bytesRx = bytes, bytesTx = 0, status = status, schemaVersion = 4)
+
     @Test
-    fun `hourly aggregation follows the B1 counting rule`() {
+    fun `hourly bytes come from NSM readings, network stats from the samples`() {
         val h0 = monMidnight
-        val history = HourlyUsage.aggregate(listOf(
-            sample(h0 + 30_000, 1_000, signal = -91),
-            sample(h0 + 60_000, 2_000, signal = -999),
-            sample(h0 + 90_000, 0, net = "WIFI", signal = -85),
-            sample(h0 + 120_000, 4_000, net = "5G", status = "GAP", signal = 0),
-            sample(h0 + 150_000, 8_000, net = "CELLULAR", signal = -80),
-            sample(h0 + HOUR_MS, 16_000, net = "NONE", signal = -999)
-        ))
+        val m = 60_000L
+        val history = HourlyUsage.aggregate(
+            readings = listOf(
+                reading(h0, h0 + 30 * m, 6_000_000),
+                reading(h0 + 30 * m, h0 + 90 * m, 4_000_000, "GAP"), // straddles the hour: half each
+                reading(h0 + 90 * m, h0 + 120 * m, 0),
+                reading(h0 + 120 * m, h0 + 300 * m, 9_000_000, "GAP") // 3 h: its hours are unobserved
+            ),
+            samples = listOf(
+                sample(h0 + 30_000, 1, signal = -91),
+                sample(h0 + 60_000, 1, signal = -999),
+                sample(h0 + 90_000, 0, net = "WIFI", signal = -85),
+                sample(h0 + 120_000, 1, net = "5G", signal = 0),
+                sample(h0 + 150_000, 1, net = "CELLULAR", signal = -80)
+            )
+        )
+        assertEquals(setOf(h0, h0 + HOUR_MS), history.keys)
         val first = history.getValue(h0)
-        assertEquals(1_000.0 + 2_000 + 8_000, first.mobileBytes, 0.0) // GAP not counted
+        assertEquals(8_000_000.0, first.mobileBytes, 1e-6)
         assertEquals(5, first.readings)
         assertEquals(4, first.cellularReadings)
         assertEquals(-85.0, first.signalDbm, 0.0)
         assertEquals(listOf(0, 0, 2, 1), first.radio.toList())
-        val second = history.getValue(h0 + HOUR_MS) // NONE: observed, but 0 mobile bytes
-        assertEquals(0.0, second.mobileBytes, 0.0)
-        assertTrue(second.signalDbm.isNaN())
+        val second = history.getValue(h0 + HOUR_MS) // measured by NSM, no 30-second samples
+        assertEquals(2_000_000.0, second.mobileBytes, 1e-6)
+        assertEquals(0, second.readings)
+        assertTrue(FeatureExtractor.networkOfHour(second).cellularShare.isNaN())
+    }
+
+    @Test
+    fun `hours with a reset, an overlap or a hole are unobserved`() {
+        val m = 60_000L
+        val h = HourlyUsage.hourlyFromWindows(listOf(
+            HourlyUsage.Window(monMidnight, monMidnight + 60 * m, 0.0, "COUNTER_RESET"),
+            HourlyUsage.Window(monMidnight + 60 * m, monMidnight + 100 * m, 1.0, "OK"),
+            HourlyUsage.Window(monMidnight + 90 * m, monMidnight + 120 * m, 1.0, "OK"),
+            HourlyUsage.Window(monMidnight + 125 * m, monMidnight + 180 * m, 1.0, "OK")
+        ))
+        assertEquals(3, h.size)
+        assertTrue(h.values.all { it.isNaN() })
     }
 
     @Test
