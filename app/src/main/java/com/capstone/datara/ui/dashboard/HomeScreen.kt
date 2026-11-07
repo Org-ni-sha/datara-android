@@ -27,6 +27,7 @@ import com.capstone.datara.ui.profile.ProfileViewModel
 import com.capstone.datara.ui.auth.AuthUiState
 import com.capstone.datara.ui.theme.*
 import com.capstone.datara.ui.tracking.TrackingSetupScreen
+import com.capstone.datara.ui.diagnostics.DiagnosticsRoute
 
 @Composable
 fun DashboardScreen(
@@ -35,7 +36,7 @@ fun DashboardScreen(
     cycleViewModel: QuotaCycleViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel(),
     notificationsViewModel: NotificationCenterViewModel = hiltViewModel(),
-    settingsViewModel: SettingsPreviewViewModel = hiltViewModel(),
+    settingsViewModel: SettingsStatusViewModel = hiltViewModel(),
     preferencesViewModel: NotificationPreferencesViewModel = hiltViewModel(),
     alertNavigationViewModel: AlertNavigationViewModel = hiltViewModel(),
     profileViewModel: ProfileViewModel = hiltViewModel()
@@ -47,7 +48,7 @@ fun DashboardScreen(
     val openedCycle by notificationsViewModel.openedCycle.collectAsState()
     val alertPreferences by preferencesViewModel.preferences.collectAsState()
     val alertTap by alertNavigationViewModel.tap.collectAsState()
-    val settingsState by settingsViewModel.uiState.collectAsState()
+    val settingsStatus by settingsViewModel.status.collectAsState()
     val profileState by profileViewModel.uiState.collectAsState()
     val authState by authViewModel.uiState.collectAsState()
     var creating by rememberSaveable { mutableStateOf(false) }
@@ -56,6 +57,7 @@ fun DashboardScreen(
     var settings by rememberSaveable { mutableStateOf(false) }
     var notifications by rememberSaveable { mutableStateOf(false) }
     var tracking by rememberSaveable { mutableStateOf(false) }
+    var diagnostics by rememberSaveable { mutableStateOf(false) }
     val screenStates = rememberSaveableStateHolder()
     // An alert's cycle: the current one opens Quota Details, a past one opens read-only from the inbox
     val openAlertCycle: (String) -> Unit = { cycleId ->
@@ -75,10 +77,12 @@ fun DashboardScreen(
         tap.cycleId?.let(openAlertCycle) ?: run { notifications = true }
         alertNavigationViewModel.consume()
     }
-    BackHandler(tracking || creating || details || notifications || history || settings) {
+    BackHandler(!diagnostics && (tracking || creating || details || notifications || history || settings)) {
         if (tracking) tracking = false else if (creating) creating = false else if (details) details = false else if (notifications) notifications = false else { history = false; settings = false }
     }
-    if (tracking) {
+    if (diagnostics) {
+        DiagnosticsRoute(onBack = { diagnostics = false })
+    } else if (tracking) {
         TrackingSetupScreen(onBack = { tracking = false })
     } else if (creating) {
         CreateQuotaScreen(onBack = { cycleViewModel.clearError(); creating = false }, onCreateQuota = { bytes, name ->
@@ -102,12 +106,10 @@ fun DashboardScreen(
             openedCycle = openedCycle, onCloseCycle = notificationsViewModel::closeCycle)
     } else if (settings) {
         screenStates.SaveableStateProvider("settings") {
-            SettingsScreen(settingsState, authViewModel.currentUserEmail,
+            SettingsScreen(authViewModel.currentUserEmail,
                 onSaveName = profileViewModel::saveName,
                 onMilestonesChange = preferencesViewModel::setMilestones,
                 onForecastsChange = preferencesViewModel::setForecasts,
-                onSelectSync = settingsViewModel::selectSync,
-                onPreviewSync = settingsViewModel::previewSync,
                 onHome = { settings = false; history = false },
                 onHistory = { settings = false; history = true },
                 onSignOut = { authViewModel.signOut(onComplete = onSignedOut) },
@@ -116,7 +118,10 @@ fun DashboardScreen(
                 profile = profileState,
                 onNameEdited = profileViewModel::onNameEdited,
                 onTrackingSetup = { tracking = true },
-                alertPreferences = alertPreferences)
+                alertPreferences = alertPreferences,
+                status = settingsStatus,
+                onRefreshStatus = settingsViewModel::refresh,
+                onOpenDiagnostics = { diagnostics = true })
         }
     } else if (history) {
         screenStates.SaveableStateProvider("history") {

@@ -31,7 +31,8 @@ As of 2026-10-29:
 - **Implemented (D6):** on-device forecasting — ONNX Runtime runs the bundled Global model (`assets/models/global_xgboost.onnx`, currently the interim `v0-tweedie-pet-2026-11-07`, a Tweedie model trained on about a week of harvester data from 17 devices with hyperparameters chosen by PET error), `FeatureExtractor` reproduces datara-ml's feature contract v4 (parity-tested; hourly bytes from NetworkStatsManager `durable_readings`, not the 30-second samples — see datara-ml `docs/measurement-gaps.md`), the local residual layer and reversible GLOBAL/LOCAL switch live in `user_model_state`, the PET projection logs one `forecasts` row per active cycle per hour, and Home's hero and Quota Details show the real PET — see [forecast](docs/forecast.md).
 - **Implemented (D8):** quota alerts — `alerts/` (`AlertRules`, `QuotaAlertEngine`, channels and delivery in `QuotaAlertNotifications`): 75%, 90% and 100% milestones and 24 h / 3 h forecast alerts, each once per cycle (Room unique index), evaluated on the telemetry/forecast cadence, never while the forecast is collecting or beyond 30 days. The notification center reads Room `notifications` with real `read_at`; the Settings switches persist in `notification_preferences` — see [quota alerts](docs/notifications.md).
 - **Implemented (D7):** History on durable data — `ui/history/` (`HistoryAggregation`, `HistoryViewModel`): 24-hour and 7-day charts and per-cycle daily charts from the NetworkStatsManager hourly rule the forecast uses (`HourlyUsage`), unmeasured hours shown as gaps, every cycle's progress and read-only details, and the logged PET against the actual reach — see [history](docs/history.md).
-- **Pending:** a trained model (B3–B5, a file swap), the diagnostics screen (D9) and sync (C3). Do not mark D5 or D9 complete just because their UI exists.
+- **Implemented (D9):** the hidden ML diagnostics screen (tap the Settings version 7 times; `ui/diagnostics/`), real tracking status checks in Settings, and an honest "Not synced yet" sync card in place of the simulated sync states. See [diagnostics](docs/diagnostics.md).
+- **Pending:** the final 14-day model (a file swap) and sync (C3). Do not mark D5 complete just because its UI exists.
 
 The current implementation details and limitations are in [quota UI preview](docs/quota-ui-preview.md).
 
@@ -104,7 +105,8 @@ app/src/main/java/com/capstone/datara/
     ├── quota/                        # Create/Details, sample state and navigation
     ├── history/                      # Real usage charts and cycle history (D7)
     ├── notifications/                # Alert inbox over Room notifications (D8)
-    ├── settings/, profile/           # Preview preferences; real profile name/username and sign-out
+    ├── settings/, profile/           # Real tracking status, alert switches, profile name/username, sign-out
+    ├── diagnostics/                  # Hidden ML diagnostics (D9; 7 taps on the Settings version)
     ├── components/                   # Theme-aware shared Material 3 wrappers
     ├── navigation/NavGraph.kt        # DataraRoute constants + start destination
     └── theme/                        # Color.kt, Theme.kt, Type.kt

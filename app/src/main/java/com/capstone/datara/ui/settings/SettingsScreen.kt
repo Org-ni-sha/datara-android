@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.capstone.datara.alerts.AlertPreferences
 import com.capstone.datara.alerts.QuotaAlertNotifications
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -37,28 +38,31 @@ import com.capstone.datara.ui.quota.QuotaBottomBar
 import com.capstone.datara.ui.theme.QuotaTheme
 
 @Composable
-fun SettingsScreen(state: SettingsPreviewState, email: String?, onSaveName: (String) -> String?,
+fun SettingsScreen(email: String?, onSaveName: (String) -> String?,
     onMilestonesChange: (Boolean) -> Unit, onForecastsChange: (Boolean) -> Unit,
-    onSelectSync: (SyncPreview) -> Unit, onPreviewSync: () -> Unit,
     onHome: () -> Unit, onHistory: () -> Unit, onSignOut: () -> Unit,
     isSigningOut: Boolean = false, signOutError: String? = null,
     profile: ProfileUiState = ProfileUiState(), onNameEdited: () -> Unit = {}, onTrackingSetup: () -> Unit = {},
-    alertPreferences: AlertPreferences = AlertPreferences()) {
+    alertPreferences: AlertPreferences = AlertPreferences(), status: SettingsStatus = SettingsStatus(),
+    onRefreshStatus: () -> Unit = {}, onOpenDiagnostics: () -> Unit = {}) {
     QuotaTheme {
-        SettingsContent(state, email, onSaveName, onMilestonesChange, onForecastsChange, onSelectSync,
-            onPreviewSync, onHome, onHistory, onSignOut, isSigningOut, signOutError, profile, onNameEdited, onTrackingSetup,
-            alertPreferences)
+        SettingsContent(email, onSaveName, onMilestonesChange, onForecastsChange,
+            onHome, onHistory, onSignOut, isSigningOut, signOutError, profile, onNameEdited, onTrackingSetup,
+            alertPreferences, status, onRefreshStatus, onOpenDiagnostics)
     }
 }
 
+/** Taps on the version that open the hidden diagnostics screen (D9). */
+const val DIAGNOSTICS_TAPS = 7
+
 @Composable
-private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveName: (String) -> String?,
+private fun SettingsContent(email: String?, onSaveName: (String) -> String?,
     onMilestonesChange: (Boolean) -> Unit, onForecastsChange: (Boolean) -> Unit,
-    onSelectSync: (SyncPreview) -> Unit, onPreviewSync: () -> Unit,
     onHome: () -> Unit, onHistory: () -> Unit, onSignOut: () -> Unit,
     isSigningOut: Boolean, signOutError: String?,
     profileState: ProfileUiState, onNameEdited: () -> Unit, onTrackingSetup: () -> Unit,
-    alertPreferences: AlertPreferences) {
+    alertPreferences: AlertPreferences, status: SettingsStatus, onRefreshStatus: () -> Unit,
+    onOpenDiagnostics: () -> Unit) {
     var profile by rememberSaveable { mutableStateOf(false) }
     var dialog by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(profile) { profile = false }
@@ -71,7 +75,7 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
         return
     }
     Scaffold(containerColor = MaterialTheme.colorScheme.background, bottomBar = bottomBar,
-        topBar = { DataraAppBar("Settings", actions = { PreviewMenu(SyncPreview.entries.map { option -> "Sync preview: ${option.label}" to { onSelectSync(option) } }) }) }) { insets ->
+        topBar = { DataraAppBar("Settings") }) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)) {
             SectionTitle("App preferences", "Manage alerts, access and your profile.")
@@ -95,32 +99,33 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
                 SystemNotificationStatus()
             }
             SettingsCard("Tracking status") {
-                Text("Usage Access and permissions", style = MaterialTheme.typography.titleMedium)
-                Text("Grant access and start or stop measuring mobile data. Home and History still show sample values.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                LifecycleResumeEffect(Unit) {
+                    onRefreshStatus()
+                    onPauseOrDispose { }
+                }
+                StatusLine("Tracking service", status.serviceRunning, "Running", "Stopped")
+                StatusLine("Usage Access", status.access.usageAccess, "Granted", "Not granted")
+                StatusLine("Notifications", status.access.notifications, "Allowed", "Off")
+                StatusLine("Battery optimization", status.access.batteryUnrestricted, "Unrestricted", "Restricted")
+                Text("Usage Access and notifications are needed to measure mobile data; an unrestricted battery lets tracking restart on its own.",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedButton(onClick = onTrackingSetup, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open tracking setup") }
             }
             SettingsCard("Cloud sync") {
-                Text("Sample status · ${state.sync.label}", style = MaterialTheme.typography.titleMedium)
-                Text("${state.pendingItems} sample items pending")
-                Text(if (state.sync == SyncPreview.SYNCED) "Last sync: just now · simulated" else "Last sync: not connected",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(when (state.sync) {
-                    SyncPreview.PENDING -> "Preview how queued readings will appear."
-                    SyncPreview.SYNCED -> "Simulated sync complete. No data was uploaded."
-                    SyncPreview.OFFLINE -> "Sample offline state. Tracking history would remain on the device."
-                    SyncPreview.ERROR -> "Sample sync error. You can preview a successful retry."
-                }, style = MaterialTheme.typography.bodyMedium)
-                OutlinedButton(onClick = onPreviewSync, shape = MaterialTheme.shapes.medium, enabled = state.sync != SyncPreview.OFFLINE && state.sync != SyncPreview.SYNCED) {
-                    Text("Preview manual sync")
-                }
+                Text("Not synced yet", style = MaterialTheme.typography.titleMedium)
+                Text("Cloud backup is not connected yet. Your quotas, usage, forecasts and alerts are kept on this phone.",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             SettingsCard("About DATAra") {
-                Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleMedium)
+                var taps by remember { mutableIntStateOf(0) }
+                Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.clickable(interactionSource = null, indication = null) {
+                        taps++
+                        if (taps >= DIAGNOSTICS_TAPS) { taps = 0; onOpenDiagnostics() }
+                    })
                 Text("Forecast when mobile usage reaches a quota you choose.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = { dialog = "Privacy and tracking" }) { Text("Privacy and tracking") }
             }
-            SampleLabel("Cloud sync status is a preview")
             OutlinedButton(onClick = { dialog = "Sign out" }, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Sign out") }
         }
@@ -131,7 +136,7 @@ private fun SettingsContent(state: SettingsPreviewState, email: String?, onSaveN
             text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(when (title) {
                     "Sign out" -> "You’ll need to sign in again to access your account. Settings stay on this phone; cloud sync is not connected yet."
-                    else -> "Usage, quotas, forecasts and alerts are measured and kept on this phone; History and sync are still previews. Signing in uses Supabase Auth. DATAra does not read SMS or block internet access. Data retention, deletion and real sync controls will be documented when storage is connected."
+                    else -> "Usage, quotas, forecasts and alerts are measured and kept on this phone; cloud sync is not connected yet. Signing in uses Supabase Auth. DATAra does not read SMS or block internet access. Data retention, deletion and sync controls will be documented when sync is connected."
                 })
                 if (signingOut && signOutError != null) Text(signOutError, color = MaterialTheme.colorScheme.error)
             } }, confirmButton = {
@@ -172,6 +177,15 @@ private fun SystemNotificationStatus() {
 }
 
 @Composable
+private fun StatusLine(label: String, ok: Boolean, okText: String, badText: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Text(if (ok) okText else badText, style = MaterialTheme.typography.bodyLarge,
+            color = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+    }
+}
+
+@Composable
 private fun PreferenceSwitch(title: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     ListItem(modifier = Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = onChange),
         leadingContent = { TonalIcon(if (title == "Quota milestones") DataraIcons.Data else DataraIcons.Clock) },
@@ -195,5 +209,5 @@ private fun SettingsCard(title: String, content: @Composable ColumnScope.() -> U
 @Preview(name = "Settings landscape", widthDp = 800, heightDp = 360)
 @Composable
 private fun SettingsPreview() {
-    SettingsScreen(SettingsPreviewState(), "student@example.com", { null }, {}, {}, {}, {}, {}, {}, {})
+    SettingsScreen("student@example.com", { null }, {}, {}, {}, {}, {})
 }

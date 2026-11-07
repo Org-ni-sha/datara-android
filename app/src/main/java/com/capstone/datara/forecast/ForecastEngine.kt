@@ -67,6 +67,12 @@ sealed interface ForecastStatus {
     }
 }
 
+/**
+ * How long ONNX inference took in the last forecast run (D9 diagnostics): one next-hour prediction
+ * and the whole PET projection (one prediction per projected hour, up to 30 days).
+ */
+data class InferenceTiming(val measuredAt: Long, val singleMicros: Long, val projectionMillis: Long?, val projectedHours: Int?)
+
 /** Storage the engine reads and writes (Room in the app, in memory in JVM tests). */
 interface ForecastStore {
     /** 30-second samples whose interval ended in [from, until). */
@@ -132,6 +138,10 @@ class ForecastEngine(
     private val lock = Mutex()
     private val mutableStatus = MutableStateFlow<ForecastStatus>(ForecastStatus.Pending)
     val status: StateFlow<ForecastStatus> = mutableStatus.asStateFlow()
+
+    private val mutableTiming = MutableStateFlow<InferenceTiming?>(null)
+    /** The last measured inference latency in this process; null before the first prediction. */
+    val lastTiming: StateFlow<InferenceTiming?> = mutableTiming.asStateFlow()
 
     /** (hour, active cycle id) of the last completed run, so repeated calls in an hour are free. */
     @Volatile private var lastRun: Pair<Long, String?>? = null
@@ -202,7 +212,9 @@ class ForecastEngine(
             }
         } else {
             val x = FeatureExtractor.featureVector(history, hour, zoneId)
+            val t0 = System.nanoTime()
             val globalBytes = model.predictBytes(x)
+            mutableTiming.value = InferenceTiming(now, (System.nanoTime() - t0) / 1_000, null, null)
             val localReady = params.isReady
             val localBytes = if (localReady) globalBytes * params.factor(localHour(hour, zoneId)) else null
             if (params.pendingHour != hour) {
@@ -240,7 +252,10 @@ class ForecastEngine(
     ): ForecastStatus {
         val row = store.forecastAt(cycleId, hour) ?: run {
             val remaining = remainingBytes.toDouble()
-            val global = PetProjector.project(history, hour, remaining, zoneId) { x, _ -> model.predictBytes(x) }
+            var calls = 0
+            val t0 = System.nanoTime()
+            val global = PetProjector.project(history, hour, remaining, zoneId) { x, _ -> calls++; model.predictBytes(x) }
+            mutableTiming.value = mutableTiming.value?.copy(projectionMillis = (System.nanoTime() - t0) / 1_000_000, projectedHours = calls)
             val local = if (params.isReady) PetProjector.project(history, hour, remaining, zoneId) { x, t ->
                 model.predictBytes(x) * params.factor(localHour(t, zoneId))
             } else null
