@@ -158,7 +158,8 @@ fun DashboardScreen(
             trackingIssue = TrackingIssue.of(settingsStatus.access, settingsStatus.serviceRunning,
                 cycleActive = cycleDetails.hasQuota && !cycleDetails.isEnded && !cycleDetails.isReached),
             week = (historyState as? HistoryUiState.Ready)?.data?.week?.let(HomeWeek::from),
-            onShowRealData = viewModel::showRealData)
+            onShowRealData = viewModel::showRealData,
+            greeting = homeGreeting(java.time.LocalTime.now().hour, profileState.name, profileState.username))
     }
     // One snackbar host above the docked navigation bar, for every signed-in screen
     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 80.dp))
@@ -171,9 +172,9 @@ fun HomeScreen(state: HomeUiState, onCreateQuota: () -> Unit,
     modifier: Modifier = Modifier, onViewQuota: () -> Unit = {}, onHistory: () -> Unit = {},
     onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {},
     onTrackingSetup: () -> Unit = {}, live: QuotaDetailsModel? = null, liveLoading: Boolean = false,
-    trackingIssue: TrackingIssue? = null, week: HomeWeek? = null, onShowRealData: () -> Unit = {}) {
+    trackingIssue: TrackingIssue? = null, week: HomeWeek? = null, onShowRealData: () -> Unit = {}, greeting: String = "Hello") {
     QuotaTheme { HomeContent(state, onCreateQuota, onSelectScenario, onSignOut, modifier, onViewQuota, onHistory, onNotifications,
-        unreadCount, onSettings, onTrackingSetup, live, liveLoading, trackingIssue, week, onShowRealData) }
+        unreadCount, onSettings, onTrackingSetup, live, liveLoading, trackingIssue, week, onShowRealData, greeting) }
 }
 
 @Preview(name = "No quota", widthDp = 360, heightDp = 800)

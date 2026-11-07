@@ -75,4 +75,11 @@ class HomeStatusTest {
         val hero = HeroContent.live(live.copy(isReached = true), TrackingIssue.SERVICE_STOPPED)
         assertNull(hero.issue)
     }
+
+    @Test fun greetingUsesTimeOfDayAndFirstName() {
+        assertEquals("Good morning, Cybe", homeGreeting(8, "Cybe Montejo", "cybe"))
+        assertEquals("Good afternoon, @cybe", homeGreeting(13, " ", "cybe"))
+        assertEquals("Good evening", homeGreeting(22, null, null))
+        assertEquals("Tracking “Defense”", homeSubtitle("Defense"))
+    }
 }

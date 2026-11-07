@@ -4,6 +4,17 @@ import com.capstone.datara.telemetry.TrackingAccess
 import com.capstone.datara.ui.history.DayBucket
 import java.time.format.DateTimeFormatter
 
+/** Home's header greeting: time of day plus the profile's first name, else @username, else none. */
+fun homeGreeting(hour: Int, name: String?, username: String?): String {
+    val part = when (hour) { in 5..11 -> "Good morning"; in 12..17 -> "Good afternoon"; else -> "Good evening" }
+    val who = name?.trim()?.split(Regex("\\s+"))?.firstOrNull()?.takeIf { it.isNotEmpty() }
+        ?: username?.trim()?.takeIf { it.isNotEmpty() }?.let { "@$it" }
+    return if (who == null) part else "$part, $who"
+}
+
+/** Home's header subtitle. */
+fun homeSubtitle(quotaName: String?): String = quotaName?.let { "Tracking “$it”" } ?: "Set a quota to start forecasting"
+
 /** Why a live cycle is not being measured properly, most blocking first. */
 enum class TrackingIssue(val title: String, val body: String) {
     USAGE_ACCESS("Tracking is paused", "Usage Access is off, so DATAra can’t read your mobile data."),

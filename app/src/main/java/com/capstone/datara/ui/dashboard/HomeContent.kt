@@ -26,11 +26,13 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
     modifier: Modifier = Modifier, onViewQuota: () -> Unit = {}, onHistory: () -> Unit = {},
     onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {},
     onTrackingSetup: () -> Unit = {}, live: QuotaDetailsModel? = null, liveLoading: Boolean = false,
-    trackingIssue: TrackingIssue? = null, week: HomeWeek? = null, onShowRealData: () -> Unit = {}) {
+    trackingIssue: TrackingIssue? = null, week: HomeWeek? = null, onShowRealData: () -> Unit = {},
+    greeting: String = "Hello") {
     var showInfo by remember { mutableStateOf(false) }
     val hero = HeroContent.select(state, live, liveLoading, trackingIssue)
     Scaffold(modifier, containerColor = MaterialTheme.colorScheme.background,
-        topBar = { DataraAppBar("DATAra", actions = {
+        topBar = { DataraAppBar(greeting, showLogo = true,
+            subtitle = homeSubtitle(hero.name.takeIf { !hero.empty && !hero.loading && !hero.ended && !hero.reached }), actions = {
             NotificationBell(unreadCount, onNotifications)
             // Review tool for the defense screens; removed before the freeze
             PreviewMenu(listOf("Show my real quota" to onShowRealData) +

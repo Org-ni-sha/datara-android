@@ -12,8 +12,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -21,47 +19,41 @@ import androidx.compose.ui.unit.dp
 import com.capstone.datara.ui.auth.components.DataraIcons
 import androidx.core.view.WindowCompat
 import com.capstone.datara.R
-import com.capstone.datara.ui.theme.DataraBrandNavy
-import com.capstone.datara.ui.theme.DataraOnBrand
 
 /** Shared native Material 3 building blocks for the signed-in experience. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DataraAppBar(title: String, onBack: (() -> Unit)? = null, actions: @Composable RowScope.() -> Unit = {}) {
-    LightStatusBarIcons()
+fun DataraAppBar(title: String, onBack: (() -> Unit)? = null, subtitle: String? = null, showLogo: Boolean = false,
+    actions: @Composable RowScope.() -> Unit = {}) {
+    // Light bar on the app background: navy text, dark status-bar icons (set by QuotaTheme)
     TopAppBar(title = {
-        if (title == "DATAra") DataraWordmark()
-        else Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1,
-            overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (showLogo) Image(painterResource(R.drawable.datara_brand_symbol), null, Modifier.size(28.dp), contentScale = ContentScale.Fit)
+            Column(Modifier.semantics(mergeDescendants = true) { heading() }) {
+                Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     },
         navigationIcon = { if (onBack != null) IconButton(onClick = onBack) { Icon(DataraIcons.ArrowBack, "Back") } },
         actions = actions,
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = DataraBrandNavy, titleContentColor = DataraOnBrand,
-            navigationIconContentColor = DataraOnBrand, actionIconContentColor = DataraOnBrand))
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background,
+            titleContentColor = MaterialTheme.colorScheme.primary, navigationIconContentColor = MaterialTheme.colorScheme.primary,
+            actionIconContentColor = MaterialTheme.colorScheme.primary))
 }
 
-/** The brand as [D-mark]ATAra: the logo mark stands in for the "D". */
+/** Light navigation-bar icons while a navy bottom bar is on screen; restores the previous setting after. */
 @Composable
-private fun DataraWordmark() {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.semantics(mergeDescendants = true) {
-        contentDescription = "DATAra"; heading()
-    }) {
-        Image(painterResource(R.drawable.datara_brand_symbol), null, Modifier.size(30.dp), contentScale = ContentScale.Fit)
-        Text("ATAra", style = MaterialTheme.typography.titleLarge, maxLines = 1, modifier = Modifier.clearAndSetSemantics { })
-    }
-}
-
-/** Light status-bar icons while a navy app bar is on screen; restores the previous setting after. */
-@Composable
-private fun LightStatusBarIcons() {
+fun LightNavigationBarIcons() {
     val view = LocalView.current
     if (view.isInEditMode) return
     DisposableEffect(view) {
         val window = (view.context as? Activity)?.window
         val controller = window?.let { WindowCompat.getInsetsController(it, view) }
-        val old = controller?.isAppearanceLightStatusBars
-        controller?.isAppearanceLightStatusBars = false
-        onDispose { if (old != null) controller.isAppearanceLightStatusBars = old }
+        val old = controller?.isAppearanceLightNavigationBars
+        controller?.isAppearanceLightNavigationBars = false
+        onDispose { if (old != null) controller.isAppearanceLightNavigationBars = old }
     }
 }
 
