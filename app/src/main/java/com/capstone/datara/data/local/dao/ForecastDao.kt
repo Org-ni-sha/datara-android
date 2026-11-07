@@ -30,6 +30,10 @@ interface ForecastDao {
     )
     suspend fun between(cycleId: String, from: Long, until: Long): List<Forecast>
 
+    /** The user's [limit] most recent forecasts on [deviceId], newest first (D9 diagnostics). */
+    @Query("SELECT * FROM forecasts WHERE user_id = :userId AND device_id = :deviceId ORDER BY predicted_at DESC LIMIT :limit")
+    suspend fun recent(userId: String, deviceId: String, limit: Int): List<Forecast>
+
     @Query("SELECT * FROM forecasts WHERE synced_at IS NULL ORDER BY predicted_at LIMIT :limit")
     suspend fun unsynced(limit: Int): List<Forecast>
 
