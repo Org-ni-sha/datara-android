@@ -37,6 +37,9 @@ data class TrackingSetupUiState(
 
     val canStop: Boolean get() = isRunning || shouldCollect
 
+    /** Running with every required grant: the setup screen shows "All set". */
+    val isComplete: Boolean get() = isRunning && access.canStart
+
     /** Why Start is disabled, or null when it isn't (or tracking already runs). */
     val startBlockedReason: String?
         get() = when {

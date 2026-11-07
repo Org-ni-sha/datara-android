@@ -39,11 +39,11 @@ class QuotaCycleViewModel @Inject constructor(
     val action: StateFlow<QuotaActionState> = mutableAction.asStateFlow()
 
     /** Starts a cycle; [onCreated] runs only when it was stored. */
-    fun createQuota(quotaBytes: Long, name: String, onCreated: () -> Unit = {}) = run(onCreated) {
+    fun createQuota(quotaBytes: Long, name: String, onCreated: () -> Unit = {}) = run(QuotaAction.CREATE, onCreated) {
         manager.create(quotaBytes, name)
     }
 
-    fun endCycle(onEnded: () -> Unit = {}) = run(onEnded) { manager.end() }
+    fun endCycle(onEnded: () -> Unit = {}) = run(QuotaAction.END, onEnded) { manager.end() }
 
     fun clearError() = mutableAction.update { it.copy(errorMessage = null) }
 
@@ -57,13 +57,25 @@ class QuotaCycleViewModel @Inject constructor(
         }
     }
 
-    private fun run(onSuccess: () -> Unit, block: suspend () -> Result<*>) {
+    private fun run(kind: QuotaAction, onSuccess: () -> Unit, block: suspend () -> Result<*>) {
         if (mutableAction.value.isSaving) return
         mutableAction.value = QuotaActionState(isSaving = true)
         viewModelScope.launch {
             val result = block()
-            mutableAction.value = QuotaActionState(errorMessage = result.exceptionOrNull()?.let { it.message ?: "Something went wrong. Try again." })
+            mutableAction.value = QuotaActionState(errorMessage = result.exceptionOrNull()?.let { quotaErrorMessage(kind, it) })
             if (result.isSuccess) onSuccess()
         }
     }
 }
+
+enum class QuotaAction { CREATE, END }
+
+/** Sentences written for people; anything else (database or system text) becomes a plain retry message. */
+private val PLAIN_MESSAGES = setOf("Sign in to track a quota.", "There is no cycle to end.")
+
+/** A plain sentence for a failed create or end; raw exception text is never shown. */
+fun quotaErrorMessage(action: QuotaAction, error: Throwable): String =
+    error.message?.takeIf { it in PLAIN_MESSAGES } ?: when (action) {
+        QuotaAction.CREATE -> "Couldn’t start this quota. Try again."
+        QuotaAction.END -> "Couldn’t end this cycle. Try again."
+    }

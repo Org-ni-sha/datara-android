@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
@@ -47,21 +48,21 @@ private fun CreateQuotaContent(onBack: () -> Unit, onCreateQuota: (Long, String)
             Surface(color = MaterialTheme.colorScheme.background) {
                 Column(Modifier.navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     errorMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
-                    DataraActionButton(if (isSaving) "Starting…" else "Start tracking", { submit() })
-                    Text(replacingName?.let { "Starting ends your current cycle, “$it”." } ?: "Usage counts from the moment you start.",
+                    DataraActionButton(if (isSaving) "Starting…" else "Start tracking", { submit() }, enabled = !isSaving)
+                    Text(replacingName?.let { "Starting ends your current cycle, “$it”." } ?: "Usage counts while tracking is on. We’ll help you turn it on next.",
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { TonalIcon(DataraIcons.Data); SampleLabel("New cycle") }
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { TonalIcon(DataraIcons.Data); StatusPill("New cycle", StatusTone.NEUTRAL, Modifier.align(Alignment.CenterVertically)) }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Set your tracking amount", style = MaterialTheme.typography.headlineMedium)
                 Text("Choose an amount to track. We’ll help you see when you’re likely to reach it.", style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     OutlinedTextField(amount, { amount = it; error = null }, label = { Text("Data amount") }, placeholder = { Text("10") },
                         modifier = Modifier.fillMaxWidth(), singleLine = true, isError = error != null,
@@ -88,7 +89,7 @@ private fun CreateQuotaContent(onBack: () -> Unit, onCreateQuota: (Long, String)
                 singleLine = true, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { submit() }),
                 supportingText = { Text("Give this cycle a name you’ll recognize.") })
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+            Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
                 Text("What counts?", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, top = 16.dp))
                 ListItem(leadingContent = { TonalIcon(DataraIcons.Data) }, headlineContent = { Text("Mobile data counts") },
                     supportingContent = { Text("Uploads, downloads and promo freebies.") })
