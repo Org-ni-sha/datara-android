@@ -49,8 +49,8 @@ fun QuotaDetailsScreen(state: HomeUiState, onBack: () -> Unit, onEndCycle: () ->
 @Composable
 fun QuotaDetailsScreen(state: QuotaDetailsModel, onBack: () -> Unit, onEndCycle: () -> Unit,
     onCreateQuota: () -> Unit, modifier: Modifier = Modifier, readOnly: Boolean = false,
-    onTrackingSetup: (() -> Unit)? = null, actionError: String? = null) {
-    QuotaTheme { QuotaDetailsContent(state, onBack, onEndCycle, onCreateQuota, modifier, readOnly, onTrackingSetup, actionError) }
+    onTrackingSetup: (() -> Unit)? = null, actionError: String? = null, readOnlyNote: String? = null) {
+    QuotaTheme { QuotaDetailsContent(state, onBack, onEndCycle, onCreateQuota, modifier, readOnly, onTrackingSetup, actionError, readOnlyNote) }
 }
 
 internal fun detailsStatus(state: QuotaDetailsModel): String {
@@ -99,7 +99,8 @@ private fun QuotaDetailsContent(
     modifier: Modifier = Modifier,
     readOnly: Boolean = false,
     onTrackingSetup: (() -> Unit)? = null,
-    actionError: String? = null
+    actionError: String? = null,
+    readOnlyNote: String? = null
 ) {
     var confirmEnd by rememberSaveable { mutableStateOf(false) }
     val empty = !state.hasQuota
@@ -131,7 +132,7 @@ private fun QuotaDetailsContent(
             }
             actionError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
             if (readOnly) {
-                Text(if (state.isSample) "Sample past cycle · Read-only details" else "Opened from an alert · Read-only details", style = MaterialTheme.typography.labelLarge)
+                Text(readOnlyNote ?: if (state.isSample) "Sample past cycle · Read-only details" else "Opened from an alert · Read-only details", style = MaterialTheme.typography.labelLarge)
             } else if (empty || state.isEnded || state.isReached) {
                 if (!state.isLoading) DataraActionButton(if (empty) "Create a quota" else "Create another quota", onCreateQuota)
             } else {
