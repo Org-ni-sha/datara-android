@@ -26,7 +26,8 @@ data class PetForecastUi(
                 "A forecast appears once ${status.neededHours} of the last 24 hours have measured usage " +
                     "(${status.observedHours} so far)."
             )
-            status is ForecastStatus.Unavailable -> PetForecastUi("FORECAST UNAVAILABLE", "Forecast unavailable", status.reason)
+            status is ForecastStatus.Unavailable -> PetForecastUi("FORECAST UNAVAILABLE", "Forecast unavailable",
+                "The forecast can’t be calculated right now. Your usage is still being measured, and DATAra tries again every hour.")
             else -> PetForecastUi(
                 "FORECASTING", "Preparing your forecast",
                 "The forecast is calculated on this device from your measured usage, once an hour."

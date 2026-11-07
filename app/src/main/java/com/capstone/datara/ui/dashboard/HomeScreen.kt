@@ -21,6 +21,10 @@ import com.capstone.datara.ui.auth.AuthViewModel
 import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.quota.*
 import com.capstone.datara.ui.history.HistoryScreen
+import com.capstone.datara.ui.history.HistoryUiState
+import com.capstone.datara.ui.history.HistoryViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import kotlinx.coroutines.launch
 import com.capstone.datara.ui.notifications.*
 import com.capstone.datara.ui.settings.*
 import com.capstone.datara.ui.profile.ProfileViewModel
@@ -39,7 +43,8 @@ fun DashboardScreen(
     settingsViewModel: SettingsStatusViewModel = hiltViewModel(),
     preferencesViewModel: NotificationPreferencesViewModel = hiltViewModel(),
     alertNavigationViewModel: AlertNavigationViewModel = hiltViewModel(),
-    profileViewModel: ProfileViewModel = hiltViewModel()
+    profileViewModel: ProfileViewModel = hiltViewModel(),
+    historyViewModel: HistoryViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val cycleDetails by cycleViewModel.details.collectAsState()
@@ -51,6 +56,12 @@ fun DashboardScreen(
     val settingsStatus by settingsViewModel.status.collectAsState()
     val profileState by profileViewModel.uiState.collectAsState()
     val authState by authViewModel.uiState.collectAsState()
+    val historyState by historyViewModel.state.collectAsState()
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val notify: (String) -> Unit = { message -> scope.launch { snackbar.showSnackbar(message) } }
+    // Grants change in Android Settings, outside the app: Home's banner re-checks on every resume
+    LifecycleResumeEffect(Unit) { settingsViewModel.refresh(); onPauseOrDispose { } }
     var creating by rememberSaveable { mutableStateOf(false) }
     var details by rememberSaveable { mutableStateOf(false) }
     var history by rememberSaveable { mutableStateOf(false) }
@@ -80,10 +91,12 @@ fun DashboardScreen(
     BackHandler(!diagnostics && (tracking || creating || details || notifications || history || settings)) {
         if (tracking) tracking = false else if (creating) creating = false else if (details) details = false else if (notifications) notifications = false else { history = false; settings = false }
     }
+    Box(Modifier.fillMaxSize()) {
     if (diagnostics) {
         DiagnosticsRoute(onBack = { diagnostics = false })
     } else if (tracking) {
-        TrackingSetupScreen(onBack = { tracking = false })
+        TrackingSetupScreen(onBack = { tracking = false }, onMessage = notify,
+            onHome = { tracking = false; settings = false; history = false; details = false })
     } else if (creating) {
         CreateQuotaScreen(onBack = { cycleViewModel.clearError(); creating = false }, onCreateQuota = { bytes, name ->
             cycleViewModel.createQuota(bytes, name) {
@@ -91,13 +104,17 @@ fun DashboardScreen(
                 viewModel.createQuota(bytes, name)
                 creating = false
                 details = false
+                notify("Quota created")
+                // A new quota is only measured while tracking runs: guide the user there when it can't
+                settingsViewModel.refresh()
+                if (!settingsViewModel.status.value.let { it.access.canStart && it.serviceRunning }) tracking = true
             }
         }, isSaving = cycleAction.isSaving, errorMessage = cycleAction.errorMessage,
             replacingName = cycleDetails.takeIf { it.hasQuota && !it.isEnded }?.name)
     } else if (details) {
         // Quota Details shows the real cycle (D3) and its on-device forecast (D6)
         QuotaDetailsScreen(cycleDetails, onBack = { cycleViewModel.clearError(); details = false },
-            onEndCycle = { cycleViewModel.endCycle { viewModel.endCycle() } }, onCreateQuota = { creating = true },
+            onEndCycle = { cycleViewModel.endCycle { viewModel.endCycle(); notify("Cycle ended") } }, onCreateQuota = { creating = true },
             onTrackingSetup = { tracking = true }, actionError = cycleAction.errorMessage)
     } else if (notifications) {
         NotificationsScreen(notificationState,
@@ -136,7 +153,15 @@ fun DashboardScreen(
             onNotifications = { notifications = true }, unreadCount = notificationState.unreadCount,
             onSettings = { settings = true; history = false },
             onTrackingSetup = { tracking = true },
-            live = cycleDetails.takeIf { it.hasQuota && !it.isSample })
+            live = cycleDetails.takeIf { it.hasQuota && !it.isSample },
+            liveLoading = cycleDetails.isLoading,
+            trackingIssue = TrackingIssue.of(settingsStatus.access, settingsStatus.serviceRunning,
+                cycleActive = cycleDetails.hasQuota && !cycleDetails.isEnded && !cycleDetails.isReached),
+            week = (historyState as? HistoryUiState.Ready)?.data?.week?.let(HomeWeek::from),
+            onShowRealData = viewModel::showRealData)
+    }
+    // One snackbar host above the docked navigation bar, for every signed-in screen
+    SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 80.dp))
     }
 }
 
@@ -145,8 +170,10 @@ fun HomeScreen(state: HomeUiState, onCreateQuota: () -> Unit,
     onSelectScenario: (HomeSampleState) -> Unit, onSignOut: () -> Unit,
     modifier: Modifier = Modifier, onViewQuota: () -> Unit = {}, onHistory: () -> Unit = {},
     onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {},
-    onTrackingSetup: () -> Unit = {}, live: QuotaDetailsModel? = null) {
-    QuotaTheme { HomeContent(state, onCreateQuota, onSelectScenario, onSignOut, modifier, onViewQuota, onHistory, onNotifications, unreadCount, onSettings, onTrackingSetup, live) }
+    onTrackingSetup: () -> Unit = {}, live: QuotaDetailsModel? = null, liveLoading: Boolean = false,
+    trackingIssue: TrackingIssue? = null, week: HomeWeek? = null, onShowRealData: () -> Unit = {}) {
+    QuotaTheme { HomeContent(state, onCreateQuota, onSelectScenario, onSignOut, modifier, onViewQuota, onHistory, onNotifications,
+        unreadCount, onSettings, onTrackingSetup, live, liveLoading, trackingIssue, week, onShowRealData) }
 }
 
 @Preview(name = "No quota", widthDp = 360, heightDp = 800)
@@ -156,14 +183,14 @@ private fun EmptyHomePreview() { QuotaTheme { HomeScreen(HomeUiState(), {}, {}, 
 @Preview(name = "Large text", widthDp = 360, heightDp = 800, fontScale = 2f)
 @Preview(name = "Landscape", widthDp = 800, heightDp = 360)
 @Composable
-private fun ForecastHomePreview() { QuotaTheme { HomeScreen(HomeUiState(HomeSampleState.FORECAST_AVAILABLE), {}, {}, {}) } }
+private fun ForecastHomePreview() { QuotaTheme { HomeScreen(HomeUiState(previewing = true, scenario = HomeSampleState.FORECAST_AVAILABLE), {}, {}, {}) } }
 @Preview(name = "Collecting", widthDp = 360, heightDp = 800)
 @Composable
-private fun CollectingHomePreview() { QuotaTheme { HomeScreen(HomeUiState(HomeSampleState.COLLECTING), {}, {}, {}) } }
+private fun CollectingHomePreview() { QuotaTheme { HomeScreen(HomeUiState(previewing = true, scenario = HomeSampleState.COLLECTING), {}, {}, {}) } }
 @Preview(name = "Permission missing", widthDp = 360, heightDp = 800)
 @Composable
-private fun PermissionHomePreview() { QuotaTheme { HomeScreen(HomeUiState(HomeSampleState.MISSING_PERMISSION), {}, {}, {}) } }
+private fun PermissionHomePreview() { QuotaTheme { HomeScreen(HomeUiState(previewing = true, scenario = HomeSampleState.MISSING_PERMISSION), {}, {}, {}) } }
 @Preview(name = "Quota reached", widthDp = 360, heightDp = 800)
 @Composable
-private fun ReachedHomePreview() { QuotaTheme { HomeScreen(HomeUiState(HomeSampleState.QUOTA_REACHED), {}, {}, {}) } }
+private fun ReachedHomePreview() { QuotaTheme { HomeScreen(HomeUiState(previewing = true, scenario = HomeSampleState.QUOTA_REACHED), {}, {}, {}) } }
 

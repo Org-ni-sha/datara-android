@@ -20,7 +20,8 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 internal fun formatQuotaData(bytes: Long): String {
-    val unit = if (bytes >= QuotaUnit.GB.bytes) QuotaUnit.GB else QuotaUnit.MB
+    // A value that would round to "1,000 MB" (e.g. 999,999,999 B) reads as 1 GB instead
+    val unit = if (bytes >= QuotaUnit.GB.bytes || Math.round(bytes / 10_000.0) >= 100_000) QuotaUnit.GB else QuotaUnit.MB
     return "${NumberFormat.getNumberInstance().apply { maximumFractionDigits = 2 }.format(bytes.toDouble() / unit.bytes)} ${unit.name}"
 }
 
@@ -69,6 +70,12 @@ internal fun detailsStatus(state: QuotaDetailsModel): String {
     }
 }
 
+private fun detailsTone(state: QuotaDetailsModel): StatusTone = when {
+    state.sampleScenario == HomeSampleState.MISSING_PERMISSION -> StatusTone.PROBLEM
+    state.isReached || state.isEnded || !state.hasQuota -> StatusTone.NEUTRAL
+    else -> StatusTone.GOOD
+}
+
 private fun forecastTitle(state: QuotaDetailsModel): String = when {
     state.isEnded -> "Forecast stopped"
     state.isReached -> "Your quota has been reached"
@@ -106,9 +113,15 @@ private fun QuotaDetailsContent(
     val empty = !state.hasQuota
     Scaffold(modifier = modifier, containerColor = MaterialTheme.colorScheme.background, topBar = { DataraAppBar("Quota details", onBack) }) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            .padding(horizontal = 20.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            if (state.isLoading) {
+                Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.tertiary)
+                }
+                return@Column
+            }
             SectionTitle(if (empty) "No active quota" else state.name)
-            SampleLabel(detailsStatus(state))
+            StatusPill(detailsStatus(state), detailsTone(state))
             if (!empty) {
                 QuotaProgressCard(state)
                 state.measurement?.let { MeasurementCard(it, state.isEnded, onTrackingSetup) }
@@ -143,7 +156,7 @@ private fun QuotaDetailsContent(
             }
             if (!readOnly) Text(
                 if (state.isSample) "Preview cycles are kept only for this session. Creating another quota replaces these sample details; saved history will come later."
-                else "Cycles are saved on this phone. Past cycles will appear in History in a later update.",
+                else "Cycles are saved on this phone. Past cycles are in History.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
     }

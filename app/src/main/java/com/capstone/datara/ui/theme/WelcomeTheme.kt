@@ -16,6 +16,9 @@ import androidx.core.view.WindowCompat
  */
 val DataraBrandNavy = Color(0xFF101522)
 
+/** Text and icons on [DataraBrandNavy] (the signed-in app bar). */
+val DataraOnBrand = Color(0xFFFFFFFF)
+
 // Text and outlines checked for WCAG contrast on DataraBrandNavy: white 18.2:1, muted 9.5:1,
 // outline 4.5:1 (non-text minimum 3:1).
 private val DataraWelcomeMuted = Color(0xFFAFBCD3)

@@ -10,7 +10,7 @@ import javax.inject.Inject
 enum class HomeSampleState(val label: String) {
     NO_QUOTA("No active quota"), COLLECTING("Collecting usage"),
     FORECAST_AVAILABLE("Forecast available"), MISSING_PERMISSION("Missing permission"),
-    QUOTA_REACHED("Quota reached")
+    QUOTA_REACHED("Quota reached"), TRACKING_OFF("Tracking off banner"), LOADING("Loading")
 }
 
 /** Presentation fixtures only. No telemetry, permissions, storage or inference is connected. */
@@ -19,7 +19,9 @@ data class HomeUiState(
     val amountBytes: Long = 10_000_000_000L,
     val name: String = "Everyday data",
     val startedAtMillis: Long = System.currentTimeMillis(),
-    val endedAtMillis: Long? = null
+    val endedAtMillis: Long? = null,
+    /** A scenario was picked from Preview options; until "Show my real quota", it replaces real data. */
+    val previewing: Boolean = false
 ) {
     val isEnded: Boolean get() = endedAtMillis != null
     val canEnd: Boolean get() = !isEnded && scenario != HomeSampleState.NO_QUOTA && scenario != HomeSampleState.QUOTA_REACHED
@@ -40,13 +42,17 @@ class QuotaDemoViewModel @Inject constructor(private val saved: SavedStateHandle
         amountBytes = saved.get<Long>("amount") ?: 10_000_000_000L,
         name = saved.get<String>("quotaName") ?: "Everyday data",
         startedAtMillis = saved.get<Long>("startedAt") ?: System.currentTimeMillis(),
-        endedAtMillis = saved.get<Long>("endedAt")
+        endedAtMillis = saved.get<Long>("endedAt"),
+        previewing = saved.get<Boolean>("previewing") ?: false
     ))
     val uiState = mutableState.asStateFlow()
 
     init { update(mutableState.value) }
 
-    fun selectScenario(scenario: HomeSampleState) = update(mutableState.value.copy(scenario = scenario, endedAtMillis = null))
+    fun selectScenario(scenario: HomeSampleState) = update(mutableState.value.copy(scenario = scenario, endedAtMillis = null, previewing = true))
+
+    /** Leaves the review scenarios: Home shows the real cycle (or the real empty state) again. */
+    fun showRealData() = update(mutableState.value.copy(previewing = false))
 
     fun createQuota(amountBytes: Long, name: String, nowMillis: Long = System.currentTimeMillis()) {
         require(amountBytes >= QuotaUnit.MB.bytes)
@@ -64,6 +70,7 @@ class QuotaDemoViewModel @Inject constructor(private val saved: SavedStateHandle
         saved["quotaName"] = state.name
         saved["startedAt"] = state.startedAtMillis
         saved["endedAt"] = state.endedAtMillis
+        saved["previewing"] = state.previewing
         mutableState.value = state
     }
 }

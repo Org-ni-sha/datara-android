@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.components.*
 import com.capstone.datara.ui.notifications.NotificationBell
@@ -24,37 +25,44 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
     onSelectScenario: (HomeSampleState) -> Unit, onSignOut: () -> Unit,
     modifier: Modifier = Modifier, onViewQuota: () -> Unit = {}, onHistory: () -> Unit = {},
     onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {},
-    onTrackingSetup: () -> Unit = {}, live: QuotaDetailsModel? = null) {
-    var info by remember { mutableStateOf<String?>(null) }
-    // A real cycle (and its on-device forecast) replaces the sample hero; Preview options apply otherwise
-    val hero = live?.let(HeroContent::live) ?: HeroContent.sample(state)
-    val empty = hero.empty
+    onTrackingSetup: () -> Unit = {}, live: QuotaDetailsModel? = null, liveLoading: Boolean = false,
+    trackingIssue: TrackingIssue? = null, week: HomeWeek? = null, onShowRealData: () -> Unit = {}) {
+    var showInfo by remember { mutableStateOf(false) }
+    val hero = HeroContent.select(state, live, liveLoading, trackingIssue)
     Scaffold(modifier, containerColor = MaterialTheme.colorScheme.background,
         topBar = { DataraAppBar("DATAra", actions = {
             NotificationBell(unreadCount, onNotifications)
-            PreviewMenu(HomeSampleState.entries.map { option -> option.label to { onSelectScenario(option) } })
+            // Review tool for the defense screens; removed before the freeze
+            PreviewMenu(listOf("Show my real quota" to onShowRealData) +
+                HomeSampleState.entries.map { option -> "Sample: ${option.label}" to { onSelectScenario(option) } })
         }) }, bottomBar = { QuotaBottomBar(false, {}, onHistory, onSettings) }) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            .padding(horizontal = 20.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            if (state.previewing) {
+                StatusPill("Sample screen · Preview options", StatusTone.NEUTRAL)
+            }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Your mobile usage", style = MaterialTheme.typography.headlineMedium)
                 Text("Forecasting against your chosen quota.", style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             ForecastHero(hero, onCreateQuota, onAccess = onTrackingSetup, onViewQuota = onViewQuota)
-            if (!empty) {
-                if (hero.isLive || state.scenario == HomeSampleState.FORECAST_AVAILABLE || state.scenario == HomeSampleState.QUOTA_REACHED) {
-                    HomeUsageTrend()
-                } else {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            if (hero.loading) {
+                // Nothing more until the cycle is known
+            } else if (!hero.empty) {
+                if (hero.missing || hero.hideUsage) {
+                    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                         ListItem(leadingContent = { TonalIcon(DataraIcons.Data) },
-                            headlineContent = { Text(if (state.scenario == HomeSampleState.MISSING_PERMISSION) "Usage unavailable" else "Usage trend pending") },
-                            supportingContent = { Text(if (state.scenario == HomeSampleState.MISSING_PERMISSION) "Restore access to read mobile usage." else "Your trend will appear after usage readings are collected.") })
+                            headlineContent = { Text(if (hero.missing) "Usage unavailable" else "Usage trend pending") },
+                            supportingContent = { Text(if (hero.missing) "Turn on Usage Access to read mobile usage." else "Your trend appears once usage has been measured.") },
+                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface))
                     }
+                } else {
+                    HomeUsageTrend(week, onHistory)
                 }
             } else {
                 SectionTitle("How tracking works")
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     listOf(Triple(DataraIcons.Plus, "Choose your quota", "An amount in MB or GB, just for you."),
                         Triple(DataraIcons.Data, "Follow your usage", "Mobile uploads and downloads count."),
                         Triple(DataraIcons.Clock, "Look a little ahead", "See when you’re likely to reach it.")).forEach { (icon, title, description) ->
@@ -64,18 +72,14 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                SampleLabel(if (hero.isLive) "Live forecast · Chart is sample" else "Sample data")
-                TextButton(onClick = { info = "What counts?" }) {
-                    Icon(DataraIcons.Shield, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("What counts?")
-                }
+            TextButton(onClick = { showInfo = true }, modifier = Modifier.align(Alignment.End)) {
+                Icon(DataraIcons.Shield, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("What counts?")
             }
         }
     }
-    info?.let { title -> AlertDialog(onDismissRequest = { info = null }, title = { Text(title) },
-        text = { Text("Your quota counts mobile uploads and downloads on this device, including promo freebies. Wi-Fi is excluded. It does not represent your carrier balance or block internet access. The forecast is calculated on this device; the 7-day chart is still sample data.") },
-        confirmButton = { TextButton(onClick = { info = null }) { Text("Got it") } },
-        dismissButton = { TextButton(onClick = { info = null }) { Text("Close") } }) }
+    if (showInfo) AlertDialog(onDismissRequest = { showInfo = false }, title = { Text("What counts?") },
+        text = { Text("Mobile uploads and downloads on this phone, including promo freebies. Wi-Fi doesn’t count. Your quota isn’t your carrier balance, and DATAra never blocks your internet. The forecast is calculated on this phone.") },
+        confirmButton = { TextButton(onClick = { showInfo = false }) { Text("Got it") } })
 }
 
 /** What the forecast hero shows: a real cycle with its live forecast, or a labelled sample. */
@@ -94,10 +98,32 @@ internal data class HeroContent(
     val usedBytes: Long,
     val remainingBytes: Long,
     val progress: Float,
-    val isLive: Boolean
+    val isLive: Boolean,
+    /** Shown as a warning banner inside the hero, with "Fix tracking". */
+    val issue: TrackingIssue? = null,
+    val loading: Boolean = false
 ) {
     companion object {
+        /**
+         * A Preview options scenario while one is picked; otherwise the real cycle (loading,
+         * live, or the real empty state). A real cycle never shows sample data by default.
+         */
+        fun select(state: HomeUiState, live: QuotaDetailsModel?, liveLoading: Boolean, issue: TrackingIssue?): HeroContent = when {
+            state.previewing -> sample(state)
+            liveLoading -> LOADING
+            live != null -> live(live, issue)
+            else -> sample(HomeUiState())
+        }
+
+        val LOADING = HeroContent(empty = false, reached = false, ended = false, missing = false, hideUsage = true,
+            label = "LOADING", headline = "Loading your quota…", body = "", name = "", amountBytes = 0, usedBytes = 0,
+            remainingBytes = 0, progress = 0f, isLive = false, loading = true)
+
         fun sample(state: HomeUiState): HeroContent {
+            if (state.scenario == HomeSampleState.LOADING) return LOADING
+            if (state.scenario == HomeSampleState.TRACKING_OFF && !state.isEnded) {
+                return sample(state.copy(scenario = HomeSampleState.FORECAST_AVAILABLE)).copy(issue = TrackingIssue.SERVICE_STOPPED)
+            }
             val empty = state.scenario == HomeSampleState.NO_QUOTA
             val reached = state.scenario == HomeSampleState.QUOTA_REACHED
             val missing = state.scenario == HomeSampleState.MISSING_PERMISSION
@@ -134,7 +160,7 @@ internal data class HeroContent(
         }
 
         /** A real cycle (D3) and its on-device forecast (D6). */
-        fun live(details: QuotaDetailsModel): HeroContent {
+        fun live(details: QuotaDetailsModel, issue: TrackingIssue? = null): HeroContent {
             val forecast = details.forecast
             return HeroContent(
                 empty = false, reached = details.isReached, ended = details.isEnded, missing = false, hideUsage = false,
@@ -154,7 +180,8 @@ internal data class HeroContent(
                     else -> forecast?.body ?: "The forecast is calculated on this device from your measured usage."
                 },
                 name = details.name, amountBytes = details.quotaBytes, usedBytes = details.usedBytes ?: 0,
-                remainingBytes = details.remainingBytes ?: 0, progress = details.progress, isLive = true
+                remainingBytes = details.remainingBytes ?: 0, progress = details.progress, isLive = true,
+                issue = issue.takeIf { !details.isEnded && !details.isReached }
             )
         }
     }
@@ -167,10 +194,19 @@ private fun ForecastHero(hero: HeroContent, onCreate: () -> Unit, onAccess: () -
     val statusColor = if (missing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
     Card(shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        if (hero.loading) {
+            Column(Modifier.fillMaxWidth().padding(20.dp).semantics(mergeDescendants = true) {},
+                verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.tertiary)
+                Text(hero.headline, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            return@Card
+        }
         Column(Modifier.fillMaxWidth().animateContentSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            hero.issue?.let { TrackingBanner(it, onAccess) }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TonalIcon(if (empty) DataraIcons.Plus else if (missing) DataraIcons.Shield else DataraIcons.Clock, positive = !missing)
-                Text(hero.label, style = MaterialTheme.typography.labelLarge, color = statusColor)
+                Text(hero.label, style = MaterialTheme.typography.labelLarge, color = statusColor, modifier = Modifier.weight(1f))
             }
             Text(hero.headline, style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onSurface)
             Surface(color = if (missing) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainerLow,
@@ -227,6 +263,25 @@ private fun QuotaMetric(value: String, label: String, modifier: Modifier) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(value, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+        }
+    }
+}
+
+/** M3-style warning banner: what is wrong with tracking and one action to fix it. */
+@Composable
+private fun TrackingBanner(issue: TrackingIssue, onFix: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(DataraIcons.Shield, null, modifier = Modifier.size(20.dp))
+                Text(issue.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { heading() })
+            }
+            Text(issue.body, style = MaterialTheme.typography.bodyMedium)
+            Button(onClick = onFix, modifier = Modifier.heightIn(min = 48.dp), shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError)) {
+                Text("Fix tracking")
+            }
         }
     }
 }
