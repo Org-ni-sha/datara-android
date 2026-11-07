@@ -301,8 +301,8 @@ Promo/expiry cards and live network badges are not part of the current UI. Signa
 #### Phase D9: Profile, Settings & Developer ML Diagnostics Screen
 - [x] Settings/Profile UI: display name loaded from and saved to `public.users.name` (with the `@username` shown read-only), notification switches (persisted in Room since D8), simulated sync states, Usage Access guidance, version/privacy information and signed-in email.
 - [x] Confirmed sign-out through existing Supabase Auth, pending/error handling and navigation only after success.
-- [ ] Persist profile name and preferences; connect actual permission/status checks and cloud sync. No phone field is required by the current UI.
-- [ ] **Developer ML Diagnostics Screen (Hidden):** gated behind a secret gesture; expose active model mode, MAE/RMSE/R², inputs and latency only when the real pipeline exists.
+- [x] Persist profile name and preferences; connect actual permission/status checks (tracking service, Usage Access, notifications, battery optimization). Simulated sync states removed: Settings says "Not synced yet" until C3. No phone field is required by the current UI.
+- [x] **Developer ML Diagnostics Screen (Hidden):** tap the version in Settings 7 times. Shows the active model and why (hours learned vs 168, recent Global/Local MAE, the 5% rule), the latest forecast for both models, the 12 inputs, ONNX latency, model metadata, telemetry health and the last 24 forecasts. See [diagnostics](docs/diagnostics.md). RMSE/R² are offline evaluation numbers (B4/E3), not on-device.
 
 
 ---

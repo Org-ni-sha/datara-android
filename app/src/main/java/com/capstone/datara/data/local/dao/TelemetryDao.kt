@@ -41,6 +41,12 @@ interface TelemetryDao {
     @Query("SELECT * FROM usage_samples WHERE interval_end >= :from AND interval_end < :until ORDER BY rowid")
     suspend fun samplesEndingIn(from: Long, until: Long): List<UsageSampleEntity>
 
+    @Query("SELECT MAX(interval_end) FROM usage_samples")
+    suspend fun latestSampleEnd(): Long?
+
+    @Query("SELECT COUNT(*) FROM usage_samples WHERE interval_end >= :from")
+    suspend fun countSamplesEndingSince(from: Long): Int
+
     @Query("SELECT MIN(interval_end) FROM usage_samples")
     suspend fun earliestSampleEnd(): Long?
 
@@ -64,6 +70,9 @@ interface TelemetryDao {
         if (readings.isNotEmpty()) insertReadings(readings)
         upsertDurableCheckpoint(checkpoint)
     }
+
+    @Query("SELECT MAX(until) FROM durable_readings")
+    suspend fun latestReadingUntil(): Long?
 
     /** The most recent [limit] readings, oldest first. */
     @Query("SELECT * FROM durable_readings WHERE rowid IN (SELECT rowid FROM durable_readings ORDER BY rowid DESC LIMIT :limit) ORDER BY rowid")
