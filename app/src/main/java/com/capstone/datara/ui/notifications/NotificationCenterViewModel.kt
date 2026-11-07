@@ -28,7 +28,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class AlertCategory(val label: String) { QUOTA("Quota milestone"), FORECAST("Forecast"), INFO("Quota reached") }
+/** [label] is the small tag on an inbox row; the title already says what happened, so it names the kind of alert. */
+enum class AlertCategory(val label: String) { QUOTA("Usage milestone"), FORECAST("Forecast alert"), REACHED("Usage milestone") }
 
 /** One inbox row. [cycleId] opens the cycle's details; null for an alert without a cycle. */
 data class AlertItem(val id: String, val title: String, val message: String,
@@ -90,7 +91,7 @@ class NotificationCenterViewModel @Inject constructor(
             message = row.message,
             category = when (row.notificationType) {
                 in AlertRules.FORECASTS -> AlertCategory.FORECAST
-                NotificationType.QUOTA_REACHED -> AlertCategory.INFO
+                NotificationType.QUOTA_REACHED -> AlertCategory.REACHED
                 else -> AlertCategory.QUOTA
             },
             receivedAtMillis = row.sentAt,

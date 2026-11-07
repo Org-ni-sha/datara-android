@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -610,15 +611,21 @@ private fun LoginForm(
     DataraFieldLabel(
         label = "Password",
         trailingContent = {
-            Text(
-                text = "Forgot password?",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+            // 48dp touch target around the short link text (accessibility minimum)
+            Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
                     .clickable(role = Role.Button, onClick = onForgotPasswordClick)
-                    .padding(horizontal = 4.dp, vertical = 8.dp)
-            )
+                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                    .padding(horizontal = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Forgot password?",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     )
     Spacer(Modifier.height(8.dp))

@@ -106,8 +106,8 @@ private fun HistoryContent(state: HistoryUiState, onHome: () -> Unit, onSettings
                     }
                     if (window == HistoryWindow.CYCLE) {
                         if (cycle == null) HistoryCard {
-                            Text("No quota cycles yet", style = MaterialTheme.typography.titleMedium)
-                            Text("Create a quota on Home to see its usage here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("No quota yet", style = MaterialTheme.typography.titleMedium)
+                            Text("Set a quota on Home. Its daily usage will show here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         } else {
                             Box {
                                 OutlinedButton(onClick = { cycleMenu = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
@@ -133,7 +133,7 @@ private fun HistoryContent(state: HistoryUiState, onHome: () -> Unit, onSettings
         }
     }
     if (readings && snapshot != null) ModalBottomSheet(onDismissRequest = { readings = false }, containerColor = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.fillMaxWidth().fillMaxHeight(0.8f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 12.dp),
+        Column(Modifier.fillMaxWidth().fillMaxHeight(0.8f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionTitle("Exact readings", if (window == HistoryWindow.DAY) "Hourly mobile usage" else "Daily mobile usage")
             snapshot.points.forEach { point ->
@@ -161,7 +161,7 @@ private fun CollectingNote(hours: Int) {
 private fun TotalCard(snapshot: HistorySnapshot, window: HistoryWindow) {
     Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface)) {
-        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("MOBILE DATA USED", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
                 Icon(DataraIcons.Data, null)
@@ -179,12 +179,13 @@ private fun TotalCard(snapshot: HistorySnapshot, window: HistoryWindow) {
 
 @Composable
 private fun TrendCard(snapshot: HistorySnapshot, window: HistoryWindow, onReadings: () -> Unit) {
+    val unit = remember(snapshot) { chartUnit(snapshot.points) }
     HistoryCard {
-        SectionTitle("Usage trend", if (window == HistoryWindow.DAY) "Hourly totals · MB" else "Daily totals · MB")
+        SectionTitle("Usage trend", "${if (window == HistoryWindow.DAY) "Hourly" else "Daily"} totals · ${unit.name}")
         if (snapshot.points.isNotEmpty() && window != HistoryWindow.DAY) Text("${snapshot.points.first().label} – ${snapshot.points.last().label}",
             style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (snapshot.hasData) {
-            UsageChart(snapshot.points, window)
+            UsageChart(snapshot.points, window, unit)
             if (snapshot.points.any { !it.isMeasured }) Text("Blank spaces are periods that were not measured, not zero usage.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else Text("No measured usage in this period yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -228,6 +229,13 @@ private fun PetComparisonText(pet: PetComparison) {
     }
 }
 
+/**
+ * The chart's unit: GB once any reading reaches 1 GB, matching formatQuotaData, so the axis and
+ * the totals above it use the same unit.
+ */
+internal fun chartUnit(points: List<UsagePoint>): QuotaUnit =
+    if (points.any { (it.bytes ?: 0L) >= QuotaUnit.GB.bytes }) QuotaUnit.GB else QuotaUnit.MB
+
 internal fun petErrorText(errorMillis: Long): String = when {
     kotlin.math.abs(errorMillis) < 60_000 -> "On time"
     errorMillis > 0 -> "${formatDuration(errorMillis)} later than predicted"
@@ -236,7 +244,7 @@ internal fun petErrorText(errorMillis: Long): String = when {
 
 @Composable
 private fun CycleCard(item: CycleHistory, onClick: () -> Unit) {
-    Card(onClick = onClick, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+    Card(onClick = onClick, shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         ListItem(leadingContent = { TonalIcon(DataraIcons.History, positive = item.cycle.endedAt == null) },
             headlineContent = { Text(item.name, style = MaterialTheme.typography.titleMedium) },
             supportingContent = { Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -249,23 +257,23 @@ private fun CycleCard(item: CycleHistory, onClick: () -> Unit) {
 }
 
 @Composable
-private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow) {
+private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow, unit: QuotaUnit) {
     // Unmeasured periods get no x value, so they render as blank space rather than zero-height bars
     val measured = remember(points) { points.withIndex().filter { it.value.isMeasured } }
-    val model = remember(measured) {
+    val model = remember(measured, unit) {
         CartesianChartModel(ColumnCartesianLayerModel.build {
-            series(x = measured.map { it.index }, y = measured.map { it.value.bytes!! / 1_000_000.0 })
+            series(x = measured.map { it.index }, y = measured.map { it.value.bytes!!.toDouble() / unit.bytes })
         })
     }
-    val description = remember(points) {
-        "Mobile usage chart in MB, ${measured.size} of ${points.size} periods measured. Exact readings are available below."
+    val description = remember(points, unit) {
+        "Mobile usage chart in ${unit.name}, ${measured.size} of ${points.size} periods measured. Exact readings are available below."
     }
     CartesianChartHost(
         chart = rememberCartesianChart(
             rememberColumnCartesianLayer(columnProvider = ColumnCartesianLayer.ColumnProvider.series(
                 rememberLineComponent(fill = Fill(MaterialTheme.colorScheme.tertiary), thickness = if (window == HistoryWindow.DAY) 6.dp else 12.dp)),
                 rangeProvider = remember(points.size) { CartesianLayerRangeProvider.fixed(minX = 0.0, maxX = (points.size - 1).toDouble(), minY = 0.0) }),
-            startAxis = VerticalAxis.rememberStart(valueFormatter = CartesianValueFormatter.decimal(suffix = " MB")),
+            startAxis = VerticalAxis.rememberStart(valueFormatter = remember(unit) { CartesianValueFormatter.decimal(suffix = " ${unit.name}") }),
             bottomAxis = HorizontalAxis.rememberBottom(
                 valueFormatter = CartesianValueFormatter { _, value, _ ->
                     points.getOrNull(value.toInt())?.label?.let {

@@ -3,6 +3,7 @@ package com.capstone.datara.ui.profile
 import androidx.compose.foundation.layout.*
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.foundation.rememberScrollState
@@ -40,15 +41,16 @@ fun ProfileScreen(profile: ProfileUiState, email: String?, onBack: () -> Unit,
             topBar = { DataraAppBar("Profile", onBack) }, bottomBar = {
                 Column {
                     Surface(color = MaterialTheme.colorScheme.background) {
-                        Box(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) { DataraActionButton(if (profile.isSaving) "Saving…" else "Save name", { if (!profile.isSaving) save() }) }
+                        Box(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) { DataraActionButton(if (profile.isSaving) "Saving…" else "Save name", { save() }, enabled = !profile.isSaving) }
                     }
                     bottomBar()
                 }
             }) { insets ->
             Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                if (profile.isLoading) LinearProgressIndicator(Modifier.fillMaxWidth().semantics { contentDescription = "Loading your profile" })
+                Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
                             Box(Modifier.size(68.dp), contentAlignment = Alignment.Center) {
                                 if (displayName.isBlank()) Icon(DataraIcons.Person, null, modifier = Modifier.size(32.dp))
@@ -68,10 +70,10 @@ fun ProfileScreen(profile: ProfileUiState, email: String?, onBack: () -> Unit,
                     singleLine = true, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
                     supportingText = { Text(error ?: "${DisplayNameValidator.MIN_LENGTH} to ${DisplayNameValidator.MAX_LENGTH} characters") },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { save() }))
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    keyboardActions = KeyboardActions(onDone = { if (!profile.isSaving) save() }))
+                Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     ListItem(leadingContent = { TonalIcon(DataraIcons.Email) }, headlineContent = { Text(email ?: "Email unavailable") },
-                        overlineContent = { Text("ACCOUNT EMAIL") }, supportingContent = { Text("Your sign-in email is read-only here.") })
+                        overlineContent = { Text("Sign-in email") }, supportingContent = { Text("This is the email you sign in with. It can’t be changed here.") })
                 }
                 if (profile.loadFailed) {
                     Text("Couldn’t load your saved name. Check your connection; you can still set a new one.",
