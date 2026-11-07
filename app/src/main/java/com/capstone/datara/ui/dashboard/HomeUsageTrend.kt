@@ -11,15 +11,27 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.capstone.datara.ui.history.*
+import java.time.format.DateTimeFormatter
 import com.capstone.datara.ui.quota.formatQuotaData
 import java.time.LocalDate
 
-/** Independent History fixture, never presented as readings from the current quota. */
+private data class SamplePoint(val label: String, val bytes: Long)
+private class SampleWeek(val points: List<SamplePoint>) { val totalBytes get() = points.sumOf { it.bytes } }
+
+/** Fixed proportions of 4 GB over the last 7 days; Home's trend stays a sample until D5. */
+private fun sampleWeek(today: LocalDate): SampleWeek {
+    val weights = listOf(10, 12, 18, 9, 16, 20, 15)
+    val unit = 4_000_000_000L / weights.sum()
+    return SampleWeek(weights.mapIndexed { i, w ->
+        SamplePoint(today.minusDays(6L - i).format(DateTimeFormatter.ofPattern("MMM d")), unit * w)
+    })
+}
+
+/** Independent fixture, never presented as readings from the current quota. */
 @Composable
 internal fun HomeUsageTrend() {
     val today = remember { LocalDate.now() }
-    val snapshot = remember(today) { historySnapshot(HistoryWindow.WEEK, historyCycles(today).first(), today) }
+    val snapshot = remember(today) { sampleWeek(today) }
     val line = MaterialTheme.colorScheme.tertiary
     val bar = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.72f)
     val grid = MaterialTheme.colorScheme.outlineVariant

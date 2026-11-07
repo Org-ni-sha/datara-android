@@ -285,7 +285,7 @@ Promo/expiry cards and live network badges are not part of the current UI. Signa
 #### Phase D7: Usage History & Analytics (Vico Charts)
 - [x] Vico Compose 3.3.1 through the version catalog.
 - [x] History UI with independent sample data: 24-hour, 7-day and quota-cycle filters, total/average and peak interval, exact-readings sheet, empty preview and read-only past-cycle details.
-- [ ] Connect charts and cycle details to durable measured usage and quota history. Home actions do not currently create History entries.
+- [x] Connect charts and cycle details to durable measured usage and quota history. *(2026-11-07: `HistoryViewModel` reads this device's cycles, the `durable_readings` through the forecast's `HourlyUsage` rule and the `forecasts` log. Unmeasured hours are gaps, not zeros; totals count measured hours; reached cycles compare the forecast made about a day earlier with the actual reach. Sample fixtures and the preview toggle are gone. Checked on a POCO F3. See [history](docs/history.md).)*
 
 #### Phase D8: Proactive Alerts & Notification System
 *Production delivery depends on D4 measurements/access and D6 forecasts.*

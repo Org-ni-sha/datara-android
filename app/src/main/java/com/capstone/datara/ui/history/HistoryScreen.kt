@@ -3,27 +3,27 @@ package com.capstone.datara.ui.history
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.capstone.datara.ui.auth.components.DataraIcons
+import com.capstone.datara.ui.components.*
+import com.capstone.datara.ui.notifications.NotificationBell
 import com.capstone.datara.ui.quota.*
 import com.capstone.datara.ui.theme.QuotaTheme
-import com.capstone.datara.ui.components.*
-import com.capstone.datara.ui.auth.components.DataraIcons
-import com.capstone.datara.ui.notifications.NotificationBell
-import androidx.compose.ui.Alignment
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModel
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianLayerRangeProvider
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.compose.cartesian.data.ColumnCartesianLayerModel
 import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
@@ -33,123 +33,115 @@ import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import com.patrykandpatrick.vico.compose.common.Fill
 import com.patrykandpatrick.vico.compose.common.ProvideVicoTheme
-import com.patrykandpatrick.vico.compose.common.vicoTheme
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
-import java.time.LocalDate
+import com.patrykandpatrick.vico.compose.common.vicoTheme
+import java.time.ZoneId
 
+/** History over durable data (D7); see [HistoryViewModel]. */
 @Composable
 fun HistoryScreen(onHome: () -> Unit, onSettings: () -> Unit, modifier: Modifier = Modifier,
-    onNotifications: () -> Unit = {}, unreadCount: Int = 0) {
+    onNotifications: () -> Unit = {}, unreadCount: Int = 0, viewModel: HistoryViewModel = hiltViewModel()) {
+    val state by viewModel.state.collectAsState()
+    HistoryScreen(state, onHome, onSettings, modifier, onNotifications, unreadCount)
+}
+
+@Composable
+fun HistoryScreen(state: HistoryUiState, onHome: () -> Unit, onSettings: () -> Unit, modifier: Modifier = Modifier,
+    onNotifications: () -> Unit = {}, unreadCount: Int = 0, zone: ZoneId = ZoneId.systemDefault()) {
     QuotaTheme {
         ProvideVicoTheme(vicoTheme.copy(lineColor = MaterialTheme.colorScheme.outlineVariant,
             textColor = MaterialTheme.colorScheme.onSurfaceVariant,
             columnCartesianLayerColors = listOf(MaterialTheme.colorScheme.tertiary))) {
-            HistoryContent(onHome, onSettings, modifier, onNotifications, unreadCount)
+            HistoryContent(state, onHome, onSettings, modifier, onNotifications, unreadCount, zone)
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HistoryContent(onHome: () -> Unit, onSettings: () -> Unit, modifier: Modifier,
-    onNotifications: () -> Unit, unreadCount: Int) {
-    val today = remember { LocalDate.now() }
-    val cycles = remember(today) { historyCycles(today) }
+private fun HistoryContent(state: HistoryUiState, onHome: () -> Unit, onSettings: () -> Unit, modifier: Modifier,
+    onNotifications: () -> Unit, unreadCount: Int, zone: ZoneId) {
+    val data = (state as? HistoryUiState.Ready)?.data
     var windowName by rememberSaveable { mutableStateOf(HistoryWindow.WEEK.name) }
-    var cycleId by rememberSaveable { mutableStateOf(cycles.first().id) }
+    var cycleId by rememberSaveable { mutableStateOf<String?>(null) }
     var detailsId by rememberSaveable { mutableStateOf<String?>(null) }
-    var empty by rememberSaveable { mutableStateOf(false) }
     var readings by rememberSaveable { mutableStateOf(false) }
     var cycleMenu by remember { mutableStateOf(false) }
     val window = HistoryWindow.valueOf(windowName)
-    val cycle = cycles.first { it.id == cycleId }
-    val snapshot = remember(window, cycle, today) { historySnapshot(window, cycle, today) }
-    val selected = cycles.firstOrNull { it.id == detailsId }
+    val cycle = data?.cycles?.let { list -> list.firstOrNull { it.cycle.cycleId == cycleId } ?: list.firstOrNull() }
+    val snapshot = remember(window, data, cycle, zone) { data?.let { HistoryAggregation.snapshot(window, it, cycle, zone) } }
+    val selected = data?.cycles?.firstOrNull { it.cycle.cycleId == detailsId }
     BackHandler(selected != null) { detailsId = null }
     if (selected != null) {
-        QuotaDetailsScreen(selected.state, onBack = { detailsId = null }, onEndCycle = {}, onCreateQuota = {}, readOnly = true)
+        QuotaDetailsScreen(selected.toDetails(), onBack = { detailsId = null }, onEndCycle = {}, onCreateQuota = {},
+            readOnly = true, readOnlyNote = "From History · Read-only details")
         return
     }
     Scaffold(modifier = modifier, containerColor = MaterialTheme.colorScheme.background,
-        topBar = { DataraAppBar("History", actions = {
-            NotificationBell(unreadCount, onNotifications)
-            PreviewMenu(listOf((if (empty) "Show sample history" else "Preview empty history") to { empty = !empty }))
-        }) }, bottomBar = { QuotaBottomBar(true, onHome, {}, onSettings) }) { insets ->
+        topBar = { DataraAppBar("History", actions = { NotificationBell(unreadCount, onNotifications) }) },
+        bottomBar = { QuotaBottomBar(true, onHome, {}, onSettings) }) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            SectionTitle("Usage history", "Review mobile usage over time.")
-            if (empty) {
-                HistoryCard {
+            SectionTitle("Usage history", "Mobile data measured on this phone.")
+            when {
+                data == null -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.semantics { contentDescription = "Loading history" })
+                }
+                data.isEmpty -> HistoryCard {
                     TonalIcon(DataraIcons.History, positive = true)
                     Text("No usage history yet", style = MaterialTheme.typography.headlineLarge)
-                    Text("Usage trends and completed cycles will appear here once tracking is connected.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("History fills in from tracked mobile usage, one hour at a time. Make sure tracking is on, then check back in an hour.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                     DataraActionButton("Go to Home", onHome)
                 }
-            } else {
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    HistoryWindow.entries.forEachIndexed { index, option ->
-                        SegmentedButton(selected = window == option, onClick = { windowName = option.name; readings = false },
-                            shape = SegmentedButtonDefaults.itemShape(index, HistoryWindow.entries.size), icon = {}) {
-                            Text(option.label, style = MaterialTheme.typography.labelLarge)
+                else -> {
+                    if (data.measuredHours < 24) CollectingNote(data.measuredHours)
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        HistoryWindow.entries.forEachIndexed { index, option ->
+                            SegmentedButton(selected = window == option, onClick = { windowName = option.name; readings = false },
+                                shape = SegmentedButtonDefaults.itemShape(index, HistoryWindow.entries.size), icon = {}) {
+                                Text(option.label, style = MaterialTheme.typography.labelLarge)
+                            }
                         }
                     }
-                }
-                if (window == HistoryWindow.CYCLE) Box {
-                    OutlinedButton(onClick = { cycleMenu = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
-                        Text(cycle.state.name); Spacer(Modifier.width(12.dp)); Icon(DataraIcons.Chevron, null, modifier = Modifier.size(16.dp))
-                    }
-                    DropdownMenu(cycleMenu, onDismissRequest = { cycleMenu = false }) {
-                        cycles.forEach { item -> DropdownMenuItem(text = { Text(item.state.name) }, onClick = { cycleId = item.id; cycleMenu = false }) }
-                    }
-                }
-                Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface)) {
-                    Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("MOBILE DATA USED", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-                            Icon(DataraIcons.Data, null)
-                        }
-                        Text(formatQuotaData(snapshot.totalBytes), style = MaterialTheme.typography.displayLarge)
-                        Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
-                            Text("${formatQuotaData(snapshot.averageDailyBytes)} average per day", modifier = Modifier.fillMaxWidth().padding(14.dp), style = MaterialTheme.typography.bodyMedium)
+                    if (window == HistoryWindow.CYCLE) {
+                        if (cycle == null) HistoryCard {
+                            Text("No quota cycles yet", style = MaterialTheme.typography.titleMedium)
+                            Text("Create a quota on Home to see its usage here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else {
+                            Box {
+                                OutlinedButton(onClick = { cycleMenu = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+                                    Text(cycle.name, modifier = Modifier.weight(1f, fill = false))
+                                    Spacer(Modifier.width(12.dp)); Icon(DataraIcons.Chevron, null, modifier = Modifier.size(16.dp))
+                                }
+                                DropdownMenu(cycleMenu, onDismissRequest = { cycleMenu = false }) {
+                                    data.cycles.forEach { item -> DropdownMenuItem(text = { Text("${item.name} · ${formatCycleDate(item.cycle.startAt)}") },
+                                        onClick = { cycleId = item.cycle.cycleId; cycleMenu = false }) }
+                                }
+                            }
+                            CycleSummary(cycle)
                         }
                     }
-                }
-                HistoryCard {
-                    SectionTitle("Usage trend", if (window == HistoryWindow.DAY) "4-hour totals · MB" else "Daily totals · MB")
-                    if (window != HistoryWindow.DAY) Text("${snapshot.points.first().label} – ${snapshot.points.last().label}",
-                        style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    UsageChart(snapshot.points, window)
-                    snapshot.peak?.let {
-                        ListItem(leadingContent = { TonalIcon(DataraIcons.Data, positive = true) },
-                            headlineContent = { Text("Peak ${if (window == HistoryWindow.DAY) "hour" else "day"}: ${it.label}") },
-                            supportingContent = { Text(formatQuotaData(it.bytes)) })
+                    if (snapshot != null && !(window == HistoryWindow.CYCLE && cycle == null)) {
+                        TotalCard(snapshot, window)
+                        TrendCard(snapshot, window) { readings = true }
                     }
-                    TextButton(onClick = { readings = true }) {
-                        Text("View exact readings"); Spacer(Modifier.width(8.dp)); Icon(DataraIcons.ArrowForward, null, modifier = Modifier.size(16.dp))
-                    }
-                }
-                SectionTitle("Past quota cycles", "Completed sample cycles")
-                cycles.forEach { item ->
-                    Card(onClick = { detailsId = item.id }, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                        ListItem(leadingContent = { TonalIcon(DataraIcons.History) },
-                            headlineContent = { Text(item.state.name, style = MaterialTheme.typography.titleMedium) },
-                            supportingContent = { Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(if (item.state.scenario == HomeSampleState.QUOTA_REACHED) "Quota reached" else "Ended early")
-                                Text("${formatQuotaData(item.state.usedBytes)} of ${formatQuotaData(item.state.amountBytes)} used")
-                            } }, trailingContent = { Icon(DataraIcons.Chevron, null, modifier = Modifier.size(18.dp)) },
-                            modifier = Modifier.padding(vertical = 6.dp))
-                    }
+                    SectionTitle("Quota cycles", if (data.cycles.isEmpty()) "No cycles yet" else "Tap a cycle for its details")
+                    data.cycles.forEach { item -> CycleCard(item) { detailsId = item.cycle.cycleId } }
                 }
             }
-            SampleLabel("Illustrative history")
         }
     }
-    if (readings) ModalBottomSheet(onDismissRequest = { readings = false }, containerColor = MaterialTheme.colorScheme.surface) {
+    if (readings && snapshot != null) ModalBottomSheet(onDismissRequest = { readings = false }, containerColor = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.8f).verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionTitle("Exact readings", if (window == HistoryWindow.DAY) "Hourly sample usage" else "Daily sample usage")
-            snapshot.points.forEach { point -> ListItem(headlineContent = { Text(point.label) }, trailingContent = { Text(formatQuotaData(point.bytes)) }) }
+            SectionTitle("Exact readings", if (window == HistoryWindow.DAY) "Hourly mobile usage" else "Daily mobile usage")
+            snapshot.points.forEach { point ->
+                ListItem(headlineContent = { Text(point.label) },
+                    supportingContent = if (point.isPartial) ({ Text("${point.measuredHours} of ${point.totalHours} hours measured") }) else null,
+                    trailingContent = { Text(point.bytes?.let(::formatQuotaData) ?: "Not measured",
+                        color = if (point.isMeasured) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant) })
+            }
             TextButton(onClick = { readings = false }) { Text("Close") }
             Spacer(Modifier.navigationBarsPadding())
         }
@@ -157,24 +149,135 @@ private fun HistoryContent(onHome: () -> Unit, onSettings: () -> Unit, modifier:
 }
 
 @Composable
-private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow) {
-    val displayed = remember(points, window) {
-        if (window == HistoryWindow.DAY) points.chunked(4).map { group -> UsagePoint(group.first().label, group.sumOf { it.bytes }) }
-        else points
+private fun CollectingNote(hours: Int) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
+        Text(if (hours == 0) "Collecting: no complete hour measured yet. Charts fill in as tracking runs."
+            else "Collecting: $hours ${if (hours == 1) "hour" else "hours"} measured so far. Charts fill in as tracking runs.",
+            modifier = Modifier.fillMaxWidth().padding(14.dp), style = MaterialTheme.typography.bodyMedium)
     }
-    val model = remember(displayed) { CartesianChartModel(ColumnCartesianLayerModel.build { series(displayed.map { it.bytes / 1_000_000.0 }) }) }
+}
+
+@Composable
+private fun TotalCard(snapshot: HistorySnapshot, window: HistoryWindow) {
+    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface)) {
+        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("MOBILE DATA USED", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                Icon(DataraIcons.Data, null)
+            }
+            Text(formatQuotaData(snapshot.totalBytes), style = MaterialTheme.typography.displayLarge)
+            if (snapshot.isPartial) Text("Measured ${snapshot.measuredHours} of ${snapshot.totalHours} hours. Totals count measured hours only.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (window != HistoryWindow.DAY && snapshot.hasData) Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
+                Text("${formatQuotaData(snapshot.averageDailyBytes)} average per measured day", modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrendCard(snapshot: HistorySnapshot, window: HistoryWindow, onReadings: () -> Unit) {
+    HistoryCard {
+        SectionTitle("Usage trend", if (window == HistoryWindow.DAY) "Hourly totals · MB" else "Daily totals · MB")
+        if (snapshot.points.isNotEmpty() && window != HistoryWindow.DAY) Text("${snapshot.points.first().label} – ${snapshot.points.last().label}",
+            style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (snapshot.hasData) {
+            UsageChart(snapshot.points, window)
+            if (snapshot.points.any { !it.isMeasured }) Text("Blank spaces are periods that were not measured, not zero usage.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else Text("No measured usage in this period yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        snapshot.peak?.let {
+            ListItem(leadingContent = { TonalIcon(DataraIcons.Data, positive = true) },
+                headlineContent = { Text("Peak ${if (window == HistoryWindow.DAY) "hour" else "day"}: ${it.label}") },
+                supportingContent = { Text(formatQuotaData(it.bytes!!)) })
+        }
+        if (snapshot.points.isNotEmpty()) TextButton(onClick = onReadings) {
+            Text("View exact readings"); Spacer(Modifier.width(8.dp)); Icon(DataraIcons.ArrowForward, null, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun CycleSummary(item: CycleHistory) {
+    val details = item.toDetails()
+    HistoryCard {
+        Text(item.statusLabel.uppercase(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.tertiary)
+        Text("${formatQuotaData(item.usage.usedBytes)} of ${formatQuotaData(item.cycle.quotaBytes)}", style = MaterialTheme.typography.headlineMedium)
+        LinearProgressIndicator(progress = { details.progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(8.dp))
+        Text("${formatCycleDate(item.cycle.startAt)} – ${item.cycle.endedAt?.let(::formatCycleDate) ?: "now"}",
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (item.usage.isIncomplete) Text("Some time in this cycle was not measured, so usage may be higher.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        item.pet?.let { PetComparisonText(it) }
+        if (item.cycle.reachedAt != null && item.pet == null) Text("No forecast was logged before the quota was reached.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun PetComparisonText(pet: PetComparison) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
+        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Forecast vs actual", style = MaterialTheme.typography.titleSmall)
+            Text("Predicted on ${formatCycleDate(pet.predictedAt)}: reach ${formatCycleDate(pet.predictedReachAt)}", style = MaterialTheme.typography.bodyMedium)
+            Text("Reached ${formatCycleDate(pet.reachedAt)}", style = MaterialTheme.typography.bodyMedium)
+            Text(petErrorText(pet.errorMillis), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.tertiary)
+        }
+    }
+}
+
+internal fun petErrorText(errorMillis: Long): String = when {
+    kotlin.math.abs(errorMillis) < 60_000 -> "On time"
+    errorMillis > 0 -> "${formatDuration(errorMillis)} later than predicted"
+    else -> "${formatDuration(-errorMillis)} earlier than predicted"
+}
+
+@Composable
+private fun CycleCard(item: CycleHistory, onClick: () -> Unit) {
+    Card(onClick = onClick, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        ListItem(leadingContent = { TonalIcon(DataraIcons.History, positive = item.cycle.endedAt == null) },
+            headlineContent = { Text(item.name, style = MaterialTheme.typography.titleMedium) },
+            supportingContent = { Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("${item.statusLabel} · started ${formatCycleDate(item.cycle.startAt)}")
+                Text("${formatQuotaData(item.usage.usedBytes)} of ${formatQuotaData(item.cycle.quotaBytes)} used")
+                item.pet?.let { Text("Forecast: ${petErrorText(it.errorMillis)}") }
+            } }, trailingContent = { Icon(DataraIcons.Chevron, null, modifier = Modifier.size(18.dp)) },
+            modifier = Modifier.padding(vertical = 6.dp))
+    }
+}
+
+@Composable
+private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow) {
+    // Unmeasured periods get no x value, so they render as blank space rather than zero-height bars
+    val measured = remember(points) { points.withIndex().filter { it.value.isMeasured } }
+    val model = remember(measured) {
+        CartesianChartModel(ColumnCartesianLayerModel.build {
+            series(x = measured.map { it.index }, y = measured.map { it.value.bytes!! / 1_000_000.0 })
+        })
+    }
+    val description = remember(points) {
+        "Mobile usage chart in MB, ${measured.size} of ${points.size} periods measured. Exact readings are available below."
+    }
     CartesianChartHost(
         chart = rememberCartesianChart(
             rememberColumnCartesianLayer(columnProvider = ColumnCartesianLayer.ColumnProvider.series(
-                rememberLineComponent(fill = Fill(MaterialTheme.colorScheme.tertiary), thickness = 12.dp))),
+                rememberLineComponent(fill = Fill(MaterialTheme.colorScheme.tertiary), thickness = if (window == HistoryWindow.DAY) 6.dp else 12.dp)),
+                rangeProvider = remember(points.size) { CartesianLayerRangeProvider.fixed(minX = 0.0, maxX = (points.size - 1).toDouble(), minY = 0.0) }),
             startAxis = VerticalAxis.rememberStart(valueFormatter = CartesianValueFormatter.decimal(suffix = " MB")),
-            bottomAxis = HorizontalAxis.rememberBottom(valueFormatter = CartesianValueFormatter { _, value, _ ->
-                displayed.getOrNull(value.toInt())?.label?.let {
-                    if (window == HistoryWindow.DAY) it.replace(":00", "h") else it.substringAfterLast(" ")
-                } ?: ""
-            })),
+            bottomAxis = HorizontalAxis.rememberBottom(
+                valueFormatter = CartesianValueFormatter { _, value, _ ->
+                    points.getOrNull(value.toInt())?.label?.let {
+                        if (window == HistoryWindow.DAY) it.substringBefore(":") else it.substringAfterLast(" ")
+                    } ?: ""
+                },
+                itemPlacer = remember(window, points.size) {
+                    HorizontalAxis.ItemPlacer.aligned(spacing = { if (window == HistoryWindow.DAY) 4 else if (points.size > 10) 3 else 1 })
+                }),
+            getXStep = { _, _, _ -> 1.0 }),
         model = model,
-        modifier = Modifier.fillMaxWidth().height(240.dp).semantics { contentDescription = "Mobile usage chart in MB. Exact readings are available below." },
+        modifier = Modifier.fillMaxWidth().height(240.dp).semantics { contentDescription = description },
         scrollState = rememberVicoScrollState(scrollEnabled = false), zoomState = rememberVicoZoomState(zoomEnabled = false))
 }
 
@@ -187,6 +290,7 @@ private fun HistoryCard(content: @Composable ColumnScope.() -> Unit) {
 
 @Preview(widthDp = 360, heightDp = 800)
 @Preview(name = "History large text", widthDp = 360, heightDp = 800, fontScale = 2f)
-@Preview(name = "History landscape", widthDp = 800, heightDp = 360)
 @Composable
-private fun HistoryPreview() { HistoryScreen({}, {}) }
+private fun HistoryEmptyPreview() {
+    HistoryScreen(HistoryUiState.Ready(HistoryData(emptyList(), emptyList(), emptyList(), 0)), {}, {})
+}
