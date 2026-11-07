@@ -208,7 +208,7 @@ class QuotaAlertEngineTest {
         cycle(used = quota, status = CycleStatus.REACHED)
         evaluate()
         val item = NotificationCenterViewModel.toItem(store.rows.value.single())
-        assertEquals(AlertCategory.INFO, item.category)
+        assertEquals(AlertCategory.REACHED, item.category)
         assertFalse(item.isRead)
         assertEquals("c1", item.cycleId)
         store.markAllRead("u1", now)

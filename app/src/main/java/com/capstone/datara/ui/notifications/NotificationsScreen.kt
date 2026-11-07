@@ -74,7 +74,7 @@ private fun NotificationsContent(state: NotificationCenterState, onBack: () -> U
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Your updates", style = MaterialTheme.typography.headlineMedium)
-                    Text(if (state.alerts.isEmpty()) "A quiet moment." else if (state.unreadCount == 0) "You’re all caught up." else "${state.unreadCount} unread ${if (state.unreadCount == 1) "update" else "updates"}",
+                    Text(if (state.isLoading) "Loading…" else if (state.alerts.isEmpty()) "A quiet moment." else if (state.unreadCount == 0) "You’re all caught up." else "${state.unreadCount} unread ${if (state.unreadCount == 1) "update" else "updates"}",
                         style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                     Spacer(Modifier.height(4.dp))
@@ -88,13 +88,18 @@ private fun NotificationsContent(state: NotificationCenterState, onBack: () -> U
                         enabled = state.unreadCount > 0) { Text("Mark all as read") }
                 }
             }
+            if (state.isLoading) item {
+                Box(Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.semantics { contentDescription = "Loading notifications" })
+                }
+            }
             if (visible.isEmpty() && !state.isLoading) item {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         TonalIcon(DataraIcons.Bell, positive = true)
                         Text(if (unreadOnly && state.alerts.isNotEmpty()) "No unread notifications" else "No notifications yet", style = MaterialTheme.typography.headlineMedium)
                         Text(if (unreadOnly && state.alerts.isNotEmpty()) "Your read updates are still available under All."
-                            else "You’ll be told here at 75%, 90% and 100% of your quota, and when it’s likely to be reached within 24 hours and within 3 hours.",
+                            else "Alerts about your quota will show up here.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (unreadOnly) TextButton(onClick = { unreadOnly = false }) { Text("View all notifications") }
                     }
@@ -104,16 +109,16 @@ private fun NotificationsContent(state: NotificationCenterState, onBack: () -> U
                 item(key = "date-$day") { Text(if (day == LocalDate.now()) "Today" else day.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)),
                     style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp)) }
                 items(alerts, key = { it.id }) { alert ->
-                    Card(onClick = { onMarkRead(alert.id); selectedId = alert.id },
+                    Card(onClick = { onMarkRead(alert.id); selectedId = alert.id }, shape = MaterialTheme.shapes.large,
                         colors = CardDefaults.cardColors(containerColor = if (alert.isRead) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.secondaryContainer),
                         modifier = Modifier.fillMaxWidth().semantics { stateDescription = if (alert.isRead) "Read" else "Unread" }) {
                         ListItem(leadingContent = { TonalIcon(if (alert.category == AlertCategory.FORECAST) DataraIcons.Clock else DataraIcons.Bell,
-                            positive = alert.category == AlertCategory.INFO) },
+                            positive = alert.category == AlertCategory.REACHED) },
                             headlineContent = { Text(alert.title, style = MaterialTheme.typography.titleMedium,
                                 fontWeight = if (alert.isRead) FontWeight.Medium else FontWeight.Bold) },
                             supportingContent = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(alert.message, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                                Text("${alert.category.label} · ${if (alert.isRead) "Read" else "Unread"}", style = MaterialTheme.typography.labelSmall)
+                                Text(alertMeta(alert), style = MaterialTheme.typography.labelSmall)
                             } }, colors = ListItemDefaults.colors(containerColor = if (alert.isRead) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.secondaryContainer),
                             modifier = Modifier.padding(vertical = 10.dp))
                     }
@@ -138,6 +143,11 @@ private fun NotificationsContent(state: NotificationCenterState, onBack: () -> U
         }
     }
 }
+
+/** The small line under an alert: its kind and when it arrived. Read state is shown by weight and colour, and announced. */
+internal fun alertMeta(alert: AlertItem, zone: ZoneId = ZoneId.systemDefault()): String =
+    "${alert.category.label} · ${DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+        .format(Instant.ofEpochMilli(alert.receivedAtMillis).atZone(zone))}"
 
 @Composable
 internal fun NotificationBell(unreadCount: Int, onClick: () -> Unit) {

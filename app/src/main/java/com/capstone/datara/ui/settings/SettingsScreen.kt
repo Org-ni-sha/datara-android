@@ -77,22 +77,25 @@ private fun SettingsContent(email: String?, onSaveName: (String) -> String?,
     Scaffold(containerColor = MaterialTheme.colorScheme.background, bottomBar = bottomBar,
         topBar = { DataraAppBar("Settings") }) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
             SectionTitle("App preferences", "Manage alerts, access and your profile.")
             Surface(onClick = { profile = true }, color = MaterialTheme.colorScheme.surface,
                 contentColor = MaterialTheme.colorScheme.onSurface, shape = MaterialTheme.shapes.large) {
-                Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Surface(color = MaterialTheme.colorScheme.tertiaryContainer, shape = MaterialTheme.shapes.medium) {
                         Icon(DataraIcons.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(12.dp).size(28.dp))
                     }
                     Text(profileState.name.ifBlank { "Your profile" }, style = MaterialTheme.typography.headlineMedium)
                     Text(email ?: "Email unavailable", style = MaterialTheme.typography.bodyMedium)
-                    Text("View and edit profile →", style = MaterialTheme.typography.labelLarge)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("View and edit profile", style = MaterialTheme.typography.labelLarge)
+                        Icon(DataraIcons.ArrowForward, null, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
             SettingsCard("Notification preferences") {
-                PreferenceSwitch("Quota milestones", "At 75%, 90% and 100% of your quota", alertPreferences.milestones, onMilestonesChange)
-                PreferenceSwitch("Forecast reminders", "When your quota is likely to be reached within 24 hours and within 3 hours",
+                PreferenceSwitch(PreferenceKey.MILESTONES, "Quota milestones", "At 75%, 90% and 100% of your quota", alertPreferences.milestones, onMilestonesChange)
+                PreferenceSwitch(PreferenceKey.FORECASTS, "Forecast reminders", "When your quota is likely to be reached within 24 hours and within 3 hours",
                     alertPreferences.forecasts, onForecastsChange)
                 Text("Each alert is sent once per quota. Reaching a quota never cuts your connection.",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -111,11 +114,7 @@ private fun SettingsContent(email: String?, onSaveName: (String) -> String?,
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedButton(onClick = onTrackingSetup, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open tracking setup") }
             }
-            SettingsCard("Cloud sync") {
-                Text("Not synced yet", style = MaterialTheme.typography.titleMedium)
-                Text("Cloud backup is not connected yet. Your quotas, usage, forecasts and alerts are kept on this phone.",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            // The "Cloud sync" card returns when sync (C3) exists; until then there is nothing to show.
             SettingsCard("About DATAra") {
                 var taps by remember { mutableIntStateOf(0) }
                 Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleMedium,
@@ -135,8 +134,8 @@ private fun SettingsContent(email: String?, onSaveName: (String) -> String?,
         AlertDialog(onDismissRequest = { if (!isSigningOut) dialog = null }, title = { Text(if (signingOut) "Sign out of DATAra?" else title) },
             text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(when (title) {
-                    "Sign out" -> "You’ll need to sign in again to access your account. Settings stay on this phone; cloud sync is not connected yet."
-                    else -> "Usage, quotas, forecasts and alerts are measured and kept on this phone; cloud sync is not connected yet. Signing in uses Supabase Auth. DATAra does not read SMS or block internet access. Data retention, deletion and sync controls will be documented when sync is connected."
+                    "Sign out" -> "You’ll need to sign in again to use DATAra. Your quotas and usage stay on this phone."
+                    else -> PRIVACY_TEXT
                 })
                 if (signingOut && signOutError != null) Text(signOutError, color = MaterialTheme.colorScheme.error)
             } }, confirmButton = {
@@ -176,19 +175,30 @@ private fun SystemNotificationStatus() {
     }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Allow notifications") }
 }
 
+/** Plain-language privacy summary; keep it true to what the app does today. */
+internal const val PRIVACY_TEXT =
+    "DATAra measures your mobile data on this phone. Your quotas, usage, forecasts and alerts are stored here too.\n\n" +
+    "Each install gets a random device ID. Your sign-in and profile name are handled by Supabase Auth.\n\n" +
+    "DATAra never reads your SMS and never blocks your internet. Cloud sync isn’t active yet, so your usage data stays on this phone."
+
+/** Label and value side by side; the value drops below the label when large text no longer fits. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StatusLine(label: String, ok: Boolean, okText: String, badText: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
+    FlowRow(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}, horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(end = 12.dp))
         Text(if (ok) okText else badText, style = MaterialTheme.typography.bodyLarge,
             color = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
     }
 }
 
+internal enum class PreferenceKey { MILESTONES, FORECASTS }
+
 @Composable
-private fun PreferenceSwitch(title: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun PreferenceSwitch(key: PreferenceKey, title: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     ListItem(modifier = Modifier.fillMaxWidth().toggleable(checked, role = Role.Switch, onValueChange = onChange),
-        leadingContent = { TonalIcon(if (title == "Quota milestones") DataraIcons.Data else DataraIcons.Clock) },
+        leadingContent = { TonalIcon(when (key) { PreferenceKey.MILESTONES -> DataraIcons.Data; PreferenceKey.FORECASTS -> DataraIcons.Clock }) },
         headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
         supportingContent = { Text(description, style = MaterialTheme.typography.bodyMedium) },
         trailingContent = { Switch(checked = checked, onCheckedChange = null) })

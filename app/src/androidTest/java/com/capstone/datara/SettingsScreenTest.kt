@@ -36,7 +36,7 @@ class SettingsScreenTest {
                 { if (it.isBlank()) "Enter a name" else null.also { saves++ } }, {}, {}, {}, {}, {},
                 profile = ProfileUiState(username = "student_01"))
         }
-        compose.onNodeWithText("View and edit profile →").performScrollTo().performClick()
+        compose.onNodeWithText("View and edit profile").performScrollTo().performClick()
         compose.onNodeWithText("student@example.com").assertExists()
         compose.onNodeWithText("@student_01").assertExists()
         compose.captureUi("profile")
@@ -78,7 +78,7 @@ class SettingsScreenTest {
                 status = SettingsStatus(TrackingAccess(usageAccess = true, notifications = true), serviceRunning = true))
         }
         compose.onNodeWithText("Running").performScrollTo().assertExists()
-        compose.onNodeWithText("Not synced yet").performScrollTo().assertExists()
+        compose.onNodeWithText("Not synced yet").assertDoesNotExist()
         // The bottom navigation lists no diagnostics entry
         compose.onNodeWithText("diagnostics", substring = true, ignoreCase = true).assertDoesNotExist()
         val version = compose.onNodeWithText("Version", substring = true).performScrollTo()
