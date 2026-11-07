@@ -18,8 +18,9 @@ import kotlin.math.roundToInt
 internal fun QuotaProgressCard(state: QuotaDetailsModel) {
     val missing = state.usageUnavailable
     val progress by animateFloatAsState(if (missing) 0f else state.progress.coerceIn(0f, 1f), tween(350), label = "Quota gauge")
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    val largeFont = LocalDensity.current.fontScale > 1.3f
+    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val stacked = maxWidth < 280.dp || LocalDensity.current.fontScale > 1.4f
                 val gauge: @Composable () -> Unit = {
@@ -45,8 +46,14 @@ internal fun QuotaProgressCard(state: QuotaDetailsModel) {
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                Value(if (state.isEnded) "Used at end" else "Used", if (missing) "Unavailable" else formatQuotaData(state.usedBytes ?: 0), Modifier.weight(1f))
+            val used = if (missing) "Unavailable" else formatQuotaData(state.usedBytes ?: 0)
+            val usedLabel = if (state.isEnded) "Used at end" else "Used"
+            // At large font sizes the two values stack instead of squeezing side by side
+            if (largeFont) Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Value(usedLabel, used, Modifier.fillMaxWidth())
+                Value("Starting quota", formatQuotaData(state.quotaBytes), Modifier.fillMaxWidth())
+            } else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                Value(usedLabel, used, Modifier.weight(1f))
                 Value("Starting quota", formatQuotaData(state.quotaBytes), Modifier.weight(1f))
             }
         }
