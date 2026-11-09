@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,7 +30,8 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
     onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {},
     onTrackingSetup: () -> Unit = {}, live: QuotaDetailsModel? = null, liveLoading: Boolean = false,
     trackingIssue: TrackingIssue? = null, week: HomeWeek? = null, onShowRealData: () -> Unit = {},
-    greeting: String = "Hello", insights: List<HomeInsight> = emptyList(), onSampleEnded: () -> Unit = {}) {
+    greeting: String = "Hello", insights: List<HomeInsight> = emptyList(), onSampleEnded: () -> Unit = {},
+    onRefresh: () -> Unit = {}) {
     var showInfo by remember { mutableStateOf(false) }
     val hero = HeroContent.select(state, live, liveLoading, trackingIssue)
     Scaffold(modifier, containerColor = MaterialTheme.colorScheme.background,
@@ -41,7 +43,11 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
                 HomeSampleState.entries.map { option -> "Sample: ${option.label}" to { onSelectScenario(option) } } +
                 listOf("Sample: Cycle ended" to onSampleEnded))
         }) }, bottomBar = { QuotaBottomBar(false, {}, onHistory, onSettings) }) { insets ->
-        Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState())
+        // Pull to re-read usage and tracking status, as on History; the spinner is brief because Room reads are fast
+        var refreshing by remember { mutableStateOf(false) }
+        LaunchedEffect(refreshing) { if (refreshing) { kotlinx.coroutines.delay(700); refreshing = false } }
+        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true; onRefresh() }, modifier = Modifier.fillMaxSize().padding(insets)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             if (state.previewing) {
                 StatusPill("Sample screen · Preview options", StatusTone.NEUTRAL)
@@ -77,6 +83,7 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
             TextButton(onClick = { showInfo = true }, modifier = Modifier.align(Alignment.End)) {
                 Icon(DataraIcons.Shield, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text("What counts?")
             }
+        }
         }
     }
     if (showInfo) AlertDialog(onDismissRequest = { showInfo = false }, title = { Text("What counts?") },

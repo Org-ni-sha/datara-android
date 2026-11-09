@@ -161,7 +161,8 @@ fun DashboardScreen(
             insights = (historyState as? HistoryUiState.Ready)?.data?.let { HomeInsight.from(it, java.time.ZoneId.systemDefault()) }.orEmpty(),
             onShowRealData = viewModel::showRealData,
             onSampleEnded = { viewModel.selectScenario(HomeSampleState.FORECAST_AVAILABLE); viewModel.endCycle() },
-            greeting = homeGreeting(java.time.LocalTime.now().hour, profileState.name, profileState.username))
+            greeting = homeGreeting(java.time.LocalTime.now().hour, profileState.name, profileState.username),
+            onRefresh = { historyViewModel.refresh(); settingsViewModel.refresh() })
     }
     // One snackbar host above the docked navigation bar, for every signed-in screen
     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 80.dp))
@@ -175,9 +176,10 @@ fun HomeScreen(state: HomeUiState, onCreateQuota: () -> Unit,
     onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {},
     onTrackingSetup: () -> Unit = {}, live: QuotaDetailsModel? = null, liveLoading: Boolean = false,
     trackingIssue: TrackingIssue? = null, week: HomeWeek? = null, onShowRealData: () -> Unit = {}, greeting: String = "Hello",
-    insights: List<HomeInsight> = emptyList(), onSampleEnded: () -> Unit = {}) {
+    insights: List<HomeInsight> = emptyList(), onSampleEnded: () -> Unit = {}, onRefresh: () -> Unit = {}) {
     QuotaTheme { HomeContent(state, onCreateQuota, onSelectScenario, onSignOut, modifier, onViewQuota, onHistory, onNotifications,
-        unreadCount, onSettings, onTrackingSetup, live, liveLoading, trackingIssue, week, onShowRealData, greeting, insights, onSampleEnded) }
+        unreadCount, onSettings, onTrackingSetup, live, liveLoading, trackingIssue, week, onShowRealData, greeting, insights, onSampleEnded,
+        onRefresh) }
 }
 
 @Preview(name = "No quota", widthDp = 360, heightDp = 800)
