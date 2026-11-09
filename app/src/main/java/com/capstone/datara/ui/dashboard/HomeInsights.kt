@@ -2,9 +2,8 @@ package com.capstone.datara.ui.dashboard
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.material3.carousel.HorizontalUncontainedCarousel
-import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -76,30 +75,67 @@ private fun HomeInsight.Kind.icon(): ImageVector = when (this) {
     HomeInsight.Kind.FORECAST_VS_ACTUAL -> DataraIcons.CheckCircle
 }
 
-/** Home's insights carousel; nothing is drawn until some usage has been measured. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Home's insights: Today as one wide card, then the other insights as a row of small cards, so
+ * every insight is visible without swiping. At large font sizes the small cards stack instead.
+ * Nothing is drawn until some usage has been measured.
+ */
 @Composable
-fun HomeInsightsCarousel(insights: List<HomeInsight>, modifier: Modifier = Modifier) {
+fun HomeInsightsPanel(insights: List<HomeInsight>, modifier: Modifier = Modifier) {
     if (insights.none { it.value != null }) return
     val large = LocalDensity.current.fontScale > 1.3f
-    val state = rememberCarouselState { insights.size }
-    // Uncontained: every card keeps its full width, so no label is clipped mid-word
-    HorizontalUncontainedCarousel(state, itemWidth = if (large) 260.dp else 164.dp,
-        modifier = modifier.fillMaxWidth(), itemSpacing = 10.dp) { index ->
-        val insight = insights[index]
-        Surface(Modifier.fillMaxWidth().maskClip(MaterialTheme.shapes.large).semantics(mergeDescendants = true) {},
-            color = MaterialTheme.colorScheme.surface) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer) {
-                    Icon(insight.kind.icon(), null, Modifier.padding(8.dp).size(18.dp))
+    val featured = insights.firstOrNull { it.kind == HomeInsight.Kind.TODAY }
+    val rest = insights.filter { it !== featured }
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        featured?.let { WideInsightCard(it) }
+        if (rest.isNotEmpty()) {
+            if (large) {
+                rest.forEach { WideInsightCard(it) }
+            } else {
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    rest.forEach { SmallInsightCard(it, Modifier.weight(1f).fillMaxHeight()) }
                 }
-                Text(insight.kind.title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(insight.value ?: "—", style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(insight.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis, minLines = 2)
             }
+        }
+    }
+}
+
+@Composable
+private fun InsightIcon(kind: HomeInsight.Kind) {
+    Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer) {
+        Icon(kind.icon(), null, Modifier.padding(8.dp).size(18.dp))
+    }
+}
+
+@Composable
+private fun WideInsightCard(insight: HomeInsight, modifier: Modifier = Modifier) {
+    Surface(modifier.fillMaxWidth().semantics(mergeDescendants = true) {}, shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            InsightIcon(insight.kind)
+            Column(Modifier.weight(1f)) {
+                Text(insight.kind.title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(insight.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Text(insight.value ?: "—", style = MaterialTheme.typography.headlineSmall, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun SmallInsightCard(insight: HomeInsight, modifier: Modifier = Modifier) {
+    Surface(modifier.semantics(mergeDescendants = true) {}, shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            InsightIcon(insight.kind)
+            Text(insight.kind.title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(insight.value ?: "—", style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(insight.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
     }
 }
