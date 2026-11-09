@@ -1,5 +1,7 @@
 # Signed-in UI design and review
 
+Screens of the finished UI: [docs/screens](screens/README.md) (overview image plus one image per screen and Home state).
+
 ## Material 3 restyle (2026-11-09)
 
 The earlier look read as white cards on off-white. The restyle keeps the light greeting header and navy docked bar and adds depth and a focal point:
