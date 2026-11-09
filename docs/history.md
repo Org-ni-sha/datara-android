@@ -2,6 +2,8 @@
 
 History shows mobile data measured on this phone and the user's quota cycles, all from Room. Nothing in it is a fixture.
 
+Two tabs (2026-11-09): **Usage** holds the 24 hours / 7 days range chips, the total and the chart; **Quota cycles** shows the selected cycle (status, used of quota, forecast vs actual, "View cycle details" for the read-only details), its daily chart, then **All cycles**, where tapping a cycle selects it (the shown one is outlined and marked "Showing").
+
 ## Sources
 
 | What | From |

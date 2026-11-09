@@ -1,5 +1,8 @@
 package com.capstone.datara.ui.history
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.semantics.selected
+import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -78,12 +81,15 @@ fun HistoryScreen(state: HistoryUiState, onHome: () -> Unit, onSettings: () -> U
 private fun HistoryContent(state: HistoryUiState, onHome: () -> Unit, onSettings: () -> Unit, modifier: Modifier,
     onNotifications: () -> Unit, unreadCount: Int, zone: ZoneId, onRefresh: () -> Unit) {
     val data = (state as? HistoryUiState.Ready)?.data
+    // Two tabs: Usage (24 hours / 7 days) and Quota cycles (one cycle's chart plus every cycle)
+    var cyclesTab by rememberSaveable { mutableStateOf(false) }
     var windowName by rememberSaveable { mutableStateOf(HistoryWindow.WEEK.name) }
     var cycleId by rememberSaveable { mutableStateOf<String?>(null) }
     var detailsId by rememberSaveable { mutableStateOf<String?>(null) }
     var readings by rememberSaveable { mutableStateOf(false) }
-    var cycleMenu by remember { mutableStateOf(false) }
-    val window = HistoryWindow.valueOf(windowName)
+    val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val window = if (cyclesTab) HistoryWindow.CYCLE else HistoryWindow.valueOf(windowName).takeIf { it != HistoryWindow.CYCLE } ?: HistoryWindow.WEEK
     val cycle = data?.cycles?.let { list -> list.firstOrNull { it.cycle.cycleId == cycleId } ?: list.firstOrNull() }
     val snapshot = remember(window, data, cycle, zone) { data?.let { HistoryAggregation.snapshot(window, it, cycle, zone) } }
     val selected = data?.cycles?.firstOrNull { it.cycle.cycleId == detailsId }
@@ -100,7 +106,7 @@ private fun HistoryContent(state: HistoryUiState, onHome: () -> Unit, onSettings
         topBar = { DataraCollapsingAppBar("History", scrollBehavior, actions = { NotificationBell(unreadCount, onNotifications) }) },
         bottomBar = { QuotaBottomBar(true, onHome, {}, onSettings) }) { insets ->
         PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true; onRefresh() }, modifier = Modifier.fillMaxSize().padding(insets)) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
+        Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Text("Mobile data measured on this phone.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             when {
@@ -116,40 +122,45 @@ private fun HistoryContent(state: HistoryUiState, onHome: () -> Unit, onSettings
                 }
                 else -> {
                     if (data.measuredHours < 24) CollectingNote(data.measuredHours)
-                    // FlowRow so the three range chips wrap instead of squeezing at large font sizes
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        HistoryWindow.entries.forEach { option ->
-                            FilterChip(selected = window == option, onClick = { windowName = option.name; readings = false },
-                                label = { Text(option.label, style = MaterialTheme.typography.labelLarge) },
-                                modifier = Modifier.heightIn(min = 48.dp),
-                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer))
-                        }
+                    PrimaryTabRow(selectedTabIndex = if (cyclesTab) 1 else 0, containerColor = MaterialTheme.colorScheme.background) {
+                        Tab(selected = !cyclesTab, onClick = { cyclesTab = false; readings = false }, modifier = Modifier.heightIn(min = 48.dp),
+                            text = { Text("Usage", style = MaterialTheme.typography.titleSmall) })
+                        Tab(selected = cyclesTab, onClick = { cyclesTab = true; readings = false }, modifier = Modifier.heightIn(min = 48.dp),
+                            text = { Text("Quota cycles", style = MaterialTheme.typography.titleSmall) })
                     }
-                    if (window == HistoryWindow.CYCLE) {
-                        if (cycle == null) HistoryCard {
-                            Text("No quota yet", style = MaterialTheme.typography.titleMedium)
-                            Text("Set a quota on Home. Its daily usage will show here.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        } else {
-                            Box {
-                                OutlinedButton(onClick = { cycleMenu = true }, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
-                                    Text(cycle.name, modifier = Modifier.weight(1f, fill = false))
-                                    Spacer(Modifier.width(12.dp)); Icon(DataraIcons.Chevron, null, modifier = Modifier.size(16.dp))
-                                }
-                                DropdownMenu(cycleMenu, onDismissRequest = { cycleMenu = false }) {
-                                    data.cycles.forEach { item -> DropdownMenuItem(text = { Text("${item.name} · ${formatCycleDate(item.cycle.startAt)}") },
-                                        onClick = { cycleId = item.cycle.cycleId; cycleMenu = false }) }
+                    if (!cyclesTab) {
+                        // Two equal halves across the width (Material 3 segmented button)
+                        val ranges = listOf(HistoryWindow.DAY, HistoryWindow.WEEK)
+                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                            ranges.forEachIndexed { index, option ->
+                                SegmentedButton(selected = window == option, onClick = { windowName = option.name; readings = false },
+                                    shape = SegmentedButtonDefaults.itemShape(index, ranges.size),
+                                    modifier = Modifier.heightIn(min = 48.dp),
+                                    colors = SegmentedButtonDefaults.colors(activeContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        activeContentColor = MaterialTheme.colorScheme.onSecondaryContainer)) {
+                                    Text(option.label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
                                 }
                             }
-                            CycleSummary(cycle)
+                        }
+                        if (snapshot != null) {
+                            TotalCard(snapshot, window)
+                            TrendCard(snapshot, window, highlightLast = true) { readings = true }
+                        }
+                    } else if (cycle == null) HistoryCard {
+                        Text("No quota yet", style = MaterialTheme.typography.titleMedium)
+                        Text("Set a quota on Home. Each cycle, with its daily usage and how the forecast did, will show here.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        CycleSummary(cycle) { detailsId = cycle.cycle.cycleId }
+                        if (snapshot != null) TrendCard(snapshot, window, highlightLast = cycle.cycle.endedAt == null) { readings = true }
+                        SectionTitle("All cycles", if (data.cycles.size > 1) "Tap a cycle to show it above" else "Your cycles will collect here")
+                        data.cycles.forEach { item ->
+                            CycleCard(item, selected = item.cycle.cycleId == cycle.cycle.cycleId) {
+                                cycleId = item.cycle.cycleId
+                                scope.launch { scroll.animateScrollTo(0) }
+                            }
                         }
                     }
-                    if (snapshot != null && !(window == HistoryWindow.CYCLE && cycle == null)) {
-                        TotalCard(snapshot, window)
-                        TrendCard(snapshot, window, highlightLast = window != HistoryWindow.CYCLE || cycle?.cycle?.endedAt == null) { readings = true }
-                    }
-                    SectionTitle("Quota cycles", if (data.cycles.isEmpty()) "No cycles yet" else "Tap a cycle for its details")
-                    data.cycles.forEach { item -> CycleCard(item) { detailsId = item.cycle.cycleId } }
                 }
             }
         }
@@ -227,7 +238,7 @@ private fun TrendCard(snapshot: HistorySnapshot, window: HistoryWindow, highligh
 }
 
 @Composable
-private fun CycleSummary(item: CycleHistory) {
+private fun CycleSummary(item: CycleHistory, onDetails: () -> Unit) {
     val details = item.toDetails()
     val tone = item.tone()
     HistoryCard {
@@ -242,6 +253,9 @@ private fun CycleSummary(item: CycleHistory) {
         item.pet?.let { PetComparisonText(it) }
         if (item.cycle.reachedAt != null && item.pet == null) Text("No forecast was logged before the quota was reached.",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        TextButton(onClick = onDetails, contentPadding = PaddingValues(horizontal = 0.dp)) {
+            Text("View cycle details"); Spacer(Modifier.width(8.dp)); Icon(DataraIcons.ArrowForward, null, modifier = Modifier.size(16.dp))
+        }
     }
 }
 
@@ -275,10 +289,14 @@ internal fun CycleHistory.tone(): QuotaTone = quotaStatusTone(
     if (cycle.quotaBytes > 0) usage.usedBytes.toFloat() / cycle.quotaBytes else 0f, cycle.status)
 
 @Composable
-private fun CycleCard(item: CycleHistory, onClick: () -> Unit) {
+private fun CycleCard(item: CycleHistory, selected: Boolean, onClick: () -> Unit) {
     val tone = item.tone()
     val progress = if (item.cycle.quotaBytes > 0) (item.usage.usedBytes.toFloat() / item.cycle.quotaBytes).coerceIn(0f, 1f) else 0f
-    Card(onClick = onClick, shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+    // The cycle shown above gets a soft blue fill and a primary outline
+    Card(onClick = onClick, shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow),
+        border = if (selected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+        modifier = Modifier.semantics { this.selected = selected }) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 ToneIcon(DataraIcons.History, tone)
@@ -287,7 +305,7 @@ private fun CycleCard(item: CycleHistory, onClick: () -> Unit) {
                     Text("Started ${formatCycleDate(item.cycle.startAt)}", style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Icon(DataraIcons.Chevron, null, modifier = Modifier.size(18.dp))
+                if (selected) Text("Showing", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
             LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(6.dp),
                 color = tone.accent(), trackColor = tone.colors().container, drawStopIndicator = {})

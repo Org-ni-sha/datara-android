@@ -68,9 +68,11 @@ class HistoryScreenTest {
         compose.onAllNodesWithText("Not measured").onFirst().assertExists()
         compose.onAllNodesWithText("6 MB").onFirst().assertExists()
         compose.onNodeWithText("Close").performScrollTo().performClick()
-        compose.onNodeWithText("Quota cycle").performClick()
+        compose.onNodeWithText("Quota cycles").performScrollTo().performClick()
+        compose.onNodeWithText("24 hours").assertDoesNotExist()
         compose.onAllNodesWithText("QUOTA REACHED").onFirst().assertExists()
-        compose.onAllNodesWithText("Commute quota").onLast().performScrollTo().performClick()
+        compose.onNodeWithText("All cycles").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("View cycle details").performScrollTo().performClick()
         compose.onNodeWithText("From History · Read-only details").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("End cycle").assertDoesNotExist()
     }
