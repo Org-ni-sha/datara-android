@@ -32,11 +32,13 @@ import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.components.*
 import com.capstone.datara.ui.notifications.NotificationBell
 import com.capstone.datara.ui.quota.*
+import com.capstone.datara.ui.theme.ChartToday
 import com.capstone.datara.ui.theme.QuotaTheme
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProducer
+import com.patrykandpatrick.vico.compose.cartesian.data.columnModel
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
-import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModel
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianLayerRangeProvider
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.compose.cartesian.data.ColumnCartesianLayerModel
@@ -303,7 +305,7 @@ private fun CycleCard(item: CycleHistory, onClick: () -> Unit) {
 @Composable
 private fun ChartLegend(window: HistoryWindow, highlightLast: Boolean) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (highlightLast) LegendKey(MaterialTheme.colorScheme.tertiary, if (window == HistoryWindow.DAY) "This hour" else "Today")
+        if (highlightLast) LegendKey(ChartToday, if (window == HistoryWindow.DAY) "This hour" else "Today")
         if (window != HistoryWindow.DAY) LegendKey(MaterialTheme.colorScheme.primary, "Daily average", dashed = true)
         Text("Tap a bar for its value", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -322,10 +324,20 @@ private fun LegendKey(color: androidx.compose.ui.graphics.Color, label: String, 
 private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow, unit: QuotaUnit, highlightLast: Boolean, average: Double?) {
     // Unmeasured periods get no x value, so they render as blank space rather than zero-height bars
     val measured = remember(points) { points.withIndex().filter { it.value.isMeasured } }
-    val model = remember(measured, unit) {
-        CartesianChartModel(ColumnCartesianLayerModel.build {
-            series(x = measured.map { it.index }, y = measured.map { it.value.bytes!!.toDouble() / unit.bytes })
-        })
+    // A model producer (not a fixed model) so Vico grows the bars in and animates between ranges
+    val modelProducer = remember { CartesianChartModelProducer() }
+    // The model arrives a frame after the window changes, so everything that reads x values (axis
+    // labels, marker text, today's index, the x range) travels inside the model's extras with it.
+    // Reading the current `points` instead crashed on fast tab switches: an old x had no new label.
+    LaunchedEffect(measured, unit, window) {
+        if (measured.isNotEmpty()) modelProducer.runTransaction {
+            columnModel { series(x = measured.map { it.index }, y = measured.map { it.value.bytes!!.toDouble() / unit.bytes }) }
+            extras { store ->
+                store[ChartAxisLabels] = points.map { if (window == HistoryWindow.DAY) it.label.substringBefore(":") else it.label.substringAfterLast(" ") }
+                store[ChartMarkerLabels] = points.map { "${it.label} · ${it.bytes?.let(::formatQuotaData) ?: "Not measured"}" }
+                store[ChartLabelSpacing] = if (window == HistoryWindow.DAY) 4 else if (points.size > 10) 3 else 1
+            }
+        }
     }
     val description = remember(points, unit) {
         "Mobile usage chart in ${unit.name}, ${measured.size} of ${points.size} periods measured. Exact readings are available below."
@@ -333,25 +345,24 @@ private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow, unit: Qu
     val thickness = if (window == HistoryWindow.DAY) 6.dp else 12.dp
     val barShape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
     val c = MaterialTheme.colorScheme
-    // Gradient bars (teal fading down); the current hour / today in amber
+    // Gradient bars (teal fading down); the current hour / today in the logo blue
     val bar = rememberLineComponent(fill = Fill(Brush.verticalGradient(listOf(c.secondary, c.secondary.copy(alpha = 0.45f)))),
         thickness = thickness, shape = barShape)
-    val todayBar = rememberLineComponent(fill = Fill(Brush.verticalGradient(listOf(c.tertiary, c.tertiary.copy(alpha = 0.55f)))),
+    val todayBar = rememberLineComponent(fill = Fill(Brush.verticalGradient(listOf(ChartToday, ChartToday.copy(alpha = 0.55f)))),
         thickness = thickness, shape = barShape)
-    val lastIndex = points.size - 1
-    val columnProvider = remember(bar, todayBar, lastIndex, highlightLast) {
+    val columnProvider = remember(bar, todayBar, highlightLast) {
         object : ColumnCartesianLayer.ColumnProvider {
             override fun getColumn(entry: ColumnCartesianLayerModel.Entry, seriesIndex: Int, extraStore: ExtraStore) =
-                if (highlightLast && entry.x.toInt() == lastIndex) todayBar else bar
+                if (highlightLast && entry.x.toInt() == extraStore.getOrNull(ChartAxisLabels)?.lastIndex) todayBar else bar
             override fun getWidestSeriesColumn(seriesIndex: Int, extraStore: ExtraStore) = bar
         }
     }
     val markerLabel = rememberTextComponent(style = MaterialTheme.typography.labelMedium.copy(color = c.inverseOnSurface),
         padding = Insets(8.dp, 4.dp), background = rememberShapeComponent(Fill(c.inverseSurface), RoundedCornerShape(8.dp)))
-    val marker = rememberDefaultCartesianMarker(label = markerLabel, valueFormatter = remember(points) {
-        DefaultCartesianMarker.ValueFormatter { _, targets ->
-            val point = targets.firstOrNull()?.x?.toInt()?.let(points::getOrNull)
-            point?.let { "${it.label} · ${it.bytes?.let(::formatQuotaData) ?: "Not measured"}" } ?: ""
+    val marker = rememberDefaultCartesianMarker(label = markerLabel, valueFormatter = remember {
+        DefaultCartesianMarker.ValueFormatter { context, targets ->
+            val x = targets.firstOrNull()?.x?.toInt()
+            x?.let { context.model.extraStore.getOrNull(ChartMarkerLabels)?.getOrNull(it) } ?: ""
         }
     }, guideline = rememberLineComponent(fill = Fill(c.outline), thickness = 1.dp))
     val averageLine = rememberLineComponent(fill = Fill(c.primary), thickness = 2.dp,
@@ -362,22 +373,33 @@ private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow, unit: Qu
     CartesianChartHost(
         chart = rememberCartesianChart(
             rememberColumnCartesianLayer(columnProvider = columnProvider,
-                rangeProvider = remember(points.size) { CartesianLayerRangeProvider.fixed(minX = 0.0, maxX = (points.size - 1).toDouble(), minY = 0.0) }),
+                rangeProvider = remember { WindowRange }),
             startAxis = VerticalAxis.rememberStart(valueFormatter = remember(unit) { CartesianValueFormatter.decimal(suffix = " ${unit.name}") }),
             bottomAxis = HorizontalAxis.rememberBottom(
-                valueFormatter = CartesianValueFormatter { _, value, _ ->
-                    points.getOrNull(value.toInt())?.label?.let {
-                        if (window == HistoryWindow.DAY) it.substringBefore(":") else it.substringAfterLast(" ")
-                    } ?: ""
+                // Never blank: Vico throws on a blank axis label
+                valueFormatter = remember {
+                    CartesianValueFormatter { context, value, _ ->
+                        context.model.extraStore.getOrNull(ChartAxisLabels)?.getOrNull(value.toInt())?.takeIf { it.isNotBlank() } ?: "·"
+                    }
                 },
-                itemPlacer = remember(window, points.size) {
-                    HorizontalAxis.ItemPlacer.aligned(spacing = { if (window == HistoryWindow.DAY) 4 else if (points.size > 10) 3 else 1 })
-                }),
+                itemPlacer = remember { HorizontalAxis.ItemPlacer.aligned(spacing = { it.getOrNull(ChartLabelSpacing) ?: 1 }) }),
             marker = marker, decorations = decorations,
             getXStep = { _, _, _ -> 1.0 }),
-        model = model,
+        modelProducer = modelProducer,
         modifier = Modifier.fillMaxWidth().height(240.dp).semantics { contentDescription = description },
         scrollState = rememberVicoScrollState(scrollEnabled = false), zoomState = rememberVicoZoomState(zoomEnabled = false))
+}
+
+private val ChartAxisLabels = ExtraStore.Key<List<String>>()
+private val ChartMarkerLabels = ExtraStore.Key<List<String>>()
+private val ChartLabelSpacing = ExtraStore.Key<Int>()
+
+/** x from 0 to the window's last period, y from 0, taken from the model's own extras (see UsageChart). */
+private object WindowRange : CartesianLayerRangeProvider {
+    override fun getMinX(minX: Double, maxX: Double, extraStore: ExtraStore) = 0.0
+    override fun getMaxX(minX: Double, maxX: Double, extraStore: ExtraStore) =
+        extraStore.getOrNull(ChartAxisLabels)?.lastIndex?.toDouble() ?: maxX
+    override fun getMinY(minY: Double, maxY: Double, extraStore: ExtraStore) = 0.0
 }
 
 @Composable

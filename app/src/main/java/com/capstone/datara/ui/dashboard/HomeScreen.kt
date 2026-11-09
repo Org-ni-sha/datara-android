@@ -1,6 +1,15 @@
 package com.capstone.datara.ui.dashboard
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -20,7 +29,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.capstone.datara.ui.auth.AuthViewModel
 import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.quota.*
+import com.capstone.datara.ui.history.HistoryAggregation
 import com.capstone.datara.ui.history.HistoryScreen
+import com.capstone.datara.ui.history.HistoryWindow
 import com.capstone.datara.ui.history.HistoryUiState
 import com.capstone.datara.ui.history.HistoryViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -91,13 +102,25 @@ fun DashboardScreen(
     BackHandler(!diagnostics && (tracking || creating || details || notifications || history || settings)) {
         if (tracking) tracking = false else if (creating) creating = false else if (details) details = false else if (notifications) notifications = false else { history = false; settings = false }
     }
+    val screen = when {
+        diagnostics -> SignedInScreen.DIAGNOSTICS
+        tracking -> SignedInScreen.TRACKING
+        creating -> SignedInScreen.CREATE
+        details -> SignedInScreen.DETAILS
+        notifications -> SignedInScreen.NOTIFICATIONS
+        settings -> SignedInScreen.SETTINGS
+        history -> SignedInScreen.HISTORY
+        else -> SignedInScreen.HOME
+    }
     Box(Modifier.fillMaxSize()) {
-    if (diagnostics) {
+    // Tabs cross-fade; a deeper screen slides in from the right and slides back out on Back
+    AnimatedContent(screen, transitionSpec = { signedInTransition(initialState, targetState) }, label = "signed-in screen") { target ->
+    if (target == SignedInScreen.DIAGNOSTICS) {
         DiagnosticsRoute(onBack = { diagnostics = false })
-    } else if (tracking) {
+    } else if (target == SignedInScreen.TRACKING) {
         TrackingSetupScreen(onBack = { tracking = false }, onMessage = notify,
             onHome = { tracking = false; settings = false; history = false; details = false })
-    } else if (creating) {
+    } else if (target == SignedInScreen.CREATE) {
         CreateQuotaScreen(onBack = { cycleViewModel.clearError(); creating = false }, onCreateQuota = { bytes, name ->
             cycleViewModel.createQuota(bytes, name) {
                 // Home's hero shows the real cycle; keep the preview fixtures in step for its other parts
@@ -111,17 +134,17 @@ fun DashboardScreen(
             }
         }, isSaving = cycleAction.isSaving, errorMessage = cycleAction.errorMessage,
             replacingName = cycleDetails.takeIf { it.hasQuota && !it.isEnded }?.name)
-    } else if (details) {
+    } else if (target == SignedInScreen.DETAILS) {
         // Quota Details shows the real cycle (D3) and its on-device forecast (D6)
         QuotaDetailsScreen(cycleDetails, onBack = { cycleViewModel.clearError(); details = false },
             onEndCycle = { cycleViewModel.endCycle { viewModel.endCycle(); notify("Cycle ended") } }, onCreateQuota = { creating = true },
             onTrackingSetup = { tracking = true }, actionError = cycleAction.errorMessage)
-    } else if (notifications) {
+    } else if (target == SignedInScreen.NOTIFICATIONS) {
         NotificationsScreen(notificationState,
             onBack = { notifications = false }, onMarkRead = notificationsViewModel::markRead,
             onMarkAllRead = notificationsViewModel::markAllRead, onOpenCycle = openAlertCycle,
             openedCycle = openedCycle, onCloseCycle = notificationsViewModel::closeCycle)
-    } else if (settings) {
+    } else if (target == SignedInScreen.SETTINGS) {
         screenStates.SaveableStateProvider("settings") {
             SettingsScreen(authViewModel.currentUserEmail,
                 onSaveName = profileViewModel::saveName,
@@ -140,7 +163,7 @@ fun DashboardScreen(
                 onRefreshStatus = settingsViewModel::refresh,
                 onOpenDiagnostics = { diagnostics = true })
         }
-    } else if (history) {
+    } else if (target == SignedInScreen.HISTORY) {
         screenStates.SaveableStateProvider("history") {
             HistoryScreen(onHome = { history = false }, onSettings = { settings = true; history = false },
                 onNotifications = { notifications = true }, unreadCount = notificationState.unreadCount)
@@ -157,11 +180,15 @@ fun DashboardScreen(
             liveLoading = cycleDetails.isLoading,
             trackingIssue = TrackingIssue.of(settingsStatus.access, settingsStatus.serviceRunning,
                 cycleActive = cycleDetails.hasQuota && !cycleDetails.isEnded && !cycleDetails.isReached),
-            week = (historyState as? HistoryUiState.Ready)?.data?.week?.let(HomeWeek::from),
+            week = (historyState as? HistoryUiState.Ready)?.data?.let { data ->
+                HomeWeek.from(data.week, HistoryAggregation.snapshot(HistoryWindow.WEEK, data, null, java.time.ZoneId.systemDefault()).averageDailyBytes)
+            },
             insights = (historyState as? HistoryUiState.Ready)?.data?.let { HomeInsight.from(it, java.time.ZoneId.systemDefault()) }.orEmpty(),
             onShowRealData = viewModel::showRealData,
             onSampleEnded = { viewModel.selectScenario(HomeSampleState.FORECAST_AVAILABLE); viewModel.endCycle() },
-            greeting = homeGreeting(java.time.LocalTime.now().hour, profileState.name, profileState.username))
+            greeting = homeGreeting(java.time.LocalTime.now().hour, profileState.name, profileState.username),
+            onRefresh = { historyViewModel.refresh(); settingsViewModel.refresh() })
+    }
     }
     // One snackbar host above the docked navigation bar, for every signed-in screen
     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 80.dp))
@@ -175,9 +202,10 @@ fun HomeScreen(state: HomeUiState, onCreateQuota: () -> Unit,
     onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {},
     onTrackingSetup: () -> Unit = {}, live: QuotaDetailsModel? = null, liveLoading: Boolean = false,
     trackingIssue: TrackingIssue? = null, week: HomeWeek? = null, onShowRealData: () -> Unit = {}, greeting: String = "Hello",
-    insights: List<HomeInsight> = emptyList(), onSampleEnded: () -> Unit = {}) {
+    insights: List<HomeInsight> = emptyList(), onSampleEnded: () -> Unit = {}, onRefresh: () -> Unit = {}) {
     QuotaTheme { HomeContent(state, onCreateQuota, onSelectScenario, onSignOut, modifier, onViewQuota, onHistory, onNotifications,
-        unreadCount, onSettings, onTrackingSetup, live, liveLoading, trackingIssue, week, onShowRealData, greeting, insights, onSampleEnded) }
+        unreadCount, onSettings, onTrackingSetup, live, liveLoading, trackingIssue, week, onShowRealData, greeting, insights, onSampleEnded,
+        onRefresh) }
 }
 
 @Preview(name = "No quota", widthDp = 360, heightDp = 800)
@@ -198,3 +226,16 @@ private fun PermissionHomePreview() { QuotaTheme { HomeScreen(HomeUiState(previe
 @Composable
 private fun ReachedHomePreview() { QuotaTheme { HomeScreen(HomeUiState(previewing = true, scenario = HomeSampleState.QUOTA_REACHED), {}, {}, {}) } }
 
+
+/** The signed-in screens, by depth: the three tabs, then screens opened on top of them. */
+internal enum class SignedInScreen(val depth: Int) {
+    HOME(0), HISTORY(0), SETTINGS(0), DETAILS(1), NOTIFICATIONS(1), CREATE(2), DIAGNOSTICS(2), TRACKING(3)
+}
+
+/** Material motion: tabs fade through; going deeper slides in from the end, going back slides out. */
+private fun AnimatedContentTransitionScope<SignedInScreen>.signedInTransition(from: SignedInScreen, to: SignedInScreen): ContentTransform =
+    when {
+        to.depth > from.depth -> (slideInHorizontally(tween(300)) { it / 3 } + fadeIn(tween(300))) togetherWith fadeOut(tween(150))
+        to.depth < from.depth -> fadeIn(tween(200)) togetherWith (slideOutHorizontally(tween(250)) { it / 3 } + fadeOut(tween(250)))
+        else -> fadeIn(tween(220, delayMillis = 90)) togetherWith fadeOut(tween(90))
+    }

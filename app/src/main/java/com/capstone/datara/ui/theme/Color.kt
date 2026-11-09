@@ -64,6 +64,9 @@ val M3Outline = Color(0xFF74808F)
 val M3OutlineVariant = Color(0xFFC9D1DD)
 val M3InverseMint = Color(0xFF8EE3D2)        // accent on navy, 11:1
 
+// Chart highlight for today / this hour: the blue of the logo's D (4.6:1 on white, above 3:1 for marks)
+val ChartToday = Color(0xFF246BFE)
+
 // Ring/status accents on the navy hero (all ≥ 7:1 against M3Primary).
 val HeroOnTrack = Color(0xFF8EE3D2)
 val HeroHeadsUp = Color(0xFFFFCB80)
