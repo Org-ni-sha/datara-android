@@ -37,7 +37,7 @@ enum class TrackingIssue(val title: String, val body: String) {
 }
 
 /** Home's "Last 7 days" card: the same daily totals as History's 7-day window. */
-data class HomeWeek(val days: List<Day>) {
+data class HomeWeek(val days: List<Day>, val averageDailyBytes: Long = 0) {
     data class Day(val label: String, val bytes: Long?)
 
     /** Measured bytes only; unmeasured days add nothing. */
@@ -47,6 +47,8 @@ data class HomeWeek(val days: List<Day>) {
 
     companion object {
         private val LABEL = DateTimeFormatter.ofPattern("MMM d")
-        fun from(week: List<DayBucket>) = HomeWeek(week.map { Day(it.date.format(LABEL), it.bytes) })
+        /** [averageDailyBytes] is History's 7-day average (per measured hour × 24), so Home shows one number. */
+        fun from(week: List<DayBucket>, averageDailyBytes: Long = 0) =
+            HomeWeek(week.map { Day(it.date.format(LABEL), it.bytes) }, averageDailyBytes)
     }
 }

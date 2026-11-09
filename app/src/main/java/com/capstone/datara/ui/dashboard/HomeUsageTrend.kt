@@ -41,8 +41,9 @@ internal fun HomeUsageTrend(week: HomeWeek?, onHistory: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 else -> {
                     val measured = week.days.mapNotNull { it.bytes }
-                    val dailyAverage = measured.average()
-                    Text("${formatQuotaData(week.totalBytes)} measured · ${formatQuotaData(dailyAverage.toLong())} a day on average",
+                    // History's average (per measured hour × 24), the same figure as the Daily average card
+                    val dailyAverage = week.averageDailyBytes.toDouble()
+                    Text("${formatQuotaData(week.totalBytes)} measured · ${formatQuotaData(week.averageDailyBytes)} a day on average",
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     val description = week.days.joinToString("; ") { "${it.label}: ${it.bytes?.let(::formatQuotaData) ?: "not measured"}" }
                     Canvas(Modifier.fillMaxWidth().height(112.dp).semantics { contentDescription = "Daily mobile usage. $description" }) {
@@ -50,7 +51,7 @@ internal fun HomeUsageTrend(week: HomeWeek?, onHistory: () -> Unit) {
                         val base = size.height - inset
                         val height = size.height - inset * 2
                         val width = size.width - inset * 2
-                        val maximum = (measured.maxOrNull() ?: 0).toFloat().coerceAtLeast(1f)
+                        val maximum = maxOf((measured.maxOrNull() ?: 0).toDouble(), dailyAverage).toFloat().coerceAtLeast(1f)
                         drawLine(grid, Offset(inset, base), Offset(size.width - inset, base))
                         val slot = width / week.days.size
                         week.days.forEachIndexed { i, day ->

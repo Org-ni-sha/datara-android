@@ -20,7 +20,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.capstone.datara.ui.auth.AuthViewModel
 import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.quota.*
+import com.capstone.datara.ui.history.HistoryAggregation
 import com.capstone.datara.ui.history.HistoryScreen
+import com.capstone.datara.ui.history.HistoryWindow
 import com.capstone.datara.ui.history.HistoryUiState
 import com.capstone.datara.ui.history.HistoryViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -157,7 +159,9 @@ fun DashboardScreen(
             liveLoading = cycleDetails.isLoading,
             trackingIssue = TrackingIssue.of(settingsStatus.access, settingsStatus.serviceRunning,
                 cycleActive = cycleDetails.hasQuota && !cycleDetails.isEnded && !cycleDetails.isReached),
-            week = (historyState as? HistoryUiState.Ready)?.data?.week?.let(HomeWeek::from),
+            week = (historyState as? HistoryUiState.Ready)?.data?.let { data ->
+                HomeWeek.from(data.week, HistoryAggregation.snapshot(HistoryWindow.WEEK, data, null, java.time.ZoneId.systemDefault()).averageDailyBytes)
+            },
             insights = (historyState as? HistoryUiState.Ready)?.data?.let { HomeInsight.from(it, java.time.ZoneId.systemDefault()) }.orEmpty(),
             onShowRealData = viewModel::showRealData,
             onSampleEnded = { viewModel.selectScenario(HomeSampleState.FORECAST_AVAILABLE); viewModel.endCycle() },
