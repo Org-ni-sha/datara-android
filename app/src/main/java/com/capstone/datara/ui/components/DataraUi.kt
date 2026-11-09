@@ -61,9 +61,9 @@ fun LightNavigationBarIcons() {
 @Composable
 fun StatusPill(text: String, tone: StatusTone, modifier: Modifier = Modifier) {
     val (container, content) = when (tone) {
-        StatusTone.GOOD -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
+        StatusTone.GOOD -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
         StatusTone.PROBLEM -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-        StatusTone.NEUTRAL -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+        StatusTone.NEUTRAL -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
     }
     Surface(modifier, color = container, contentColor = content, shape = MaterialTheme.shapes.extraSmall) {
         Text(text, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
@@ -87,8 +87,8 @@ fun PreviewMenu(options: List<Pair<String, () -> Unit>>) {
 
 @Composable
 fun SampleLabel(text: String = "Sample data") {
-    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = RoundedCornerShape(8.dp)) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer,
+    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp)) {
+        Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
     }
 }
@@ -96,8 +96,8 @@ fun SampleLabel(text: String = "Sample data") {
 @Composable
 fun TonalIcon(icon: ImageVector, positive: Boolean = false, modifier: Modifier = Modifier) {
     Surface(modifier.size(42.dp), shape = RoundedCornerShape(14.dp),
-        color = if (positive) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = if (positive) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSecondaryContainer) {
+        color = if (positive) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
+        contentColor = if (positive) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onPrimaryContainer) {
         Box(contentAlignment = Alignment.Center) { Icon(icon, null, modifier = Modifier.size(21.dp)) }
     }
 }

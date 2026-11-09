@@ -19,6 +19,8 @@ import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.components.*
 import com.capstone.datara.ui.notifications.NotificationBell
 import com.capstone.datara.ui.quota.*
+import com.capstone.datara.data.cycle.CycleStatus
+import androidx.compose.ui.text.style.TextAlign
 
 @Composable
 internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
@@ -27,7 +29,7 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
     onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {},
     onTrackingSetup: () -> Unit = {}, live: QuotaDetailsModel? = null, liveLoading: Boolean = false,
     trackingIssue: TrackingIssue? = null, week: HomeWeek? = null, onShowRealData: () -> Unit = {},
-    greeting: String = "Hello") {
+    greeting: String = "Hello", insights: List<HomeInsight> = emptyList(), onSampleEnded: () -> Unit = {}) {
     var showInfo by remember { mutableStateOf(false) }
     val hero = HeroContent.select(state, live, liveLoading, trackingIssue)
     Scaffold(modifier, containerColor = MaterialTheme.colorScheme.background,
@@ -36,17 +38,13 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
             NotificationBell(unreadCount, onNotifications)
             // Review tool for the defense screens; removed before the freeze
             PreviewMenu(listOf("Show my real quota" to onShowRealData) +
-                HomeSampleState.entries.map { option -> "Sample: ${option.label}" to { onSelectScenario(option) } })
+                HomeSampleState.entries.map { option -> "Sample: ${option.label}" to { onSelectScenario(option) } } +
+                listOf("Sample: Cycle ended" to onSampleEnded))
         }) }, bottomBar = { QuotaBottomBar(false, {}, onHistory, onSettings) }) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             if (state.previewing) {
                 StatusPill("Sample screen · Preview options", StatusTone.NEUTRAL)
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Your mobile usage", style = MaterialTheme.typography.headlineMedium)
-                Text("Forecasting against your chosen quota.", style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             ForecastHero(hero, onCreateQuota, onAccess = onTrackingSetup, onViewQuota = onViewQuota)
             if (hero.loading) {
@@ -60,6 +58,8 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
                             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface))
                     }
                 } else {
+                    // Real measured data only, so not beside a sample hero
+                    if (!state.previewing) HomeInsightsCarousel(insights)
                     HomeUsageTrend(week, onHistory)
                 }
             } else {
@@ -103,8 +103,39 @@ internal data class HeroContent(
     val isLive: Boolean,
     /** Shown as a warning banner inside the hero, with "Fix tracking". */
     val issue: TrackingIssue? = null,
-    val loading: Boolean = false
+    val loading: Boolean = false,
+    /** Collecting: measured and needed hours of the last 24. */
+    val observedHours: Int? = null,
+    val neededHours: Int? = null,
+    /** The PET's date ("Nov 27"); null without a PET. */
+    val reachDate: String? = null
 ) {
+    val collecting: Boolean get() = !loading && !empty && !missing && !ended && !reached && (hideUsage || observedHours != null)
+    val tone: QuotaTone get() = quotaStatusTone(progress,
+        when { ended -> CycleStatus.ENDED; reached -> CycleStatus.REACHED; else -> CycleStatus.ACTIVE })
+    val percentUsed: Int get() = (progress.coerceAtLeast(0f) * 100).toInt()
+    private val beyond: Boolean get() = headline == "Beyond 30 days"
+
+    /** The ring's big centre value: hours measured, the PET ("19 days") or the share used. */
+    val ringValue: String get() = when {
+        missing -> "—"
+        collecting -> if (observedHours != null && neededHours != null) "$observedHours of $neededHours" else "…"
+        reached || ended -> "$percentUsed%"
+        beyond -> "30+ days"
+        headline.startsWith("About ") -> headline.removePrefix("About ")
+        else -> "$percentUsed%"
+    }
+    val ringCaption: String get() = when {
+        missing -> "Usage unavailable"
+        collecting -> "hours measured"
+        ended -> "used at end"
+        reached -> "used"
+        beyond -> "not within 30 days"
+        reachDate != null -> "around $reachDate"
+        headline.startsWith("About ") -> "to reach your quota"
+        else -> "used"
+    }
+
     companion object {
         /**
          * A Preview options scenario while one is picked; otherwise the real cycle (loading,
@@ -116,6 +147,9 @@ internal data class HeroContent(
             live != null -> live(live, issue)
             else -> sample(HomeUiState())
         }
+
+        private val REACH_FORMAT = java.time.format.DateTimeFormatter.ofPattern("MMM d")
+        private fun reachDate(millis: Long) = REACH_FORMAT.format(java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.systemDefault()))
 
         val LOADING = HeroContent(empty = false, reached = false, ended = false, missing = false, hideUsage = true,
             label = "LOADING", headline = "Loading your quota…", body = "", name = "", amountBytes = 0, usedBytes = 0,
@@ -157,7 +191,10 @@ internal data class HeroContent(
                     else -> "Illustrative forecast based on sample usage. Your actual pace may change."
                 },
                 name = state.name, amountBytes = state.amountBytes, usedBytes = state.usedBytes,
-                remainingBytes = state.remainingBytes, progress = state.progress, isLive = false
+                remainingBytes = state.remainingBytes, progress = state.progress, isLive = false,
+                observedHours = if (collecting) 4 else null, neededHours = if (collecting) 6 else null,
+                reachDate = if (!empty && !reached && !missing && !collecting && !state.isEnded)
+                    reachDate(System.currentTimeMillis() + 12 * 3_600_000L) else null
             )
         }
 
@@ -183,88 +220,112 @@ internal data class HeroContent(
                 },
                 name = details.name, amountBytes = details.quotaBytes, usedBytes = details.usedBytes ?: 0,
                 remainingBytes = details.remainingBytes ?: 0, progress = details.progress, isLive = true,
-                issue = issue.takeIf { !details.isEnded && !details.isReached }
+                issue = issue.takeIf { !details.isEnded && !details.isReached },
+                observedHours = forecast?.observedHours, neededHours = forecast?.neededHours,
+                reachDate = forecast?.reachAtMillis?.let(::reachDate)
             )
         }
     }
 }
 
+/** The navy forecast hero: a ring of the quota used with the PET (or the state) in its centre. */
 @Composable
 private fun ForecastHero(hero: HeroContent, onCreate: () -> Unit, onAccess: () -> Unit, onViewQuota: () -> Unit) {
-    val empty = hero.empty
-    val missing = hero.missing
-    val statusColor = if (missing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+    val scheme = MaterialTheme.colorScheme
+    val onHero = scheme.onPrimary
+    val soft = onHero.copy(alpha = 0.82f)
     Card(shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        colors = CardDefaults.cardColors(containerColor = scheme.primary, contentColor = onHero)) {
         if (hero.loading) {
-            Column(Modifier.fillMaxWidth().padding(20.dp).semantics(mergeDescendants = true) {},
+            Column(Modifier.fillMaxWidth().padding(24.dp).semantics(mergeDescendants = true) {},
                 verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.tertiary)
-                Text(hero.headline, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                CircularProgressIndicator(color = scheme.inversePrimary, trackColor = onHero.copy(alpha = 0.16f))
+                Text(hero.headline, style = MaterialTheme.typography.bodyLarge, color = soft)
             }
             return@Card
         }
-        Column(Modifier.fillMaxWidth().animateContentSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Column(Modifier.fillMaxWidth().animateContentSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             hero.issue?.let { TrackingBanner(it, onAccess) }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                TonalIcon(if (empty) DataraIcons.Plus else if (missing) DataraIcons.Shield else DataraIcons.Clock, positive = !missing)
-                Text(hero.label, style = MaterialTheme.typography.labelLarge, color = statusColor, modifier = Modifier.weight(1f))
+                Text(hero.label, style = MaterialTheme.typography.labelLarge, color = soft, modifier = Modifier.weight(1f))
+                if (!hero.empty && !hero.missing && !hero.collecting) QuotaStatusChip(hero.tone)
             }
-            Text(hero.headline, style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onSurface)
-            Surface(color = if (missing) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainerLow,
-                contentColor = if (missing) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface,
-                shape = MaterialTheme.shapes.medium) {
-                Text(hero.body, modifier = Modifier.fillMaxWidth().padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+            if (hero.empty) {
+                Text(hero.headline, style = MaterialTheme.typography.headlineLarge)
+                Text(hero.body, style = MaterialTheme.typography.bodyMedium, color = soft)
+                HeroPrimaryButton("Create a quota", onCreate)
+                return@Column
             }
-            if (!empty) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(hero.name, style = MaterialTheme.typography.titleLarge)
-                    Text("Tracking ${formatQuotaData(hero.amountBytes)}", style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val accent = if (hero.missing) scheme.inversePrimary.copy(alpha = 0f) else hero.tone.onPrimaryAccent()
+            val below = ringTextBelow()
+            val ringText: @Composable () -> Unit = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(hero.ringValue, style = MaterialTheme.typography.displaySmall, color = onHero, textAlign = TextAlign.Center)
+                    Text(hero.ringCaption, style = MaterialTheme.typography.labelLarge, color = soft, textAlign = TextAlign.Center)
                 }
-                when {
-                    missing -> Text("Remaining quota unavailable", style = MaterialTheme.typography.bodyMedium)
-                    hero.hideUsage -> Text("Usage has not been measured yet.", style = MaterialTheme.typography.bodyMedium)
-                    else -> {
-                        val progress by animateFloatAsState(hero.progress.coerceIn(0f, 1f), tween(350), label = "Quota progress")
-                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(8.dp).semantics {
-                            contentDescription = "${(hero.progress * 100).toInt()} percent of quota used"
-                        }, color = MaterialTheme.colorScheme.tertiary, trackColor = MaterialTheme.colorScheme.secondaryContainer,
-                            drawStopIndicator = {})
-                        val remaining = "${formatQuotaData(hero.remainingBytes)} ${if (hero.ended) "unused at end" else "remaining"}"
-                        val used = formatQuotaData(hero.usedBytes)
-                        val usedLabel = if (hero.ended) "Used at end" else "Used this cycle"
-                        BoxWithConstraints(Modifier.fillMaxWidth()) {
-                            if (maxWidth < 280.dp || LocalDensity.current.fontScale > 1.3f) {
-                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    QuotaMetric(remaining, "Current cycle", Modifier.fillMaxWidth())
-                                    QuotaMetric(used, usedLabel, Modifier.fillMaxWidth())
-                                }
-                            } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                QuotaMetric(remaining, "Current cycle", Modifier.weight(1f))
-                                QuotaMetric(used, usedLabel, Modifier.weight(1f))
-                            }
+            }
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                QuotaRing(progress = when { hero.collecting -> null; hero.missing -> 0f; else -> hero.progress },
+                    color = if (hero.collecting) scheme.inversePrimary else accent, trackColor = onHero.copy(alpha = 0.16f),
+                    description = ringDescription(hero), size = if (below) 120.dp else 216.dp, stroke = if (below) 10.dp else 14.dp) {
+                    if (!below) ringText()
+                }
+                if (below) ringText()
+            }
+            Text(if (hero.collecting) "Learning your usage… ${hero.body}" else hero.body,
+                style = MaterialTheme.typography.bodyMedium, color = soft)
+            if (!hero.missing && !hero.hideUsage) {
+                val remaining = formatQuotaData(hero.remainingBytes)
+                val used = formatQuotaData(hero.usedBytes)
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    if (maxWidth < 280.dp || LocalDensity.current.fontScale > 1.3f) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            QuotaMetric(remaining, if (hero.ended) "Unused at end" else "Left of ${formatQuotaData(hero.amountBytes)}", Modifier.fillMaxWidth())
+                            QuotaMetric(used, if (hero.ended) "Used at end" else "Used this cycle", Modifier.fillMaxWidth())
                         }
+                    } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        QuotaMetric(remaining, if (hero.ended) "Unused at end" else "Left of ${formatQuotaData(hero.amountBytes)}", Modifier.weight(1f))
+                        QuotaMetric(used, if (hero.ended) "Used at end" else "Used this cycle", Modifier.weight(1f))
                     }
                 }
             }
-            if (empty || hero.reached || hero.ended || missing) {
-                DataraActionButton(if (missing && !hero.ended) "About Usage Access" else if (empty) "Create a quota" else "Create another quota",
-                    if (missing && !hero.ended) onAccess else onCreate)
+            if (hero.reached || hero.ended || hero.missing) {
+                HeroPrimaryButton(if (hero.missing && !hero.ended) "About Usage Access" else "Create another quota",
+                    if (hero.missing && !hero.ended) onAccess else onCreate)
             }
-            if (!empty) FilledTonalButton(onClick = onViewQuota, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = MaterialTheme.shapes.medium) {
+            FilledTonalButton(onClick = onViewQuota, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.filledTonalButtonColors(containerColor = onHero.copy(alpha = 0.12f), contentColor = onHero)) {
                 Text("View quota details"); Spacer(Modifier.width(12.dp)); Icon(DataraIcons.ArrowForward, null, modifier = Modifier.size(18.dp))
             }
         }
     }
 }
 
+private fun ringDescription(hero: HeroContent): String = when {
+    hero.missing -> "Usage unavailable. Usage Access is needed."
+    hero.collecting -> "Learning your usage. ${hero.ringValue} ${hero.ringCaption}."
+    else -> "${hero.percentUsed} percent of quota used. ${hero.ringValue}, ${hero.ringCaption}. ${hero.tone.label}."
+}
+
+/** The hero's main action: mint on navy. */
+@Composable
+private fun HeroPrimaryButton(text: String, onClick: () -> Unit) {
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = MaterialTheme.shapes.medium,
+        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.inversePrimary,
+            contentColor = MaterialTheme.colorScheme.primary)) {
+        Text(text, style = MaterialTheme.typography.labelLarge)
+        Spacer(Modifier.width(12.dp))
+        Icon(DataraIcons.ArrowForward, null, modifier = Modifier.size(20.dp))
+    }
+}
+
 @Composable
 private fun QuotaMetric(value: String, label: String, modifier: Modifier) {
-    Surface(modifier, color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+    val onHero = MaterialTheme.colorScheme.onPrimary
+    Surface(modifier, color = onHero.copy(alpha = 0.10f), contentColor = onHero, shape = MaterialTheme.shapes.medium) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(value, style = MaterialTheme.typography.titleMedium)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = onHero.copy(alpha = 0.82f))
         }
     }
 }

@@ -451,14 +451,14 @@ private fun DoneCard(onLogIn: () -> Unit) {
             modifier = Modifier
                 .size(64.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.tertiaryContainer)
+                .background(MaterialTheme.colorScheme.secondaryContainer)
                 .semantics { contentDescription = "Success" },
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = DataraIcons.CheckCircle,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.tertiary,
+                tint = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.size(34.dp)
             )
         }

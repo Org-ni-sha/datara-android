@@ -19,8 +19,8 @@ import com.capstone.datara.ui.quota.formatQuotaData
  */
 @Composable
 internal fun HomeUsageTrend(week: HomeWeek?, onHistory: () -> Unit) {
-    val today = MaterialTheme.colorScheme.tertiary
-    val bar = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.72f)
+    val today = MaterialTheme.colorScheme.secondary
+    val bar = MaterialTheme.colorScheme.secondary.copy(alpha = 0.72f)
     val grid = MaterialTheme.colorScheme.outlineVariant
     Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -57,7 +57,7 @@ internal fun HomeUsageTrend(week: HomeWeek?, onHistory: () -> Unit) {
                     }
                     week.latest?.let {
                         Text("${it.label}: ${formatQuotaData(it.bytes ?: 0)}", style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.tertiary)
+                            color = MaterialTheme.colorScheme.secondary)
                     }
                 }
             }
