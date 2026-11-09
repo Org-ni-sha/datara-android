@@ -43,6 +43,33 @@ fun DataraAppBar(title: String, onBack: (() -> Unit)? = null, subtitle: String? 
             actionIconContentColor = MaterialTheme.colorScheme.primary))
 }
 
+/**
+ * Collapsing Material 3 header for top-level lists (History, Settings, Notifications): a medium
+ * title that shrinks into the regular bar as [scrollBehavior] scrolls. Same light colours as
+ * [DataraAppBar]; the collapsed bar picks up a tonal surface so it separates from the content.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DataraCollapsingAppBar(title: String, scrollBehavior: TopAppBarScrollBehavior, onBack: (() -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {}) {
+    MediumTopAppBar(title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() }) },
+        navigationIcon = { if (onBack != null) IconButton(onClick = onBack) { Icon(DataraIcons.ArrowBack, "Back") } },
+        actions = actions, scrollBehavior = scrollBehavior,
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background,
+            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            titleContentColor = MaterialTheme.colorScheme.primary, navigationIconContentColor = MaterialTheme.colorScheme.primary,
+            actionIconContentColor = MaterialTheme.colorScheme.primary))
+}
+
+/** Tonal icon in a quota status colour (History cycles, notification rows). */
+@Composable
+fun ToneIcon(icon: ImageVector, tone: QuotaTone, modifier: Modifier = Modifier) {
+    val colors = tone.colors()
+    Surface(modifier.size(42.dp), shape = RoundedCornerShape(14.dp), color = colors.container, contentColor = colors.content) {
+        Box(contentAlignment = Alignment.Center) { Icon(icon, null, modifier = Modifier.size(21.dp)) }
+    }
+}
+
 /** Light navigation-bar icons while a navy bottom bar is on screen; restores the previous setting after. */
 @Composable
 fun LightNavigationBarIcons() {

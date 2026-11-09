@@ -24,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -55,6 +56,7 @@ fun SettingsScreen(email: String?, onSaveName: (String) -> String?,
 /** Taps on the version that open the hidden diagnostics screen (D9). */
 const val DIAGNOSTICS_TAPS = 7
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsContent(email: String?, onSaveName: (String) -> String?,
     onMilestonesChange: (Boolean) -> Unit, onForecastsChange: (Boolean) -> Unit,
@@ -74,56 +76,66 @@ private fun SettingsContent(email: String?, onSaveName: (String) -> String?,
             onNameEdited = onNameEdited, bottomBar = bottomBar)
         return
     }
-    Scaffold(containerColor = MaterialTheme.colorScheme.background, bottomBar = bottomBar,
-        topBar = { DataraAppBar("Settings") }) { insets ->
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    Scaffold(modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection), containerColor = MaterialTheme.colorScheme.background,
+        bottomBar = bottomBar, topBar = { DataraCollapsingAppBar("Settings", scrollBehavior) }) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            SectionTitle("App preferences", "Manage alerts, access and your profile.")
-            Surface(onClick = { profile = true }, color = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface, shape = MaterialTheme.shapes.large) {
-                Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
-                        Icon(DataraIcons.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(12.dp).size(28.dp))
+            // Profile card: tonal avatar initial, name, email, chevron
+            Card(onClick = { profile = true }, shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
+                Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AvatarInitial(profileState.name, size = 56.dp)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(profileState.name.ifBlank { "Your profile" }, style = MaterialTheme.typography.titleLarge)
+                        Text(email ?: "Email unavailable", style = MaterialTheme.typography.bodyMedium)
+                        Text("View and edit profile", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                     }
-                    Text(profileState.name.ifBlank { "Your profile" }, style = MaterialTheme.typography.headlineMedium)
-                    Text(email ?: "Email unavailable", style = MaterialTheme.typography.bodyMedium)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("View and edit profile", style = MaterialTheme.typography.labelLarge)
-                        Icon(DataraIcons.ArrowForward, null, modifier = Modifier.size(18.dp))
-                    }
+                    Icon(DataraIcons.Chevron, null, modifier = Modifier.size(18.dp))
                 }
             }
             SettingsCard("Notification preferences") {
                 PreferenceSwitch(PreferenceKey.MILESTONES, "Quota milestones", "At 75%, 90% and 100% of your quota", alertPreferences.milestones, onMilestonesChange)
                 PreferenceSwitch(PreferenceKey.FORECASTS, "Forecast reminders", "When your quota is likely to be reached within 24 hours and within 3 hours",
                     alertPreferences.forecasts, onForecastsChange)
-                Text("Each alert is sent once per quota. Reaching a quota never cuts your connection.",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                SystemNotificationStatus()
+                Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Each alert is sent once per quota. Reaching a quota never cuts your connection.",
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    SystemNotificationStatus()
+                }
             }
             SettingsCard("Tracking status") {
                 LifecycleResumeEffect(Unit) {
                     onRefreshStatus()
                     onPauseOrDispose { }
                 }
-                StatusLine("Tracking service", status.serviceRunning, "Running", "Stopped")
-                StatusLine("Usage Access", status.access.usageAccess, "Granted", "Not granted")
-                StatusLine("Notifications", status.access.notifications, "Allowed", "Off")
-                StatusLine("Battery optimization", status.access.batteryUnrestricted, "Unrestricted", "Restricted")
-                Text("Usage Access and notifications are needed to measure mobile data; an unrestricted battery lets tracking restart on its own.",
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(onClick = onTrackingSetup, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open tracking setup") }
+                StatusLine(DataraIcons.Data, "Tracking service", status.serviceRunning, "Running", "Stopped")
+                StatusLine(DataraIcons.Shield, "Usage Access", status.access.usageAccess, "Granted", "Not granted")
+                StatusLine(DataraIcons.Bell, "Notifications", status.access.notifications, "Allowed", "Off")
+                StatusLine(DataraIcons.Lock, "Battery optimization", status.access.batteryUnrestricted, "Unrestricted", "Restricted")
+                Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Usage Access and notifications are needed to measure mobile data; an unrestricted battery lets tracking restart on its own.",
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    OutlinedButton(onClick = onTrackingSetup, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open tracking setup") }
+                }
             }
             // The "Cloud sync" card returns when sync (C3) exists; until then there is nothing to show.
             SettingsCard("About DATAra") {
                 var taps by remember { mutableIntStateOf(0) }
-                Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleMedium,
+                ListItem(leadingContent = { TonalIcon(DataraIcons.CheckCircle) },
+                    headlineContent = { Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleMedium) },
+                    supportingContent = { Text("Forecast when mobile usage reaches a quota you choose.") },
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                     modifier = Modifier.clickable(interactionSource = null, indication = null) {
                         taps++
                         if (taps >= DIAGNOSTICS_TAPS) { taps = 0; onOpenDiagnostics() }
                     })
-                Text("Forecast when mobile usage reaches a quota you choose.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = { dialog = "Privacy and tracking" }) { Text("Privacy and tracking") }
+                ListItem(leadingContent = { TonalIcon(DataraIcons.Shield) },
+                    headlineContent = { Text("Privacy and tracking", style = MaterialTheme.typography.titleMedium) },
+                    trailingContent = { Icon(DataraIcons.Chevron, null, modifier = Modifier.size(18.dp)) },
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    modifier = Modifier.clickable(role = Role.Button) { dialog = "Privacy and tracking" })
             }
             OutlinedButton(onClick = { dialog = "Sign out" }, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Sign out") }
@@ -181,15 +193,25 @@ internal const val PRIVACY_TEXT =
     "Each install gets a random device ID. Your sign-in and profile name are handled by Supabase Auth.\n\n" +
     "DATAra never reads your SMS and never blocks your internet. Cloud sync isn’t active yet, so your usage data stays on this phone."
 
-/** Label and value side by side; the value drops below the label when large text no longer fits. */
-@OptIn(ExperimentalLayoutApi::class)
+/** A status row: tinted leading icon, label, and its state as a pill (teal when fine, red when it needs attention). */
 @Composable
-private fun StatusLine(label: String, ok: Boolean, okText: String, badText: String) {
-    FlowRow(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}, horizontalArrangement = Arrangement.SpaceBetween,
-        verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(end = 12.dp))
-        Text(if (ok) okText else badText, style = MaterialTheme.typography.bodyLarge,
-            color = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+private fun StatusLine(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, ok: Boolean, okText: String, badText: String) {
+    ListItem(modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
+        leadingContent = { TonalIcon(icon, positive = ok) },
+        headlineContent = { Text(label, style = MaterialTheme.typography.bodyLarge) },
+        // Pill sits under the label so long values and large text never squeeze the row
+        supportingContent = { StatusPill(if (ok) okText else badText, if (ok) StatusTone.GOOD else StatusTone.PROBLEM, Modifier.padding(top = 6.dp)) },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow))
+}
+
+/** The profile initial in a tonal circle (person icon when there is no name yet). */
+@Composable
+internal fun AvatarInitial(name: String, size: androidx.compose.ui.unit.Dp) {
+    Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
+        Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+            if (name.isBlank()) Icon(DataraIcons.Person, null, modifier = Modifier.size(size / 2))
+            else Text(name.trim().take(1).uppercase(), style = MaterialTheme.typography.headlineSmall)
+        }
     }
 }
 
@@ -201,14 +223,16 @@ private fun PreferenceSwitch(key: PreferenceKey, title: String, description: Str
         leadingContent = { TonalIcon(when (key) { PreferenceKey.MILESTONES -> DataraIcons.Data; PreferenceKey.FORECASTS -> DataraIcons.Clock }) },
         headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
         supportingContent = { Text(description, style = MaterialTheme.typography.bodyMedium) },
-        trailingContent = { Switch(checked = checked, onCheckedChange = null) })
+        trailingContent = { Switch(checked = checked, onCheckedChange = null) },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow))
 }
 
 @Composable
 private fun SettingsCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 20.dp, horizontal = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 12.dp).semantics { heading() })
             content()
         }
     }

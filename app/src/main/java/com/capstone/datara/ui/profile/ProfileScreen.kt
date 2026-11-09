@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.components.*
 import com.capstone.datara.ui.theme.QuotaTheme
+import com.capstone.datara.ui.settings.AvatarInitial
 
 @Composable
 fun ProfileScreen(profile: ProfileUiState, email: String?, onBack: () -> Unit,
@@ -49,18 +50,14 @@ fun ProfileScreen(profile: ProfileUiState, email: String?, onBack: () -> Unit,
             Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 if (profile.isLoading) LinearProgressIndicator(Modifier.fillMaxWidth().semantics { contentDescription = "Loading your profile" })
-                Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
                     Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
-                            Box(Modifier.size(68.dp), contentAlignment = Alignment.Center) {
-                                if (displayName.isBlank()) Icon(DataraIcons.Person, null, modifier = Modifier.size(32.dp))
-                                else Text(displayName.take(1).uppercase(), style = MaterialTheme.typography.headlineLarge)
-                            }
-                        }
+                        AvatarInitial(displayName, size = 68.dp)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(displayName.ifBlank { "Your profile" }, style = MaterialTheme.typography.titleLarge)
                             Text(profile.username?.let { "@$it" } ?: "Your DATAra profile",
-                                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
@@ -71,8 +68,8 @@ fun ProfileScreen(profile: ProfileUiState, email: String?, onBack: () -> Unit,
                     supportingText = { Text(error ?: "${DisplayNameValidator.MIN_LENGTH} to ${DisplayNameValidator.MAX_LENGTH} characters") },
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { if (!profile.isSaving) save() }))
-                Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    ListItem(leadingContent = { TonalIcon(DataraIcons.Email) }, headlineContent = { Text(email ?: "Email unavailable") },
+                Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                    ListItem(colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow), leadingContent = { TonalIcon(DataraIcons.Email) }, headlineContent = { Text(email ?: "Email unavailable") },
                         overlineContent = { Text("Sign-in email") }, supportingContent = { Text("This is the email you sign in with. It can’t be changed here.") })
                 }
                 if (profile.loadFailed) {

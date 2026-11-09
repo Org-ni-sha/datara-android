@@ -1,5 +1,6 @@
 package com.capstone.datara.ui.notifications
 
+import com.capstone.datara.ui.components.QuotaTone
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.capstone.datara.alerts.AlertRules
@@ -33,7 +34,9 @@ enum class AlertCategory(val label: String) { QUOTA("Usage milestone"), FORECAST
 
 /** One inbox row. [cycleId] opens the cycle's details; null for an alert without a cycle. */
 data class AlertItem(val id: String, val title: String, val message: String,
-    val category: AlertCategory, val receivedAtMillis: Long, val isRead: Boolean, val cycleId: String? = null)
+    val category: AlertCategory, val receivedAtMillis: Long, val isRead: Boolean, val cycleId: String? = null,
+    /** Status colour of a milestone (same code as the ring); null for forecast alerts. */
+    val tone: QuotaTone? = null)
 
 data class NotificationCenterState(val alerts: List<AlertItem> = emptyList(), val isLoading: Boolean = false) {
     val unreadCount get() = alerts.count { !it.isRead }
@@ -96,7 +99,13 @@ class NotificationCenterViewModel @Inject constructor(
             },
             receivedAtMillis = row.sentAt,
             isRead = row.readAt != null,
-            cycleId = row.cycleId
+            cycleId = row.cycleId,
+            tone = when (row.notificationType) {
+                NotificationType.MILESTONE_75 -> QuotaTone.HEADS_UP
+                NotificationType.MILESTONE_90 -> QuotaTone.ALMOST
+                NotificationType.QUOTA_REACHED -> QuotaTone.REACHED
+                else -> null
+            }
         )
     }
 }

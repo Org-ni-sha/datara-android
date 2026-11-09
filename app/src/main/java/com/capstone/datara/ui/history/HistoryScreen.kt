@@ -9,6 +9,20 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import kotlinx.coroutines.delay
+import com.patrykandpatrick.vico.compose.cartesian.decoration.HorizontalLine
+import com.patrykandpatrick.vico.compose.cartesian.marker.DefaultCartesianMarker
+import com.patrykandpatrick.vico.compose.cartesian.marker.rememberDefaultCartesianMarker
+import com.patrykandpatrick.vico.compose.common.DashedShape
+import com.patrykandpatrick.vico.compose.common.Insets
+import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
+import com.patrykandpatrick.vico.compose.common.component.rememberTextComponent
+import com.patrykandpatrick.vico.compose.common.data.ExtraStore
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,17 +56,17 @@ import java.time.ZoneId
 fun HistoryScreen(onHome: () -> Unit, onSettings: () -> Unit, modifier: Modifier = Modifier,
     onNotifications: () -> Unit = {}, unreadCount: Int = 0, viewModel: HistoryViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsState()
-    HistoryScreen(state, onHome, onSettings, modifier, onNotifications, unreadCount)
+    HistoryScreen(state, onHome, onSettings, modifier, onNotifications, unreadCount, onRefresh = viewModel::refresh)
 }
 
 @Composable
 fun HistoryScreen(state: HistoryUiState, onHome: () -> Unit, onSettings: () -> Unit, modifier: Modifier = Modifier,
-    onNotifications: () -> Unit = {}, unreadCount: Int = 0, zone: ZoneId = ZoneId.systemDefault()) {
+    onNotifications: () -> Unit = {}, unreadCount: Int = 0, zone: ZoneId = ZoneId.systemDefault(), onRefresh: () -> Unit = {}) {
     QuotaTheme {
         ProvideVicoTheme(vicoTheme.copy(lineColor = MaterialTheme.colorScheme.outlineVariant,
             textColor = MaterialTheme.colorScheme.onSurfaceVariant,
             columnCartesianLayerColors = listOf(MaterialTheme.colorScheme.secondary))) {
-            HistoryContent(state, onHome, onSettings, modifier, onNotifications, unreadCount, zone)
+            HistoryContent(state, onHome, onSettings, modifier, onNotifications, unreadCount, zone, onRefresh)
         }
     }
 }
@@ -60,7 +74,7 @@ fun HistoryScreen(state: HistoryUiState, onHome: () -> Unit, onSettings: () -> U
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HistoryContent(state: HistoryUiState, onHome: () -> Unit, onSettings: () -> Unit, modifier: Modifier,
-    onNotifications: () -> Unit, unreadCount: Int, zone: ZoneId) {
+    onNotifications: () -> Unit, unreadCount: Int, zone: ZoneId, onRefresh: () -> Unit) {
     val data = (state as? HistoryUiState.Ready)?.data
     var windowName by rememberSaveable { mutableStateOf(HistoryWindow.WEEK.name) }
     var cycleId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -77,12 +91,16 @@ private fun HistoryContent(state: HistoryUiState, onHome: () -> Unit, onSettings
             readOnly = true, readOnlyNote = "From History · Read-only details")
         return
     }
-    Scaffold(modifier = modifier, containerColor = MaterialTheme.colorScheme.background,
-        topBar = { DataraAppBar("History", actions = { NotificationBell(unreadCount, onNotifications) }) },
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    var refreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(refreshing) { if (refreshing) { delay(700); refreshing = false } }
+    Scaffold(modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection), containerColor = MaterialTheme.colorScheme.background,
+        topBar = { DataraCollapsingAppBar("History", scrollBehavior, actions = { NotificationBell(unreadCount, onNotifications) }) },
         bottomBar = { QuotaBottomBar(true, onHome, {}, onSettings) }) { insets ->
-        Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
+        PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true; onRefresh() }, modifier = Modifier.fillMaxSize().padding(insets)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            SectionTitle("Usage history", "Mobile data measured on this phone.")
+            Text("Mobile data measured on this phone.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             when {
                 data == null -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(Modifier.semantics { contentDescription = "Loading history" })
@@ -96,12 +114,14 @@ private fun HistoryContent(state: HistoryUiState, onHome: () -> Unit, onSettings
                 }
                 else -> {
                     if (data.measuredHours < 24) CollectingNote(data.measuredHours)
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        HistoryWindow.entries.forEachIndexed { index, option ->
-                            SegmentedButton(selected = window == option, onClick = { windowName = option.name; readings = false },
-                                shape = SegmentedButtonDefaults.itemShape(index, HistoryWindow.entries.size), icon = {}) {
-                                Text(option.label, style = MaterialTheme.typography.labelLarge)
-                            }
+                    // FlowRow so the three range chips wrap instead of squeezing at large font sizes
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        HistoryWindow.entries.forEach { option ->
+                            FilterChip(selected = window == option, onClick = { windowName = option.name; readings = false },
+                                label = { Text(option.label, style = MaterialTheme.typography.labelLarge) },
+                                modifier = Modifier.heightIn(min = 48.dp),
+                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer))
                         }
                     }
                     if (window == HistoryWindow.CYCLE) {
@@ -124,12 +144,13 @@ private fun HistoryContent(state: HistoryUiState, onHome: () -> Unit, onSettings
                     }
                     if (snapshot != null && !(window == HistoryWindow.CYCLE && cycle == null)) {
                         TotalCard(snapshot, window)
-                        TrendCard(snapshot, window) { readings = true }
+                        TrendCard(snapshot, window, highlightLast = window != HistoryWindow.CYCLE || cycle?.cycle?.endedAt == null) { readings = true }
                     }
                     SectionTitle("Quota cycles", if (data.cycles.isEmpty()) "No cycles yet" else "Tap a cycle for its details")
                     data.cycles.forEach { item -> CycleCard(item) { detailsId = item.cycle.cycleId } }
                 }
             }
+        }
         }
     }
     if (readings && snapshot != null) ModalBottomSheet(onDismissRequest = { readings = false }, containerColor = MaterialTheme.colorScheme.surface) {
@@ -159,8 +180,8 @@ private fun CollectingNote(hours: Int) {
 
 @Composable
 private fun TotalCard(snapshot: HistorySnapshot, window: HistoryWindow) {
-    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface)) {
+    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("MOBILE DATA USED", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
@@ -168,8 +189,8 @@ private fun TotalCard(snapshot: HistorySnapshot, window: HistoryWindow) {
             }
             Text(formatQuotaData(snapshot.totalBytes), style = MaterialTheme.typography.displayLarge)
             if (snapshot.isPartial) Text("Measured ${snapshot.measuredHours} of ${snapshot.totalHours} hours. Totals count measured hours only.",
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (window != HistoryWindow.DAY && snapshot.hasData) Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
+                style = MaterialTheme.typography.bodyMedium)
+            if (window != HistoryWindow.DAY && snapshot.hasData) Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest, shape = MaterialTheme.shapes.medium) {
                 Text("${formatQuotaData(snapshot.averageDailyBytes)} average per measured day", modifier = Modifier.fillMaxWidth().padding(14.dp),
                     style = MaterialTheme.typography.bodyMedium)
             }
@@ -178,21 +199,24 @@ private fun TotalCard(snapshot: HistorySnapshot, window: HistoryWindow) {
 }
 
 @Composable
-private fun TrendCard(snapshot: HistorySnapshot, window: HistoryWindow, onReadings: () -> Unit) {
+private fun TrendCard(snapshot: HistorySnapshot, window: HistoryWindow, highlightLast: Boolean, onReadings: () -> Unit) {
     val unit = remember(snapshot) { chartUnit(snapshot.points) }
     HistoryCard {
         SectionTitle("Usage trend", "${if (window == HistoryWindow.DAY) "Hourly" else "Daily"} totals · ${unit.name}")
         if (snapshot.points.isNotEmpty() && window != HistoryWindow.DAY) Text("${snapshot.points.first().label} – ${snapshot.points.last().label}",
             style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (snapshot.hasData) {
-            UsageChart(snapshot.points, window, unit)
+            UsageChart(snapshot.points, window, unit, highlightLast,
+                average = if (window != HistoryWindow.DAY) snapshot.averageDailyBytes.toDouble() / unit.bytes else null)
+            ChartLegend(window, highlightLast)
             if (snapshot.points.any { !it.isMeasured }) Text("Blank spaces are periods that were not measured, not zero usage.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else Text("No measured usage in this period yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         snapshot.peak?.let {
             ListItem(leadingContent = { TonalIcon(DataraIcons.Data, positive = true) },
                 headlineContent = { Text("Peak ${if (window == HistoryWindow.DAY) "hour" else "day"}: ${it.label}") },
-                supportingContent = { Text(formatQuotaData(it.bytes!!)) })
+                supportingContent = { Text(formatQuotaData(it.bytes!!)) },
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow))
         }
         if (snapshot.points.isNotEmpty()) TextButton(onClick = onReadings) {
             Text("View exact readings"); Spacer(Modifier.width(8.dp)); Icon(DataraIcons.ArrowForward, null, modifier = Modifier.size(16.dp))
@@ -203,10 +227,12 @@ private fun TrendCard(snapshot: HistorySnapshot, window: HistoryWindow, onReadin
 @Composable
 private fun CycleSummary(item: CycleHistory) {
     val details = item.toDetails()
+    val tone = item.tone()
     HistoryCard {
-        Text(item.statusLabel.uppercase(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+        QuotaStatusChip(tone, text = item.statusLabel)
         Text("${formatQuotaData(item.usage.usedBytes)} of ${formatQuotaData(item.cycle.quotaBytes)}", style = MaterialTheme.typography.headlineMedium)
-        LinearProgressIndicator(progress = { details.progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(8.dp))
+        LinearProgressIndicator(progress = { details.progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(8.dp),
+            color = tone.accent(), trackColor = tone.colors().container, drawStopIndicator = {})
         Text("${formatCycleDate(item.cycle.startAt)} – ${item.cycle.endedAt?.let(::formatCycleDate) ?: "now"}",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (item.usage.isIncomplete) Text("Some time in this cycle was not measured, so usage may be higher.",
@@ -219,7 +245,7 @@ private fun CycleSummary(item: CycleHistory) {
 
 @Composable
 private fun PetComparisonText(pet: PetComparison) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = MaterialTheme.shapes.medium) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Forecast vs actual", style = MaterialTheme.typography.titleSmall)
             Text("Predicted on ${formatCycleDate(pet.predictedAt)}: reach ${formatCycleDate(pet.predictedReachAt)}", style = MaterialTheme.typography.bodyMedium)
@@ -242,22 +268,58 @@ internal fun petErrorText(errorMillis: Long): String = when {
     else -> "${formatDuration(-errorMillis)} earlier than predicted"
 }
 
+/** The cycle's shared status colour (same rule as the Home ring and Quota Details). */
+internal fun CycleHistory.tone(): QuotaTone = quotaStatusTone(
+    if (cycle.quotaBytes > 0) usage.usedBytes.toFloat() / cycle.quotaBytes else 0f, cycle.status)
+
 @Composable
 private fun CycleCard(item: CycleHistory, onClick: () -> Unit) {
-    Card(onClick = onClick, shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        ListItem(leadingContent = { TonalIcon(DataraIcons.History, positive = item.cycle.endedAt == null) },
-            headlineContent = { Text(item.name, style = MaterialTheme.typography.titleMedium) },
-            supportingContent = { Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("${item.statusLabel} · started ${formatCycleDate(item.cycle.startAt)}")
-                Text("${formatQuotaData(item.usage.usedBytes)} of ${formatQuotaData(item.cycle.quotaBytes)} used")
-                item.pet?.let { Text("Forecast: ${petErrorText(it.errorMillis)}") }
-            } }, trailingContent = { Icon(DataraIcons.Chevron, null, modifier = Modifier.size(18.dp)) },
-            modifier = Modifier.padding(vertical = 6.dp))
+    val tone = item.tone()
+    val progress = if (item.cycle.quotaBytes > 0) (item.usage.usedBytes.toFloat() / item.cycle.quotaBytes).coerceIn(0f, 1f) else 0f
+    Card(onClick = onClick, shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                ToneIcon(DataraIcons.History, tone)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(item.name, style = MaterialTheme.typography.titleMedium)
+                    Text("Started ${formatCycleDate(item.cycle.startAt)}", style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(DataraIcons.Chevron, null, modifier = Modifier.size(18.dp))
+            }
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(6.dp),
+                color = tone.accent(), trackColor = tone.colors().container, drawStopIndicator = {})
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp),
+                itemVerticalAlignment = Alignment.CenterVertically) {
+                QuotaStatusChip(tone, text = item.statusLabel)
+                Text("${formatQuotaData(item.usage.usedBytes)} of ${formatQuotaData(item.cycle.quotaBytes)} used", style = MaterialTheme.typography.bodyMedium)
+            }
+            item.pet?.let { Text("Forecast: ${petErrorText(it.errorMillis)}", style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
     }
 }
 
 @Composable
-private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow, unit: QuotaUnit) {
+private fun ChartLegend(window: HistoryWindow, highlightLast: Boolean) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (highlightLast) LegendKey(MaterialTheme.colorScheme.tertiary, if (window == HistoryWindow.DAY) "This hour" else "Today")
+        if (window != HistoryWindow.DAY) LegendKey(MaterialTheme.colorScheme.primary, "Daily average", dashed = true)
+        Text("Tap a bar for its value", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun LegendKey(color: androidx.compose.ui.graphics.Color, label: String, dashed: Boolean = false) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (dashed) Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { repeat(3) { Box(Modifier.size(5.dp, 2.dp).background(color)) } }
+        else Box(Modifier.size(10.dp).background(color, MaterialTheme.shapes.extraSmall))
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow, unit: QuotaUnit, highlightLast: Boolean, average: Double?) {
     // Unmeasured periods get no x value, so they render as blank space rather than zero-height bars
     val measured = remember(points) { points.withIndex().filter { it.value.isMeasured } }
     val model = remember(measured, unit) {
@@ -268,10 +330,38 @@ private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow, unit: Qu
     val description = remember(points, unit) {
         "Mobile usage chart in ${unit.name}, ${measured.size} of ${points.size} periods measured. Exact readings are available below."
     }
+    val thickness = if (window == HistoryWindow.DAY) 6.dp else 12.dp
+    val barShape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
+    val c = MaterialTheme.colorScheme
+    // Gradient bars (teal fading down); the current hour / today in amber
+    val bar = rememberLineComponent(fill = Fill(Brush.verticalGradient(listOf(c.secondary, c.secondary.copy(alpha = 0.45f)))),
+        thickness = thickness, shape = barShape)
+    val todayBar = rememberLineComponent(fill = Fill(Brush.verticalGradient(listOf(c.tertiary, c.tertiary.copy(alpha = 0.55f)))),
+        thickness = thickness, shape = barShape)
+    val lastIndex = points.size - 1
+    val columnProvider = remember(bar, todayBar, lastIndex, highlightLast) {
+        object : ColumnCartesianLayer.ColumnProvider {
+            override fun getColumn(entry: ColumnCartesianLayerModel.Entry, seriesIndex: Int, extraStore: ExtraStore) =
+                if (highlightLast && entry.x.toInt() == lastIndex) todayBar else bar
+            override fun getWidestSeriesColumn(seriesIndex: Int, extraStore: ExtraStore) = bar
+        }
+    }
+    val markerLabel = rememberTextComponent(style = MaterialTheme.typography.labelMedium.copy(color = c.inverseOnSurface),
+        padding = Insets(8.dp, 4.dp), background = rememberShapeComponent(Fill(c.inverseSurface), RoundedCornerShape(8.dp)))
+    val marker = rememberDefaultCartesianMarker(label = markerLabel, valueFormatter = remember(points) {
+        DefaultCartesianMarker.ValueFormatter { _, targets ->
+            val point = targets.firstOrNull()?.x?.toInt()?.let(points::getOrNull)
+            point?.let { "${it.label} · ${it.bytes?.let(::formatQuotaData) ?: "Not measured"}" } ?: ""
+        }
+    }, guideline = rememberLineComponent(fill = Fill(c.outline), thickness = 1.dp))
+    val averageLine = rememberLineComponent(fill = Fill(c.primary), thickness = 2.dp,
+        shape = DashedShape(dashLength = 6.dp, gapLength = 4.dp))
+    val decorations = remember(average, averageLine) {
+        if (average == null || average <= 0.0) emptyList() else listOf(HorizontalLine(y = { average }, line = averageLine))
+    }
     CartesianChartHost(
         chart = rememberCartesianChart(
-            rememberColumnCartesianLayer(columnProvider = ColumnCartesianLayer.ColumnProvider.series(
-                rememberLineComponent(fill = Fill(MaterialTheme.colorScheme.secondary), thickness = if (window == HistoryWindow.DAY) 6.dp else 12.dp)),
+            rememberColumnCartesianLayer(columnProvider = columnProvider,
                 rangeProvider = remember(points.size) { CartesianLayerRangeProvider.fixed(minX = 0.0, maxX = (points.size - 1).toDouble(), minY = 0.0) }),
             startAxis = VerticalAxis.rememberStart(valueFormatter = remember(unit) { CartesianValueFormatter.decimal(suffix = " ${unit.name}") }),
             bottomAxis = HorizontalAxis.rememberBottom(
@@ -283,6 +373,7 @@ private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow, unit: Qu
                 itemPlacer = remember(window, points.size) {
                     HorizontalAxis.ItemPlacer.aligned(spacing = { if (window == HistoryWindow.DAY) 4 else if (points.size > 10) 3 else 1 })
                 }),
+            marker = marker, decorations = decorations,
             getXStep = { _, _, _ -> 1.0 }),
         model = model,
         modifier = Modifier.fillMaxWidth().height(240.dp).semantics { contentDescription = description },
@@ -291,7 +382,7 @@ private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow, unit: Qu
 
 @Composable
 private fun HistoryCard(content: @Composable ColumnScope.() -> Unit) {
-    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
     }
 }
