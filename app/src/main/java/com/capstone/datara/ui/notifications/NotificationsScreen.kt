@@ -175,7 +175,8 @@ internal fun alertMeta(alert: AlertItem, zone: ZoneId = ZoneId.systemDefault(), 
 
 @Composable
 internal fun NotificationBell(unreadCount: Int, onClick: () -> Unit) {
-    FilledTonalIconButton(onClick = onClick, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).clearAndSetSemantics {
+    // Plain icon button: no tinted container behind the bell
+    IconButton(onClick = onClick, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).clearAndSetSemantics {
         contentDescription = "Notifications, $unreadCount unread"
         role = Role.Button
         onClick(label = "Open notifications") { onClick(); true }
@@ -183,7 +184,7 @@ internal fun NotificationBell(unreadCount: Int, onClick: () -> Unit) {
         BadgedBox(badge = { if (unreadCount > 0) Badge(containerColor = MaterialTheme.colorScheme.primary) {
             Text(unreadCount.toString(), color = MaterialTheme.colorScheme.onPrimary)
         } }) {
-            Icon(DataraIcons.Bell, null)
+            Icon(DataraIcons.Bell, null, tint = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
