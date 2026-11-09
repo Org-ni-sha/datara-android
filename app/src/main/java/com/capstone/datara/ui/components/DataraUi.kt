@@ -105,27 +105,6 @@ fun StatusPill(text: String, tone: StatusTone, modifier: Modifier = Modifier) {
 enum class StatusTone { GOOD, PROBLEM, NEUTRAL }
 
 @Composable
-fun PreviewMenu(options: List<Pair<String, () -> Unit>>) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        IconButton(onClick = { expanded = true }) { Icon(DataraIcons.More, "Preview options") }
-        DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
-            Text("REVIEW ONLY · SAMPLE SCREENS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            options.forEach { (label, action) -> DropdownMenuItem(text = { Text(label) }, onClick = { expanded = false; action() }) }
-        }
-    }
-}
-
-@Composable
-fun SampleLabel(text: String = "Sample data") {
-    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(8.dp)) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
-    }
-}
-
-@Composable
 fun TonalIcon(icon: ImageVector, positive: Boolean = false, modifier: Modifier = Modifier) {
     Surface(modifier.size(42.dp), shape = RoundedCornerShape(14.dp),
         color = if (positive) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,

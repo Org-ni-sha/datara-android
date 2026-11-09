@@ -47,7 +47,6 @@ import com.capstone.datara.ui.diagnostics.DiagnosticsRoute
 @Composable
 fun DashboardScreen(
     onSignedOut: () -> Unit,
-    viewModel: QuotaDemoViewModel = hiltViewModel(),
     cycleViewModel: QuotaCycleViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel(),
     notificationsViewModel: NotificationCenterViewModel = hiltViewModel(),
@@ -57,7 +56,6 @@ fun DashboardScreen(
     profileViewModel: ProfileViewModel = hiltViewModel(),
     historyViewModel: HistoryViewModel = hiltViewModel()
 ) {
-    val state by viewModel.uiState.collectAsState()
     val cycleDetails by cycleViewModel.details.collectAsState()
     val cycleAction by cycleViewModel.action.collectAsState()
     val notificationState by notificationsViewModel.uiState.collectAsState()
@@ -127,8 +125,6 @@ fun DashboardScreen(
     } else if (target == SignedInScreen.CREATE) {
         CreateQuotaScreen(onBack = { cycleViewModel.clearError(); creating = false }, onCreateQuota = { bytes, name ->
             cycleViewModel.createQuota(bytes, name) {
-                // Home's hero shows the real cycle; keep the preview fixtures in step for its other parts
-                viewModel.createQuota(bytes, name)
                 creating = false
                 details = false
                 notify("Quota created")
@@ -141,7 +137,7 @@ fun DashboardScreen(
     } else if (target == SignedInScreen.DETAILS) {
         // Quota Details shows the real cycle (D3) and its on-device forecast (D6)
         QuotaDetailsScreen(cycleDetails, onBack = { cycleViewModel.clearError(); details = false },
-            onEndCycle = { cycleViewModel.endCycle { viewModel.endCycle(); notify("Cycle ended") } }, onCreateQuota = { creating = true },
+            onEndCycle = { cycleViewModel.endCycle { notify("Cycle ended") } }, onCreateQuota = { creating = true },
             onTrackingSetup = { tracking = true }, actionError = cycleAction.errorMessage)
     } else if (target == SignedInScreen.NOTIFICATIONS) {
         NotificationsScreen(notificationState,
@@ -173,14 +169,13 @@ fun DashboardScreen(
                 onNotifications = { notifications = true }, unreadCount = notificationState.unreadCount)
         }
     } else {
-        HomeScreen(state, onCreateQuota = { creating = true },
-            onSelectScenario = viewModel::selectScenario,
+        HomeScreen(onCreateQuota = { creating = true },
             onSignOut = { authViewModel.signOut(onComplete = onSignedOut) },
             onViewQuota = { details = true }, onHistory = { history = true },
             onNotifications = { notifications = true }, unreadCount = notificationState.unreadCount,
             onSettings = { settings = true; history = false },
             onTrackingSetup = { tracking = true },
-            live = cycleDetails.takeIf { it.hasQuota && !it.isSample },
+            live = cycleDetails.takeIf { it.hasQuota },
             liveLoading = cycleDetails.isLoading,
             trackingIssue = TrackingIssue.of(settingsStatus.access, settingsStatus.serviceRunning,
                 cycleActive = cycleDetails.hasQuota && !cycleDetails.isEnded && !cycleDetails.isReached),
@@ -188,8 +183,6 @@ fun DashboardScreen(
                 HomeWeek.from(data.week, HistoryAggregation.snapshot(HistoryWindow.WEEK, data, null, java.time.ZoneId.systemDefault()).averageDailyBytes)
             },
             insights = (historyState as? HistoryUiState.Ready)?.data?.let { HomeInsight.from(it, java.time.ZoneId.systemDefault()) }.orEmpty(),
-            onShowRealData = viewModel::showRealData,
-            onSampleEnded = { viewModel.selectScenario(HomeSampleState.FORECAST_AVAILABLE); viewModel.endCycle() },
             greeting = homeGreeting(java.time.LocalTime.now().hour, profileState.name, profileState.username),
             onRefresh = { historyViewModel.refresh(); settingsViewModel.refresh() })
     }
@@ -200,35 +193,32 @@ fun DashboardScreen(
 }
 
 @Composable
-fun HomeScreen(state: HomeUiState, onCreateQuota: () -> Unit,
-    onSelectScenario: (HomeSampleState) -> Unit, onSignOut: () -> Unit,
+fun HomeScreen(onCreateQuota: () -> Unit, onSignOut: () -> Unit,
     modifier: Modifier = Modifier, onViewQuota: () -> Unit = {}, onHistory: () -> Unit = {},
     onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {},
     onTrackingSetup: () -> Unit = {}, live: QuotaDetailsModel? = null, liveLoading: Boolean = false,
-    trackingIssue: TrackingIssue? = null, week: HomeWeek? = null, onShowRealData: () -> Unit = {}, greeting: String = "Hello",
-    insights: List<HomeInsight> = emptyList(), onSampleEnded: () -> Unit = {}, onRefresh: () -> Unit = {}) {
-    QuotaTheme { HomeContent(state, onCreateQuota, onSelectScenario, onSignOut, modifier, onViewQuota, onHistory, onNotifications,
-        unreadCount, onSettings, onTrackingSetup, live, liveLoading, trackingIssue, week, onShowRealData, greeting, insights, onSampleEnded,
-        onRefresh) }
+    trackingIssue: TrackingIssue? = null, week: HomeWeek? = null, greeting: String = "Hello",
+    insights: List<HomeInsight> = emptyList(), onRefresh: () -> Unit = {}) {
+    QuotaTheme { HomeContent(onCreateQuota, onSignOut, modifier, onViewQuota, onHistory, onNotifications,
+        unreadCount, onSettings, onTrackingSetup, live, liveLoading, trackingIssue, week, greeting, insights, onRefresh) }
 }
+
+/** Android Studio previews only: a cycle 40% into a 10 GB quota. */
+private val PREVIEW_CYCLE = QuotaDetailsModel(hasQuota = true, name = "Everyday data", quotaBytes = 10_000_000_000L,
+    usedBytes = 4_000_000_000L, remainingBytes = 6_000_000_000L, progress = 0.4f)
 
 @Preview(name = "No quota", widthDp = 360, heightDp = 800)
 @Composable
-private fun EmptyHomePreview() { QuotaTheme { HomeScreen(HomeUiState(), {}, {}, {}) } }
-@Preview(name = "Forecast", widthDp = 360, heightDp = 800)
+private fun EmptyHomePreview() { QuotaTheme { HomeScreen({}, {}) } }
+@Preview(name = "Cycle", widthDp = 360, heightDp = 800)
 @Preview(name = "Large text", widthDp = 360, heightDp = 800, fontScale = 2f)
 @Preview(name = "Landscape", widthDp = 800, heightDp = 360)
 @Composable
-private fun ForecastHomePreview() { QuotaTheme { HomeScreen(HomeUiState(previewing = true, scenario = HomeSampleState.FORECAST_AVAILABLE), {}, {}, {}) } }
-@Preview(name = "Collecting", widthDp = 360, heightDp = 800)
-@Composable
-private fun CollectingHomePreview() { QuotaTheme { HomeScreen(HomeUiState(previewing = true, scenario = HomeSampleState.COLLECTING), {}, {}, {}) } }
-@Preview(name = "Permission missing", widthDp = 360, heightDp = 800)
-@Composable
-private fun PermissionHomePreview() { QuotaTheme { HomeScreen(HomeUiState(previewing = true, scenario = HomeSampleState.MISSING_PERMISSION), {}, {}, {}) } }
+private fun CycleHomePreview() { QuotaTheme { HomeScreen({}, {}, live = PREVIEW_CYCLE) } }
 @Preview(name = "Quota reached", widthDp = 360, heightDp = 800)
 @Composable
-private fun ReachedHomePreview() { QuotaTheme { HomeScreen(HomeUiState(previewing = true, scenario = HomeSampleState.QUOTA_REACHED), {}, {}, {}) } }
+private fun ReachedHomePreview() { QuotaTheme { HomeScreen({}, {}, live = PREVIEW_CYCLE.copy(usedBytes = 10_000_000_000L,
+    remainingBytes = 0, progress = 1f, isReached = true)) } }
 
 
 /** The signed-in screens, by depth: the three tabs, then screens opened on top of them. */

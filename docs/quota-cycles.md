@@ -76,7 +76,7 @@ interface UsageReadingRepository {
 ## Not done yet
 
 - **History:** past cycles are stored but not listed yet (D7).
-- **Home:** it still shows preview fixtures (D5); Create and End keep those fixtures in step.
+- **Home:** its hero shows the same real cycle and forecast (the preview fixtures were removed in v0.9.1).
 - **Forecast:** Details says it is not available yet (D6).
 - **Alerts:** 75/90/100% and forecast alerts (D8).
 - **Sync** (C3): cycles are queued for upload (`synced_at` null), but nothing uploads yet.

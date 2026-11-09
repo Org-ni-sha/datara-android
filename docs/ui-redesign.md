@@ -8,7 +8,7 @@ The earlier look read as white cards on off-white. The restyle keeps the light g
 
 - **Tonal colours:** a full light M3 scheme (navy primary, teal secondary, amber tertiary, filled `surfaceContainer*` roles) on a tinted page; AA contrast for every new pair.
 - **Status colours:** `quotaStatusTone` — teal on track, amber from 75%, deeper amber from 90%, soft red when reached, neutral when ended.
-- **Forecast ring hero:** Home's hero is a navy card with a ring of the share used and the PET inside; every state is reviewable through Preview options.
+- **Forecast ring hero:** Home's hero is a navy card with a ring of the share used and the PET inside; each state appears when the real cycle is in it (images of every state in [screens](screens/README.md)).
 - **Insights:** Today as a wide card, then Daily average, Peak hour and Forecast vs. actual as a row of small cards (no swiping, so none is missed), from History's aggregation so both screens agree.
 - **Brand font:** Plus Jakarta Sans (SIL OFL) for display to label styles, tabular digits everywhere.
 - The redundant "Your mobile usage" heading under the greeting is gone. Other screens pick up the colours and font via the theme; their own restyle follows separately.

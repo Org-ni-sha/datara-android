@@ -24,7 +24,7 @@ data class QuotaActionState(val isSaving: Boolean = false, val errorMessage: Str
 /**
  * Create Quota and Quota Details against the real cycle use cases ([QuotaCycleManager]), with the
  * live D6 forecast ([ForecastEngine]) of the active cycle. Home's hero shows the same real cycle
- * and forecast; its other preview scenarios stay on [QuotaDemoViewModel] fixtures.
+ * and forecast.
  */
 @HiltViewModel
 class QuotaCycleViewModel @Inject constructor(

@@ -30,10 +30,9 @@ class QuotaDetailsModelTest {
         assertEquals("No active quota", detailsStatus(QuotaDetailsModel.fromCycleState(CycleState.NoCycle)))
     }
 
-    @Test fun activeCycleShowsMeasuredUsageAndIsNotASample() {
+    @Test fun activeCycleShowsMeasuredUsage() {
         val model = tracked(CycleUsage(500_000_000, 0, null, start + 600_000, 0, 0))
         assertTrue(model.hasQuota)
-        assertFalse(model.isSample)
         assertEquals(QuotaDetailsModel.DEFAULT_NAME, model.name)
         assertEquals(500_000_000L, model.usedBytes)
         assertEquals(1_500_000_000L, model.remainingBytes)
@@ -68,18 +67,11 @@ class QuotaDetailsModelTest {
         assertTrue(model.measurement!!.isIncomplete)
     }
 
-    @Test fun samplesKeepTheirScenarioAndHideUnavailableUsage() {
-        val missing = HomeUiState(HomeSampleState.MISSING_PERMISSION).toDetailsModel()
-        assertTrue(missing.isSample)
-        assertTrue(missing.usageUnavailable)
-        assertNull(missing.remainingBytes)
-        assertEquals("Access needed", detailsStatus(missing))
-
-        val reached = HomeUiState(HomeSampleState.QUOTA_REACHED).toDetailsModel()
-        assertFalse(reached.canEnd)
-        assertEquals("Quota reached", detailsStatus(reached))
-        assertFalse(HomeUiState().toDetailsModel().hasQuota)
-        assertEquals("Tracking · sample", detailsStatus(HomeUiState(HomeSampleState.FORECAST_AVAILABLE).toDetailsModel()))
+    @Test fun noCycleHasNoQuotaAndCannotEnd() {
+        val none = QuotaDetailsModel.fromCycleState(CycleState.NoCycle)
+        assertFalse(none.hasQuota)
+        assertFalse(none.canEnd)
+        assertEquals("No active quota", detailsStatus(none))
     }
 
     @Test fun durationsAreRoundedToMinutes() {

@@ -40,10 +40,10 @@ android {
         // versionCode is internal and must only ever increase — bump it on every build
         // handed to someone else. versionName is the string shown in Android's App info,
         // and is what D9's hidden diagnostics screen counts taps on.
-        // 0.x while pre-defense; 1.0.0 (versionCode 4, tag v1.0.0) is reserved for the
+        // 0.x while pre-defense; 1.0.0 (versionCode 5, tag v1.0.0) is reserved for the
         // Nov 12 defense build with the final model.
-        versionCode = 3
-        versionName = "0.9.0"
+        versionCode = 4
+        versionName = "0.9.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -83,6 +83,9 @@ android {
                 enable = false
             }
             if (canSignRelease) signingConfig = signingConfigs.getByName("release")
+            // Release ships only the 64-bit ARM native libraries (ONNX Runtime is most of the APK):
+            // about 155 MB -> 50 MB. Debug keeps every ABI so x86_64 emulators still run the tests.
+            ndk { abiFilters += "arm64-v8a" }
         }
     }
     compileOptions {

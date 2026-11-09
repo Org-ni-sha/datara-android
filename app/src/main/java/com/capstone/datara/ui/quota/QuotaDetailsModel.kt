@@ -3,7 +3,7 @@ package com.capstone.datara.ui.quota
 import com.capstone.datara.data.cycle.CycleStatus
 import com.capstone.datara.domain.cycle.CycleState
 
-/** How complete a real cycle's measurement is; null for sample cycles. */
+/** How complete a cycle's measurement is. */
 data class CycleMeasurement(
     /** End of the latest counted 10-minute reading; null before the first one. */
     val measuredThroughMillis: Long?,
@@ -15,15 +15,12 @@ data class CycleMeasurement(
     val isIncomplete: Boolean get() = unmeasuredMillis > 0 || lostReadings > 0
 }
 
-/**
- * What Quota Details shows, from either a real cycle ([fromCycleState]) or a labelled sample
- * ([HomeUiState.toDetailsModel], used by History and Notifications previews).
- */
+/** What Quota Details shows for a real cycle ([fromCycleState]). */
 data class QuotaDetailsModel(
     val hasQuota: Boolean,
     val name: String = "",
     val quotaBytes: Long = 0,
-    /** Null when usage is unavailable (sample "missing permission"). */
+    /** Null when usage is unavailable. */
     val usedBytes: Long? = 0,
     /** Clamped at 0 for display. */
     val remainingBytes: Long? = quotaBytes,
@@ -33,24 +30,17 @@ data class QuotaDetailsModel(
     val endedAtMillis: Long? = null,
     val reachedAtMillis: Long? = null,
     val isReached: Boolean = false,
-    /** Real measurement details; null for samples. */
+    /** Measurement details; null when there is no cycle. */
     val measurement: CycleMeasurement? = null,
-    /** The preview scenario, for sample cycles only. */
-    val sampleScenario: HomeSampleState? = null,
     /** True while the session or the latest cycle is still loading. */
     val isLoading: Boolean = false,
-    /** The live D6 forecast of a real active cycle; null for samples, reached or ended cycles. */
+    /** The live D6 forecast of an active cycle; null for reached or ended cycles. */
     val forecast: PetForecastUi? = null,
-    /** The real cycle's id (alerts open it); null for samples and when there is no cycle. */
+    /** The cycle's id (alerts open it); null when there is no cycle. */
     val cycleId: String? = null
 ) {
     val isEnded: Boolean get() = endedAtMillis != null
-    val isSample: Boolean get() = sampleScenario != null
-    val canEnd: Boolean get() = hasQuota && !isEnded && when (sampleScenario) {
-        null -> true
-        HomeSampleState.NO_QUOTA, HomeSampleState.QUOTA_REACHED -> false
-        else -> true
-    }
+    val canEnd: Boolean get() = hasQuota && !isEnded
     val usageUnavailable: Boolean get() = usedBytes == null
 
     companion object {
@@ -83,21 +73,4 @@ data class QuotaDetailsModel(
             }
         }
     }
-}
-
-/** Sample fixtures keep their illustrative numbers and are labelled as samples on screen. */
-fun HomeUiState.toDetailsModel(): QuotaDetailsModel {
-    val missing = scenario == HomeSampleState.MISSING_PERMISSION
-    return QuotaDetailsModel(
-        hasQuota = scenario != HomeSampleState.NO_QUOTA,
-        name = name,
-        quotaBytes = amountBytes,
-        usedBytes = if (missing) null else usedBytes,
-        remainingBytes = if (missing) null else remainingBytes,
-        progress = if (missing) 0f else progress,
-        startedAtMillis = startedAtMillis,
-        endedAtMillis = endedAtMillis,
-        isReached = scenario == HomeSampleState.QUOTA_REACHED,
-        sampleScenario = scenario
-    )
 }
