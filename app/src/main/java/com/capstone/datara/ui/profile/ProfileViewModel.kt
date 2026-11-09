@@ -36,7 +36,11 @@ data class ProfileUiState(
     val loadFailed: Boolean = false,
     val isSaving: Boolean = false,
     val saveError: String? = null,
-    /** True after the last save succeeded; cleared when the user edits the name again. */
+    /**
+     * A one-time event: true right after a save succeeds, until the host shows its "Name saved"
+     * snackbar and calls [ProfileViewModel.consumeNameSaved]. Never shown as lasting UI, so it
+     * can't reappear when Profile is opened again.
+     */
     val nameSaved: Boolean = false
 )
 
@@ -99,6 +103,11 @@ class ProfileViewModel @Inject constructor(
                 }
         }
         return null
+    }
+
+    /** The "Name saved" snackbar was shown. */
+    fun consumeNameSaved() {
+        _uiState.update { it.copy(nameSaved = false) }
     }
 
     fun onNameEdited() {

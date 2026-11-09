@@ -61,7 +61,7 @@ fun ProfileScreen(profile: ProfileUiState, email: String?, onBack: () -> Unit,
                         }
                     }
                 }
-                SectionTitle("Display name", "Choose the name shown in the app.")
+                SectionTitle("Display name", "Optional. Home greets you by this name, or by @username if it’s empty.")
                 OutlinedTextField(draft, { draft = it; error = null; onNameEdited() }, label = { Text("Display name") },
                     placeholder = { Text("Enter your name") }, isError = error != null,
                     singleLine = true, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
@@ -76,10 +76,7 @@ fun ProfileScreen(profile: ProfileUiState, email: String?, onBack: () -> Unit,
                     Text("Couldn’t load your saved name. Check your connection; you can still set a new one.",
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                AnimatedVisibility(visible = profile.nameSaved) { Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
-                    Text("Name saved.", modifier = Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite },
-                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                } }
+                // Success is a "Name saved" snackbar from the signed-in host; only errors stay here
                 AnimatedVisibility(visible = profile.saveError != null) { Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium) {
                     Text(profile.saveError.orEmpty(), modifier = Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite },
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)

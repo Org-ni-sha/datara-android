@@ -64,9 +64,10 @@ class SettingsScreenTest {
     }
 
     @Test fun profileReportsSaveOutcome() {
+        // Success is a one-time snackbar shown by the signed-in host, never a lasting banner here
         val profile = mutableStateOf(ProfileUiState(name = "Student", nameSaved = true))
         compose.setContent { ProfileScreen(profile.value, "student@example.com", {}, { null }) }
-        compose.onNodeWithText("Name saved.").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Name saved", substring = true).assertDoesNotExist()
         profile.value = ProfileUiState(name = "Student", saveError = "Couldn't save your name.")
         compose.onNodeWithText("Couldn't save your name.").performScrollTo().assertIsDisplayed()
     }

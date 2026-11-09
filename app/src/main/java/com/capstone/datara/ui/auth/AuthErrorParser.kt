@@ -271,15 +271,15 @@ object AuthValidator {
      * [AuthViewModel.register] delegates to it rather than duplicating the rules.
      */
     fun validateRegistration(
-        name: String,
+        username: String,
         email: String,
         password: String
     ): String? = when {
-        name.isBlank() || email.isBlank() || password.isBlank() ->
+        username.isBlank() || email.isBlank() || password.isBlank() ->
             "Please fill in all required fields."
 
-        !isValidName(name) ->
-            "Please enter your full name."
+        usernameError(username) != null ->
+            usernameError(username)
 
         !isValidEmail(email) ->
             "Please enter a valid email address."

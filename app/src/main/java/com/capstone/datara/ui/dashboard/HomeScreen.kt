@@ -71,6 +71,10 @@ fun DashboardScreen(
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val notify: (String) -> Unit = { message -> scope.launch { snackbar.showSnackbar(message) } }
+    // A saved display name is confirmed once, like the other actions, then the event is consumed
+    LaunchedEffect(profileState.nameSaved) {
+        if (profileState.nameSaved) { profileViewModel.consumeNameSaved(); notify("Name saved") }
+    }
     // Grants change in Android Settings, outside the app: Home's banner re-checks on every resume
     LifecycleResumeEffect(Unit) { settingsViewModel.refresh(); onPauseOrDispose { } }
     var creating by rememberSaveable { mutableStateOf(false) }

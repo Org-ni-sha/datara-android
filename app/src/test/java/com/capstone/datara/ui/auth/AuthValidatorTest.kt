@@ -31,10 +31,18 @@ class AuthValidatorTest {
     // --- validateRegistration ------------------------------------------------
 
     @Test
+    fun `validateRegistration rejects a username with spaces`() {
+        assertEquals(
+            "Use only letters, numbers and underscores.",
+            AuthValidator.validateRegistration(username = "juan dc", email = "juan@ustp.edu.ph", password = "secret123")
+        )
+    }
+
+    @Test
     fun `validateRegistration returns null when every field is valid`() {
         assertNull(
             AuthValidator.validateRegistration(
-                name = "Juan Dela Cruz",
+                username = "juan_dc",
                 email = "juan@ustp.edu.ph",
                 password = "secret123"
             )
@@ -48,7 +56,7 @@ class AuthValidatorTest {
         assertEquals(
             "Please fill in all required fields.",
             AuthValidator.validateRegistration(
-                name = "",
+                username = "",
                 email = "not-an-email",
                 password = ""
             )
@@ -56,11 +64,11 @@ class AuthValidatorTest {
     }
 
     @Test
-    fun `validateRegistration rejects a too-short name`() {
+    fun `validateRegistration rejects a too-short username`() {
         assertEquals(
-            "Please enter your full name.",
+            "Username must be at least 3 characters.",
             AuthValidator.validateRegistration(
-                name = "J",
+                username = "jd",
                 email = "juan@ustp.edu.ph",
                 password = "secret123"
             )
@@ -72,7 +80,7 @@ class AuthValidatorTest {
         assertEquals(
             "Please enter a valid email address.",
             AuthValidator.validateRegistration(
-                name = "Juan Dela Cruz",
+                username = "juan_dc",
                 email = "juan@ustp",
                 password = "secret123"
             )
@@ -84,7 +92,7 @@ class AuthValidatorTest {
         assertEquals(
             AuthValidator.PASSWORD_RULE_MESSAGE,
             AuthValidator.validateRegistration(
-                name = "Juan Dela Cruz",
+                username = "juan_dc",
                 email = "juan@ustp.edu.ph",
                 password = "abc1234"
             )
@@ -96,7 +104,7 @@ class AuthValidatorTest {
         assertEquals(
             AuthValidator.PASSWORD_RULE_MESSAGE,
             AuthValidator.validateRegistration(
-                name = "Juan Dela Cruz",
+                username = "juan_dc",
                 email = "juan@ustp.edu.ph",
                 password = "abcdefghij"
             )

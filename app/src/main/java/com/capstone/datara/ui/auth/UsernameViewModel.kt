@@ -51,6 +51,11 @@ class UsernameViewModel @Inject constructor(
 
     private var availabilityJob: Job? = null
 
+    init {
+        // From Create account: show the username that couldn't be saved, re-checked
+        PendingUsername.take()?.let(::onInputChange)
+    }
+
     fun onInputChange(input: String) {
         val formatError = if (input.isBlank()) null else AuthValidator.usernameError(input)
         _uiState.update {
