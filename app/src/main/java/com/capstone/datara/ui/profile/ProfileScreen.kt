@@ -61,7 +61,7 @@ fun ProfileScreen(profile: ProfileUiState, email: String?, onBack: () -> Unit,
                         }
                     }
                 }
-                SectionTitle("Display name", "Choose the name shown in the app.")
+                SectionTitle("Display name", "Optional. Home greets you by this name, or by @username if it’s empty.")
                 OutlinedTextField(draft, { draft = it; error = null; onNameEdited() }, label = { Text("Display name") },
                     placeholder = { Text("Enter your name") }, isError = error != null,
                     singleLine = true, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,

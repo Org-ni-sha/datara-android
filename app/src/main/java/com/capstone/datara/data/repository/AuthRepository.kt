@@ -37,13 +37,13 @@ class AuthRepository @Inject constructor(
      * moment it is created, with no follow-up insert that could be lost to a crash or a
      * dropped connection between sign-up and write.
      */
-    suspend fun signUp(email: String, password: String, name: String): Result<Unit> = runCatching {
+    suspend fun signUp(email: String, password: String, name: String? = null): Result<Unit> = runCatching {
         auth.signUpWith(Email) {
             this.email = email
             this.password = password
-            this.data = buildJsonObject {
-                put("name", name)
-            }
+            // Create account asks for a username, not a name (2026-11-10): users.name starts null
+            // and the user can add a display name in Profile. The key stays for the trigger.
+            if (name != null) this.data = buildJsonObject { put("name", name) }
         }
     }
 

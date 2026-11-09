@@ -672,36 +672,42 @@ private fun RegisterForm(
     viewModel: AuthViewModel,
     onSwitchToLogin: () -> Unit
 ) {
-    var name by rememberSaveable { mutableStateOf("") }
+    var username by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
     val submit = {
         focusManager.clearFocus()
-        viewModel.register(name, email, password)
+        viewModel.register(username, email, password)
     }
+    // Format rules shown as the user types; availability is checked right after sign-up
+    val usernameHint = username.takeIf { it.isNotBlank() }?.let(AuthValidator::usernameError)
 
-    PanelHeader("Create your account", "You'll choose a username next.")
+    PanelHeader("Create your account", "Sign in later with your username or email.")
 
-    // Full name is sent as auth metadata so the on_auth_user_created trigger fills users.name.
-    DataraFieldLabel(label = "Full name")
+    DataraFieldLabel(label = "Username")
     Spacer(Modifier.height(8.dp))
     DataraTextField(
-        value = name,
+        value = username,
         onValueChange = {
-            name = it
+            username = it
             viewModel.clearError()
         },
-        placeholder = "Juan Dela Cruz",
+        placeholder = "juan_dc",
         leadingIcon = DataraIcons.Person,
-        contentType = ContentType.PersonFullName,
+        contentType = ContentType.NewUsername,
         keyboardOptions = KeyboardOptions(
-            capitalization = KeyboardCapitalization.Words,
+            capitalization = KeyboardCapitalization.None,
+            autoCorrectEnabled = false,
+            keyboardType = KeyboardType.Ascii,
             imeAction = ImeAction.Next
         ),
         keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
     )
+    Spacer(Modifier.height(6.dp))
+    Text(usernameHint ?: "3–20 letters, numbers or underscores.", style = MaterialTheme.typography.bodySmall,
+        color = if (usernameHint != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
 
     Spacer(Modifier.height(16.dp))
 
@@ -753,7 +759,7 @@ private fun RegisterForm(
     DataraPrimaryButton(
         text = "Create account",
         onClick = submit,
-        enabled = name.isNotBlank() && email.isNotBlank() && password.isNotBlank(),
+        enabled = username.isNotBlank() && usernameHint == null && email.isNotBlank() && password.isNotBlank(),
         isLoading = uiState is AuthUiState.Loading
     )
 

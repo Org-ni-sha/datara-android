@@ -70,21 +70,30 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun register(name: String, email: String, password: String) {
-        val trimmedName = name.trim()
+    /**
+     * Creates the account, then saves [username] on the new `public.users` row. Availability can
+     * only be checked once signed in (the check is for `authenticated`), so a taken or failed
+     * username is not an error here: the account exists, and the username screen opens with the
+     * name filled in and marked taken.
+     */
+    fun register(username: String, email: String, password: String) {
         val trimmedEmail = email.trim()
 
-        AuthValidator.validateRegistration(trimmedName, trimmedEmail, password)
+        AuthValidator.validateRegistration(username, trimmedEmail, password)
             ?.let { error ->
                 _uiState.value = AuthUiState.Error(error)
                 return
             }
+        val canonical = AuthValidator.canonicalUsername(username)
 
         viewModelScope.launch {
             _uiState.value = AuthUiState.Loading
-            repository.signUp(trimmedEmail, password, trimmedName)
-                // A brand-new account never has a username yet.
-                .onSuccess { _uiState.value = AuthUiState.Success(needsUsername = true) }
+            repository.signUp(trimmedEmail, password)
+                .onSuccess {
+                    val saved = profileRepository.setUsername(canonical).isSuccess
+                    if (!saved) PendingUsername.value = canonical
+                    _uiState.value = AuthUiState.Success(needsUsername = !saved)
+                }
                 .onFailure { _uiState.value = AuthUiState.Error(AuthErrorParser.parse(it, AuthAction.REGISTER)) }
         }
     }
