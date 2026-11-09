@@ -267,7 +267,7 @@ private fun ForecastHero(hero: HeroContent, onCreate: () -> Unit, onAccess: () -
             val below = ringTextBelow()
             val ringText: @Composable () -> Unit = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(hero.ringValue, style = MaterialTheme.typography.displaySmall, color = onHero, textAlign = TextAlign.Center)
+                    CountUpText(hero.ringValue, style = MaterialTheme.typography.displaySmall, color = onHero, textAlign = TextAlign.Center)
                     Text(hero.ringCaption, style = MaterialTheme.typography.labelLarge, color = soft, textAlign = TextAlign.Center)
                 }
             }
@@ -331,7 +331,7 @@ private fun QuotaMetric(value: String, label: String, modifier: Modifier) {
     val onHero = MaterialTheme.colorScheme.onPrimary
     Surface(modifier, color = onHero.copy(alpha = 0.10f), contentColor = onHero, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(value, style = MaterialTheme.typography.titleMedium)
+            CountUpText(value, style = MaterialTheme.typography.titleMedium)
             Text(label, style = MaterialTheme.typography.labelMedium, color = onHero.copy(alpha = 0.82f))
         }
     }

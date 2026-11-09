@@ -32,11 +32,13 @@ import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.components.*
 import com.capstone.datara.ui.notifications.NotificationBell
 import com.capstone.datara.ui.quota.*
+import com.capstone.datara.ui.theme.ChartToday
 import com.capstone.datara.ui.theme.QuotaTheme
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProducer
+import com.patrykandpatrick.vico.compose.cartesian.data.columnModel
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
-import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModel
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianLayerRangeProvider
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.compose.cartesian.data.ColumnCartesianLayerModel
@@ -303,7 +305,7 @@ private fun CycleCard(item: CycleHistory, onClick: () -> Unit) {
 @Composable
 private fun ChartLegend(window: HistoryWindow, highlightLast: Boolean) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (highlightLast) LegendKey(MaterialTheme.colorScheme.tertiary, if (window == HistoryWindow.DAY) "This hour" else "Today")
+        if (highlightLast) LegendKey(ChartToday, if (window == HistoryWindow.DAY) "This hour" else "Today")
         if (window != HistoryWindow.DAY) LegendKey(MaterialTheme.colorScheme.primary, "Daily average", dashed = true)
         Text("Tap a bar for its value", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -322,10 +324,12 @@ private fun LegendKey(color: androidx.compose.ui.graphics.Color, label: String, 
 private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow, unit: QuotaUnit, highlightLast: Boolean, average: Double?) {
     // Unmeasured periods get no x value, so they render as blank space rather than zero-height bars
     val measured = remember(points) { points.withIndex().filter { it.value.isMeasured } }
-    val model = remember(measured, unit) {
-        CartesianChartModel(ColumnCartesianLayerModel.build {
-            series(x = measured.map { it.index }, y = measured.map { it.value.bytes!!.toDouble() / unit.bytes })
-        })
+    // A model producer (not a fixed model) so Vico grows the bars in and animates between ranges
+    val modelProducer = remember { CartesianChartModelProducer() }
+    LaunchedEffect(measured, unit) {
+        if (measured.isNotEmpty()) modelProducer.runTransaction {
+            columnModel { series(x = measured.map { it.index }, y = measured.map { it.value.bytes!!.toDouble() / unit.bytes }) }
+        }
     }
     val description = remember(points, unit) {
         "Mobile usage chart in ${unit.name}, ${measured.size} of ${points.size} periods measured. Exact readings are available below."
@@ -333,10 +337,10 @@ private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow, unit: Qu
     val thickness = if (window == HistoryWindow.DAY) 6.dp else 12.dp
     val barShape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
     val c = MaterialTheme.colorScheme
-    // Gradient bars (teal fading down); the current hour / today in amber
+    // Gradient bars (teal fading down); the current hour / today in the logo blue
     val bar = rememberLineComponent(fill = Fill(Brush.verticalGradient(listOf(c.secondary, c.secondary.copy(alpha = 0.45f)))),
         thickness = thickness, shape = barShape)
-    val todayBar = rememberLineComponent(fill = Fill(Brush.verticalGradient(listOf(c.tertiary, c.tertiary.copy(alpha = 0.55f)))),
+    val todayBar = rememberLineComponent(fill = Fill(Brush.verticalGradient(listOf(ChartToday, ChartToday.copy(alpha = 0.55f)))),
         thickness = thickness, shape = barShape)
     val lastIndex = points.size - 1
     val columnProvider = remember(bar, todayBar, lastIndex, highlightLast) {
@@ -375,7 +379,7 @@ private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow, unit: Qu
                 }),
             marker = marker, decorations = decorations,
             getXStep = { _, _, _ -> 1.0 }),
-        model = model,
+        modelProducer = modelProducer,
         modifier = Modifier.fillMaxWidth().height(240.dp).semantics { contentDescription = description },
         scrollState = rememberVicoScrollState(scrollEnabled = false), zoomState = rememberVicoZoomState(zoomEnabled = false))
 }

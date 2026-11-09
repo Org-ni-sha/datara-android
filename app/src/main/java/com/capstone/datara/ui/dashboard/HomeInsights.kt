@@ -1,5 +1,6 @@
 package com.capstone.datara.ui.dashboard
 
+import com.capstone.datara.ui.components.CountUpText
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -120,7 +121,7 @@ private fun WideInsightCard(insight: HomeInsight, modifier: Modifier = Modifier)
                 Text(insight.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
-            Text(insight.value ?: "—", style = MaterialTheme.typography.headlineSmall, maxLines = 1)
+            CountUpText(insight.value ?: "—", style = MaterialTheme.typography.headlineSmall, maxLines = 1)
         }
     }
 }
@@ -133,7 +134,7 @@ private fun SmallInsightCard(insight: HomeInsight, modifier: Modifier = Modifier
             InsightIcon(insight.kind)
             Text(insight.kind.title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(insight.value ?: "—", style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            CountUpText(insight.value ?: "—", style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(insight.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
