@@ -1,5 +1,6 @@
 package com.capstone.datara.ui.components
 
+import androidx.compose.foundation.background
 import android.app.Activity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -28,7 +29,11 @@ fun DataraAppBar(title: String, onBack: (() -> Unit)? = null, subtitle: String? 
     // Light bar on the app background: navy text, dark status-bar icons (set by QuotaTheme)
     TopAppBar(title = {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (showLogo) Image(painterResource(R.drawable.datara_brand_symbol), null, Modifier.size(28.dp), contentScale = ContentScale.Fit)
+            // The D on a navy rounded square, like the launcher icon and splash
+            if (showLogo) Box(Modifier.size(40.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center) {
+                Image(painterResource(R.drawable.datara_brand_symbol), null, Modifier.size(24.dp), contentScale = ContentScale.Fit)
+            }
             Column(Modifier.semantics(mergeDescendants = true) { heading() }) {
                 Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall, maxLines = 1,
