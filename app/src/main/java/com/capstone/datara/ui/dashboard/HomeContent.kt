@@ -59,7 +59,7 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
                     }
                 } else {
                     // Real measured data only, so not beside a sample hero
-                    if (!state.previewing) HomeInsightsCarousel(insights)
+                    if (!state.previewing) HomeInsightsPanel(insights)
                     HomeUsageTrend(week, onHistory)
                 }
             } else {
