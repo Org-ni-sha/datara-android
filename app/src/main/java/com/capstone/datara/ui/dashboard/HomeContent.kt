@@ -24,24 +24,18 @@ import com.capstone.datara.data.cycle.CycleStatus
 import androidx.compose.ui.text.style.TextAlign
 
 @Composable
-internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
-    onSelectScenario: (HomeSampleState) -> Unit, onSignOut: () -> Unit,
+internal fun HomeContent(onCreateQuota: () -> Unit, onSignOut: () -> Unit,
     modifier: Modifier = Modifier, onViewQuota: () -> Unit = {}, onHistory: () -> Unit = {},
     onNotifications: () -> Unit = {}, unreadCount: Int = 0, onSettings: () -> Unit = {},
     onTrackingSetup: () -> Unit = {}, live: QuotaDetailsModel? = null, liveLoading: Boolean = false,
-    trackingIssue: TrackingIssue? = null, week: HomeWeek? = null, onShowRealData: () -> Unit = {},
-    greeting: String = "Hello", insights: List<HomeInsight> = emptyList(), onSampleEnded: () -> Unit = {},
-    onRefresh: () -> Unit = {}) {
+    trackingIssue: TrackingIssue? = null, week: HomeWeek? = null,
+    greeting: String = "Hello", insights: List<HomeInsight> = emptyList(), onRefresh: () -> Unit = {}) {
     var showInfo by remember { mutableStateOf(false) }
-    val hero = HeroContent.select(state, live, liveLoading, trackingIssue)
+    val hero = HeroContent.select(live, liveLoading, trackingIssue)
     Scaffold(modifier, containerColor = MaterialTheme.colorScheme.background,
         topBar = { DataraAppBar(greeting, showLogo = true,
             subtitle = homeSubtitle(hero.name.takeIf { !hero.empty && !hero.loading && !hero.ended && !hero.reached }), actions = {
             NotificationBell(unreadCount, onNotifications)
-            // Review tool for the defense screens; removed before the freeze
-            PreviewMenu(listOf("Show my real quota" to onShowRealData) +
-                HomeSampleState.entries.map { option -> "Sample: ${option.label}" to { onSelectScenario(option) } } +
-                listOf("Sample: Cycle ended" to onSampleEnded))
         }) }, bottomBar = { QuotaBottomBar(false, {}, onHistory, onSettings) }) { insets ->
         // Pull to re-read usage and tracking status, as on History; the spinner is brief because Room reads are fast
         var refreshing by remember { mutableStateOf(false) }
@@ -49,9 +43,6 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
         PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true; onRefresh() }, modifier = Modifier.fillMaxSize().padding(insets)) {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            if (state.previewing) {
-                StatusPill("Sample screen · Preview options", StatusTone.NEUTRAL)
-            }
             ForecastHero(hero, onCreateQuota, onAccess = onTrackingSetup, onViewQuota = onViewQuota)
             if (hero.loading) {
                 // Nothing more until the cycle is known
@@ -64,8 +55,7 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
                             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface))
                     }
                 } else {
-                    // Real measured data only, so not beside a sample hero
-                    if (!state.previewing) HomeInsightsPanel(insights)
+                    HomeInsightsPanel(insights)
                     HomeUsageTrend(week, onHistory)
                 }
             } else {
@@ -144,15 +134,11 @@ internal data class HeroContent(
     }
 
     companion object {
-        /**
-         * A Preview options scenario while one is picked; otherwise the real cycle (loading,
-         * live, or the real empty state). A real cycle never shows sample data by default.
-         */
-        fun select(state: HomeUiState, live: QuotaDetailsModel?, liveLoading: Boolean, issue: TrackingIssue?): HeroContent = when {
-            state.previewing -> sample(state)
+        /** The real cycle: loading, live, or the empty state when there is no quota. */
+        fun select(live: QuotaDetailsModel?, liveLoading: Boolean, issue: TrackingIssue?): HeroContent = when {
             liveLoading -> LOADING
             live != null -> live(live, issue)
-            else -> sample(HomeUiState())
+            else -> EMPTY
         }
 
         private val REACH_FORMAT = java.time.format.DateTimeFormatter.ofPattern("MMM d")
@@ -162,48 +148,11 @@ internal data class HeroContent(
             label = "LOADING", headline = "Loading your quota…", body = "", name = "", amountBytes = 0, usedBytes = 0,
             remainingBytes = 0, progress = 0f, isLive = false, loading = true)
 
-        fun sample(state: HomeUiState): HeroContent {
-            if (state.scenario == HomeSampleState.LOADING) return LOADING
-            if (state.scenario == HomeSampleState.TRACKING_OFF && !state.isEnded) {
-                return sample(state.copy(scenario = HomeSampleState.FORECAST_AVAILABLE)).copy(issue = TrackingIssue.SERVICE_STOPPED)
-            }
-            val empty = state.scenario == HomeSampleState.NO_QUOTA
-            val reached = state.scenario == HomeSampleState.QUOTA_REACHED
-            val missing = state.scenario == HomeSampleState.MISSING_PERMISSION
-            val collecting = state.scenario == HomeSampleState.COLLECTING && !state.isEnded
-            return HeroContent(
-                empty = empty, reached = reached, ended = state.isEnded, missing = missing, hideUsage = collecting,
-                label = when {
-                    empty -> "YOUR TRACKING REFERENCE"
-                    state.isEnded -> "CYCLE ENDED"
-                    missing -> "ACCESS NEEDED"
-                    reached -> "QUOTA REACHED"
-                    collecting -> "COLLECTING USAGE"
-                    else -> "ESTIMATED TIME TO QUOTA"
-                },
-                headline = when {
-                    state.isEnded -> "Cycle ended."
-                    empty -> "Set a tracking quota"
-                    reached -> "Quota reached."
-                    missing -> "Usage access needed"
-                    collecting -> "Collecting usage"
-                    else -> "About 12 hours"
-                },
-                body = when {
-                    state.isEnded -> "The sample forecast has stopped. You can start a new quota."
-                    empty -> "Choose an amount in MB or GB. DATAra estimates when you will reach it."
-                    reached -> "You have reached your chosen amount. Your internet stays on."
-                    missing -> "Mobile usage cannot be read until Usage Access is enabled."
-                    collecting -> "Waiting for sample readings"
-                    else -> "Illustrative forecast based on sample usage. Your actual pace may change."
-                },
-                name = state.name, amountBytes = state.amountBytes, usedBytes = state.usedBytes,
-                remainingBytes = state.remainingBytes, progress = state.progress, isLive = false,
-                observedHours = if (collecting) 4 else null, neededHours = if (collecting) 6 else null,
-                reachDate = if (!empty && !reached && !missing && !collecting && !state.isEnded)
-                    reachDate(System.currentTimeMillis() + 12 * 3_600_000L) else null
-            )
-        }
+        /** No quota yet: invites the user to set one. */
+        val EMPTY = HeroContent(empty = true, reached = false, ended = false, missing = false, hideUsage = false,
+            label = "YOUR TRACKING REFERENCE", headline = "Set a tracking quota",
+            body = "Choose an amount in MB or GB. DATAra estimates when you will reach it.",
+            name = "", amountBytes = 0, usedBytes = 0, remainingBytes = 0, progress = 0f, isLive = false)
 
         /** A real cycle (D3) and its on-device forecast (D6). */
         fun live(details: QuotaDetailsModel, issue: TrackingIssue? = null): HeroContent {

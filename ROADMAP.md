@@ -258,7 +258,7 @@ The former promo catalog, promo entry and expiry setup are superseded. A chosen 
 
 #### Phase D5: Home & Floating Navigation
 - [x] Home replaces the old dashboard placeholder; floating Material 3 navigation connects Home, History and Settings.
-- [x] Home UI covers no active quota, collecting usage, forecast available, missing permission and quota reached, plus an ended-cycle presentation. Scenarios are under Preview options and forecasts are explicitly sample data.
+- [x] Home UI covers no active quota, collecting usage, forecast available, missing permission and quota reached, plus an ended-cycle presentation. Scenarios were under Preview options with explicitly sample data until v0.9.1 removed them; Home now shows only the real cycle.
 - [x] Prominent forecast hero, quota progress/details action and seven-day usage bars. Collecting and missing-access states do not fabricate measured balances. The chart uses an independent History fixture.
 - [x] Direction C light QuotaTheme: white hero/surfaces, navy text/actions, teal progress, soft blue panels and mint navigation selection. Authentication stays dark navy; no theme toggle.
 - [ ] Connect Home and Details to persisted quota state, real access status, telemetry and D6 inference; retain honest loading/unavailable states.

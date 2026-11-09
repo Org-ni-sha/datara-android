@@ -41,13 +41,6 @@ internal fun formatDuration(millis: Long): String {
     }
 }
 
-/** Sample cycles (History and Notifications previews). */
-@Composable
-fun QuotaDetailsScreen(state: HomeUiState, onBack: () -> Unit, onEndCycle: () -> Unit,
-    onCreateQuota: () -> Unit, modifier: Modifier = Modifier, readOnly: Boolean = false) {
-    QuotaDetailsScreen(state.toDetailsModel(), onBack, onEndCycle, onCreateQuota, modifier, readOnly)
-}
-
 @Composable
 fun QuotaDetailsScreen(state: QuotaDetailsModel, onBack: () -> Unit, onEndCycle: () -> Unit,
     onCreateQuota: () -> Unit, modifier: Modifier = Modifier, readOnly: Boolean = false,
@@ -56,23 +49,18 @@ fun QuotaDetailsScreen(state: QuotaDetailsModel, onBack: () -> Unit, onEndCycle:
 }
 
 internal fun detailsStatus(state: QuotaDetailsModel): String {
-    val scenario = state.sampleScenario
     return when {
         state.isLoading -> "Loading"
         !state.hasQuota -> "No active quota"
-        state.isReached && state.isEnded && scenario == null -> "Quota reached · Cycle ended"
+        state.isReached && state.isEnded -> "Quota reached · Cycle ended"
         state.isReached -> "Quota reached"
         state.isEnded -> "Cycle ended"
-        scenario == HomeSampleState.MISSING_PERMISSION -> "Access needed"
-        scenario == HomeSampleState.COLLECTING -> "Collecting usage"
-        scenario != null -> "Tracking · sample"
         state.measurement?.measuredThroughMillis == null -> "Waiting for usage readings"
         else -> "Tracking"
     }
 }
 
 private fun detailsTone(state: QuotaDetailsModel): StatusTone = when {
-    state.sampleScenario == HomeSampleState.MISSING_PERMISSION -> StatusTone.PROBLEM
     state.isReached || state.isEnded || !state.hasQuota -> StatusTone.NEUTRAL
     else -> StatusTone.GOOD
 }
@@ -85,9 +73,6 @@ internal fun detailsQuotaTone(state: QuotaDetailsModel): QuotaTone = quotaStatus
 private fun forecastTitle(state: QuotaDetailsModel): String = when {
     state.isEnded -> "Forecast stopped"
     state.isReached -> "Your quota has been reached"
-    state.sampleScenario == HomeSampleState.MISSING_PERMISSION -> "Waiting for Usage Access"
-    state.sampleScenario == HomeSampleState.COLLECTING -> "Getting to know your usage"
-    state.sampleScenario != null -> "About 12 hours"
     state.forecast != null -> state.forecast.title
     else -> "Forecast not available yet"
 }
@@ -96,9 +81,6 @@ private fun forecastBody(state: QuotaDetailsModel): String = when {
     state.isEnded -> "This cycle has ended. Start another quota when you’re ready."
     state.isReached -> state.reachedAtMillis?.let { "Reached around ${formatCycleDate(it)}. Your internet stays on." }
         ?: "Your internet stays on."
-    state.sampleScenario == HomeSampleState.MISSING_PERMISSION -> "Usage is unavailable until access is restored. No current balance is assumed."
-    state.sampleScenario == HomeSampleState.COLLECTING -> "A forecast will appear once there’s enough usage."
-    state.sampleScenario != null -> "Illustrative estimate based on sample usage, not a live prediction."
     state.forecast != null -> state.forecast.body
     else -> "The forecast is calculated on this device from your measured usage, once an hour."
 }
@@ -143,7 +125,7 @@ private fun QuotaDetailsContent(
                 DetailsCard {
                     Text("Cycle information", style = MaterialTheme.typography.titleMedium)
                     DetailValue("Started", formatCycleDate(state.startedAtMillis))
-                    if (!state.isSample) state.reachedAtMillis?.let { DetailValue("Reached", formatCycleDate(it)) }
+                    state.reachedAtMillis?.let { DetailValue("Reached", formatCycleDate(it)) }
                     state.endedAtMillis?.let { DetailValue("Ended", formatCycleDate(it)) }
                     DetailValue("Tracking scope", "This device · Mobile data")
                     Text("Uploads and downloads, including promo freebies. Wi-Fi is excluded.",
@@ -152,7 +134,7 @@ private fun QuotaDetailsContent(
             }
             actionError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
             if (readOnly) {
-                Text(readOnlyNote ?: if (state.isSample) "Sample past cycle · Read-only details" else "Opened from an alert · Read-only details", style = MaterialTheme.typography.labelLarge)
+                Text(readOnlyNote ?: "Opened from an alert · Read-only details", style = MaterialTheme.typography.labelLarge)
             } else if (empty || state.isEnded || state.isReached) {
                 if (!state.isLoading) DataraActionButton(if (empty) "Create a quota" else "Create another quota", onCreateQuota)
             } else {
@@ -161,17 +143,14 @@ private fun QuotaDetailsContent(
                     Text("End cycle")
                 }
             }
-            if (!readOnly) Text(
-                if (state.isSample) "Preview cycles are kept only for this session. Creating another quota replaces these sample details; saved history will come later."
-                else "Cycles are saved on this phone. Past cycles are in History.",
+            if (!readOnly) Text("Cycles are saved on this phone. Past cycles are in History.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
         }
     }
     if (confirmEnd && state.canEnd && !readOnly) {
         AlertDialog(onDismissRequest = { confirmEnd = false },
             title = { Text("End this cycle?") },
-            text = { Text(if (state.isSample) "Stop this sample cycle? You can still review its details until you create another quota. Your internet stays on."
-                else "End this cycle? Its details stay in History.") },
+            text = { Text("End this cycle? Its details stay in History.") },
             confirmButton = {
                 TextButton(onClick = { confirmEnd = false; onEndCycle() },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("End cycle") }
@@ -222,11 +201,11 @@ private fun DetailValue(label: String, value: String) {
 @Preview(name = "Details large text", widthDp = 360, heightDp = 800, fontScale = 2f)
 @Preview(name = "Details landscape", widthDp = 800, heightDp = 360)
 @Composable
-private fun DetailsPreview() { QuotaTheme { QuotaDetailsScreen(HomeUiState(HomeSampleState.FORECAST_AVAILABLE), {}, {}, {}) } }
+private fun DetailsPreview() { QuotaTheme { QuotaDetailsScreen(PREVIEW_DETAILS, {}, {}, {}) } }
 
 @Preview(name = "Ended cycle", widthDp = 360, heightDp = 800)
 @Composable
-private fun EndedPreview() { QuotaTheme { QuotaDetailsScreen(HomeUiState(HomeSampleState.FORECAST_AVAILABLE, endedAtMillis = System.currentTimeMillis()), {}, {}, {}) } }
+private fun EndedPreview() { QuotaTheme { QuotaDetailsScreen(PREVIEW_DETAILS.copy(endedAtMillis = System.currentTimeMillis()), {}, {}, {}) } }
 
 @Preview(name = "Measured cycle", widthDp = 360, heightDp = 800)
 @Composable
@@ -238,3 +217,8 @@ private fun MeasuredPreview() {
             measurement = CycleMeasurement(start + 7_200_000, 1_200_000, 0)), {}, {}, {}, onTrackingSetup = {})
     }
 }
+
+/** Android Studio previews only: a cycle 40% into a 10 GB quota. */
+private val PREVIEW_DETAILS = QuotaDetailsModel(hasQuota = true, name = "Everyday data", quotaBytes = 10_000_000_000L,
+    usedBytes = 4_000_000_000L, remainingBytes = 6_000_000_000L, progress = 0.4f,
+    startedAtMillis = System.currentTimeMillis() - 3 * 86_400_000L)

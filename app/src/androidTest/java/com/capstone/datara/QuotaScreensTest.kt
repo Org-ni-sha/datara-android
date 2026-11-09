@@ -17,22 +17,26 @@ import java.io.File
 class QuotaScreensTest {
     @get:Rule val compose = createComposeRule()
 
+    /** A real-cycle model 40% into a 10 GB quota (Preview options and its samples are gone). */
+    private val cycle = QuotaDetailsModel(hasQuota = true, name = "Everyday data", quotaBytes = 10_000_000_000L,
+        usedBytes = 4_000_000_000L, remainingBytes = 6_000_000_000L, progress = 0.4f, startedAtMillis = 1000)
+
     @Test fun enlargedHomeKeepsDetailsReachable() {
         compose.setContent {
             val density = androidx.compose.ui.platform.LocalDensity.current
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, 2f)
             ) {
-                HomeScreen(HomeUiState(HomeSampleState.FORECAST_AVAILABLE), {}, {}, {})
+                HomeScreen({}, {}, live = cycle)
             }
         }
-        compose.onNodeWithText("About 12 hours").assertExists()
+        compose.onNodeWithText("40%").assertExists()
         compose.onNodeWithText("View quota details").performScrollTo().assertIsDisplayed()
         compose.captureUi("home-large-text")
     }
 
     @Test fun detailsRequireConfirmationAndOfferAnotherQuotaAfterEnding() {
-        val state = mutableStateOf(HomeUiState(HomeSampleState.FORECAST_AVAILABLE))
+        val state = mutableStateOf(cycle)
         var starts = 0
         compose.setContent { DATAraTheme {
             QuotaDetailsScreen(state.value, {}, { state.value = state.value.copy(endedAtMillis = 2000) }, { starts++ })
@@ -47,29 +51,21 @@ class QuotaScreensTest {
         compose.runOnIdle { assertEquals(1, starts) }
     }
 
-    @Test fun sampleStatesRenderWithoutShowingFakeBalancesForMissingPermission() {
-        val state = mutableStateOf(HomeUiState())
-        compose.setContent { DATAraTheme { HomeScreen(state.value, {}, {}, {}) } }
+    @Test fun homeShowsEmptyLoadingCycleAndReachedStates() {
+        val live = mutableStateOf<QuotaDetailsModel?>(null)
+        val loading = mutableStateOf(false)
+        compose.setContent { DATAraTheme { HomeScreen({}, {}, live = live.value, liveLoading = loading.value) } }
         compose.onNodeWithText("Create a quota").assertExists()
+        compose.onNodeWithText("Preview options").assertDoesNotExist()
         capture("home-empty")
-        compose.runOnIdle { state.value = HomeUiState(HomeSampleState.COLLECTING) }
-        compose.onNodeWithText("Waiting for sample readings").assertExists()
-        compose.onNodeWithText("Usage trend pending").assertExists()
-        capture("home-collecting")
-        compose.onNodeWithText("Last 7 days").assertDoesNotExist()
-        compose.runOnIdle { state.value = HomeUiState(HomeSampleState.FORECAST_AVAILABLE) }
-        compose.onNodeWithText("About 12 hours").assertExists()
-        compose.onNodeWithText("Last 7 days").assertExists()
-        compose.onNodeWithText("6 GB remaining").assertExists()
-        capture("home-forecast")
-        compose.runOnIdle { state.value = HomeUiState(HomeSampleState.MISSING_PERMISSION) }
-        compose.onNodeWithText("About Usage Access").assertExists()
-        compose.onNodeWithText("Remaining quota unavailable").assertExists()
-        compose.onNodeWithText("Last 7 days").assertDoesNotExist()
-        capture("home-access")
-        compose.onNodeWithText("6 GB").assertDoesNotExist()
-        compose.runOnIdle { state.value = HomeUiState(HomeSampleState.QUOTA_REACHED) }
-        compose.onNodeWithText("Create another quota").assertExists()
+        compose.runOnIdle { loading.value = true }
+        compose.onNodeWithText("Loading your quota…").assertExists()
+        compose.runOnIdle { loading.value = false; live.value = cycle }
+        compose.onNodeWithText("40%").assertExists()
+        compose.onNodeWithText("View quota details").performScrollTo().assertIsDisplayed()
+        capture("home-cycle")
+        compose.runOnIdle { live.value = cycle.copy(usedBytes = 10_000_000_000L, remainingBytes = 0, progress = 1f, isReached = true) }
+        compose.onNodeWithText("Create another quota").performScrollTo().assertExists()
         capture("home-reached")
     }
 

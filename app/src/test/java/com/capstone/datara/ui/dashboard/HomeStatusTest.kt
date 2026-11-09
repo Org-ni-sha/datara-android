@@ -2,8 +2,6 @@ package com.capstone.datara.ui.dashboard
 
 import com.capstone.datara.telemetry.TrackingAccess
 import com.capstone.datara.ui.history.DayBucket
-import com.capstone.datara.ui.quota.HomeSampleState
-import com.capstone.datara.ui.quota.HomeUiState
 import com.capstone.datara.ui.quota.QuotaDetailsModel
 import org.junit.Assert.*
 import org.junit.Test
@@ -50,25 +48,17 @@ class HomeStatusTest {
     private val live = QuotaDetailsModel(hasQuota = true, name = "Defense", quotaBytes = 5_000_000_000, usedBytes = 1_000_000_000,
         remainingBytes = 4_000_000_000, progress = 0.2f, startedAtMillis = 0)
 
-    @Test fun realCycleWinsUnlessAScenarioWasPicked() {
-        val hero = HeroContent.select(HomeUiState(HomeSampleState.FORECAST_AVAILABLE), live, false, TrackingIssue.SERVICE_STOPPED)
+    @Test fun realCycleShowsWithItsTrackingIssue() {
+        val hero = HeroContent.select(live, false, TrackingIssue.SERVICE_STOPPED)
         assertTrue(hero.isLive)
         assertEquals(TrackingIssue.SERVICE_STOPPED, hero.issue)
-        val preview = HeroContent.select(HomeUiState(HomeSampleState.QUOTA_REACHED, previewing = true), live, false, null)
-        assertFalse(preview.isLive)
-        assertTrue(preview.reached)
     }
 
     @Test fun loadingAndEmptyStates() {
-        assertTrue(HeroContent.select(HomeUiState(), null, liveLoading = true, issue = null).loading)
-        assertTrue(HeroContent.select(HomeUiState(HomeSampleState.FORECAST_AVAILABLE), null, false, null).empty)
-        assertTrue(HeroContent.select(HomeUiState(HomeSampleState.LOADING, previewing = true), null, false, null).loading)
-    }
-
-    @Test fun trackingOffSampleShowsBanner() {
-        val hero = HeroContent.select(HomeUiState(HomeSampleState.TRACKING_OFF, previewing = true), null, false, null)
-        assertEquals(TrackingIssue.SERVICE_STOPPED, hero.issue)
-        assertFalse(hero.empty)
+        assertTrue(HeroContent.select(null, liveLoading = true, issue = null).loading)
+        val empty = HeroContent.select(null, false, null)
+        assertTrue(empty.empty)
+        assertFalse(empty.isLive)
     }
 
     @Test fun reachedCycleHasNoBanner() {

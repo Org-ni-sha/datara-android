@@ -4,7 +4,7 @@ Every screen of the app as of Nov 10, 2026 (after PR #45), captured from the run
 
 ![All screens](overview.png)
 
-The **Home states** are the review-only samples from *Preview options*; every other screen shows real data. **Choose a username** is not captured: it only appears for a signed-in account without a username, and it uses the same navy card layout as Reset password.
+The **Home states** are the review-only samples from *Preview options*, captured just before that menu was removed in v0.9.1; every other screen shows real data. A few texts have since been shortened (PR #47). **Choose a username** is not captured: it only appears for a signed-in account without a username, and it uses the same navy card layout as Reset password.
 
 ## Sign in
 
