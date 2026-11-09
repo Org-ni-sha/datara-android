@@ -129,14 +129,17 @@ private fun HistoryContent(state: HistoryUiState, onHome: () -> Unit, onSettings
                             text = { Text("Quota cycles", style = MaterialTheme.typography.titleSmall) })
                     }
                     if (!cyclesTab) {
-                        // FlowRow so the range chips wrap instead of squeezing at large font sizes
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            listOf(HistoryWindow.DAY, HistoryWindow.WEEK).forEach { option ->
-                                FilterChip(selected = window == option, onClick = { windowName = option.name; readings = false },
-                                    label = { Text(option.label, style = MaterialTheme.typography.labelLarge) },
+                        // Two equal halves across the width (Material 3 segmented button)
+                        val ranges = listOf(HistoryWindow.DAY, HistoryWindow.WEEK)
+                        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                            ranges.forEachIndexed { index, option ->
+                                SegmentedButton(selected = window == option, onClick = { windowName = option.name; readings = false },
+                                    shape = SegmentedButtonDefaults.itemShape(index, ranges.size),
                                     modifier = Modifier.heightIn(min = 48.dp),
-                                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer))
+                                    colors = SegmentedButtonDefaults.colors(activeContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        activeContentColor = MaterialTheme.colorScheme.onSecondaryContainer)) {
+                                    Text(option.label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                                }
                             }
                         }
                         if (snapshot != null) {
