@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -66,26 +67,30 @@ private fun NotificationsContent(state: NotificationCenterState, onBack: () -> U
         return
     }
     val visible = state.alerts.filter { !unreadOnly || !it.isRead }
-    Scaffold(modifier = modifier, containerColor = MaterialTheme.colorScheme.background,
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val today = LocalDate.now()
+    Scaffold(modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection), containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = { DataraAppBar("Notifications", onBack) }) { insets ->
+        topBar = { DataraCollapsingAppBar("Notifications", scrollBehavior, onBack) }) { insets ->
         LazyColumn(Modifier.fillMaxSize().padding(insets), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Your updates", style = MaterialTheme.typography.headlineMedium)
                     Text(if (state.isLoading) "Loading…" else if (state.alerts.isEmpty()) "A quiet moment." else if (state.unreadCount == 0) "You’re all caught up." else "${state.unreadCount} unread ${if (state.unreadCount == 1) "update" else "updates"}",
                         style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                     Spacer(Modifier.height(4.dp))
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        SegmentedButton(selected = !unreadOnly, onClick = { unreadOnly = false },
-                            shape = SegmentedButtonDefaults.itemShape(0, 2), icon = {}) { Text("All") }
-                        SegmentedButton(selected = unreadOnly, onClick = { unreadOnly = true },
-                            shape = SegmentedButtonDefaults.itemShape(1, 2), icon = {}) { Text("Unread") }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically) {
+                        listOf(false to "All", true to "Unread").forEach { (option, label) ->
+                            FilterChip(selected = unreadOnly == option, onClick = { unreadOnly = option }, label = { Text(label) },
+                                modifier = Modifier.heightIn(min = 48.dp),
+                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer))
+                        }
+                        TextButton(onClick = { onMarkAllRead(); scope.launch { snackbar.showSnackbar("All notifications marked as read") } },
+                            enabled = state.unreadCount > 0) { Text("Mark all as read") }
                     }
-                    TextButton(onClick = { onMarkAllRead(); scope.launch { snackbar.showSnackbar("All notifications marked as read") } },
-                        enabled = state.unreadCount > 0) { Text("Mark all as read") }
                 }
             }
             if (state.isLoading) item {
@@ -94,7 +99,7 @@ private fun NotificationsContent(state: NotificationCenterState, onBack: () -> U
                 }
             }
             if (visible.isEmpty() && !state.isLoading) item {
-                Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
                     Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         TonalIcon(DataraIcons.Bell, positive = true)
                         Text(if (unreadOnly && state.alerts.isNotEmpty()) "No unread notifications" else "No notifications yet", style = MaterialTheme.typography.headlineMedium)
@@ -105,24 +110,16 @@ private fun NotificationsContent(state: NotificationCenterState, onBack: () -> U
                     }
                 }
             }
-            visible.groupBy { Instant.ofEpochMilli(it.receivedAtMillis).atZone(ZoneId.systemDefault()).toLocalDate() }.forEach { (day, alerts) ->
-                item(key = "date-$day") { Text(if (day == LocalDate.now()) "Today" else day.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)),
-                    style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp)) }
-                items(alerts, key = { it.id }) { alert ->
-                    Card(onClick = { onMarkRead(alert.id); selectedId = alert.id }, shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.cardColors(containerColor = if (alert.isRead) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer),
-                        modifier = Modifier.fillMaxWidth().semantics { stateDescription = if (alert.isRead) "Read" else "Unread" }) {
-                        ListItem(leadingContent = { TonalIcon(if (alert.category == AlertCategory.FORECAST) DataraIcons.Clock else DataraIcons.Bell,
-                            positive = alert.category == AlertCategory.REACHED) },
-                            headlineContent = { Text(alert.title, style = MaterialTheme.typography.titleMedium,
-                                fontWeight = if (alert.isRead) FontWeight.Medium else FontWeight.Bold) },
-                            supportingContent = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(alert.message, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                                Text(alertMeta(alert), style = MaterialTheme.typography.labelSmall)
-                            } }, colors = ListItemDefaults.colors(containerColor = if (alert.isRead) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer),
-                            modifier = Modifier.padding(vertical = 10.dp))
+            // Today / Earlier, with headers that stay pinned while their group scrolls
+            visible.groupBy { alertDay(it) == today }.toSortedMap(compareByDescending { it }).forEach { (isToday, alerts) ->
+                stickyHeader(key = "group-$isToday") {
+                    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (isToday) "Today" else "Earlier", style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp).semantics { heading() })
                     }
                 }
+                items(alerts, key = { it.id }) { alert -> AlertRow(alert, showDate = !isToday) { onMarkRead(alert.id); selectedId = alert.id } }
             }
         }
     }
@@ -130,7 +127,7 @@ private fun NotificationsContent(state: NotificationCenterState, onBack: () -> U
         ModalBottomSheet(onDismissRequest = { selectedId = null }, containerColor = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxWidth().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(horizontal = 24.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                TonalIcon(if (alert.category == AlertCategory.FORECAST) DataraIcons.Clock else DataraIcons.Bell)
+                AlertIcon(alert)
                 Text(alert.title, style = MaterialTheme.typography.headlineMedium)
                 Text(alertTime(alert.receivedAtMillis), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(alert.message, style = MaterialTheme.typography.bodyLarge)
@@ -144,10 +141,37 @@ private fun NotificationsContent(state: NotificationCenterState, onBack: () -> U
     }
 }
 
+private fun alertDay(alert: AlertItem): LocalDate = Instant.ofEpochMilli(alert.receivedAtMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+
+/** Milestones in their quota status colour; forecast alerts in the neutral navy tint. */
+@Composable
+private fun AlertIcon(alert: AlertItem) {
+    val icon = if (alert.category == AlertCategory.FORECAST) DataraIcons.Clock else DataraIcons.Bell
+    alert.tone?.let { ToneIcon(icon, it) } ?: TonalIcon(icon)
+}
+
+@Composable
+private fun AlertRow(alert: AlertItem, showDate: Boolean, onClick: () -> Unit) {
+    val container = if (alert.isRead) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.primaryContainer
+    Card(onClick = onClick, shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = container),
+        modifier = Modifier.fillMaxWidth().semantics { stateDescription = if (alert.isRead) "Read" else "Unread" }) {
+        ListItem(leadingContent = { AlertIcon(alert) },
+            headlineContent = { Text(alert.title, style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (alert.isRead) FontWeight.Medium else FontWeight.Bold) },
+            supportingContent = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(alert.message, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Text(alertMeta(alert, showDate = showDate), style = MaterialTheme.typography.labelSmall)
+            } },
+            trailingContent = if (alert.isRead) null else ({ Badge(containerColor = MaterialTheme.colorScheme.primary) }),
+            colors = ListItemDefaults.colors(containerColor = container),
+            modifier = Modifier.padding(vertical = 10.dp))
+    }
+}
+
 /** The small line under an alert: its kind and when it arrived. Read state is shown by weight and colour, and announced. */
-internal fun alertMeta(alert: AlertItem, zone: ZoneId = ZoneId.systemDefault()): String =
-    "${alert.category.label} · ${DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
-        .format(Instant.ofEpochMilli(alert.receivedAtMillis).atZone(zone))}"
+internal fun alertMeta(alert: AlertItem, zone: ZoneId = ZoneId.systemDefault(), showDate: Boolean = false): String =
+    "${alert.category.label} · ${(if (showDate) DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+        else DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)).format(Instant.ofEpochMilli(alert.receivedAtMillis).atZone(zone))}"
 
 @Composable
 internal fun NotificationBell(unreadCount: Int, onClick: () -> Unit) {

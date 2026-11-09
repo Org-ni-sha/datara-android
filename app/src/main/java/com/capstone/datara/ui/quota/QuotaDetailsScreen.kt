@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.capstone.datara.data.cycle.CycleStatus
 import com.capstone.datara.ui.auth.components.DataraIcons
 import com.capstone.datara.ui.theme.*
 import com.capstone.datara.ui.components.*
@@ -76,6 +77,11 @@ private fun detailsTone(state: QuotaDetailsModel): StatusTone = when {
     else -> StatusTone.GOOD
 }
 
+/** Same status colour as the Home ring for this cycle. */
+internal fun detailsQuotaTone(state: QuotaDetailsModel): QuotaTone = quotaStatusTone(
+    if (state.usageUnavailable) 0f else state.progress,
+    when { state.isEnded && !state.isReached -> CycleStatus.ENDED; state.isReached -> CycleStatus.REACHED; else -> CycleStatus.ACTIVE })
+
 private fun forecastTitle(state: QuotaDetailsModel): String = when {
     state.isEnded -> "Forecast stopped"
     state.isReached -> "Your quota has been reached"
@@ -121,7 +127,8 @@ private fun QuotaDetailsContent(
                 return@Column
             }
             SectionTitle(if (empty) "No active quota" else state.name)
-            StatusPill(detailsStatus(state), detailsTone(state))
+            if (empty || detailsTone(state) == StatusTone.PROBLEM) StatusPill(detailsStatus(state), detailsTone(state))
+            else QuotaStatusChip(detailsQuotaTone(state), text = detailsStatus(state))
             if (!empty) {
                 QuotaProgressCard(state)
                 state.measurement?.let { MeasurementCard(it, state.isEnded, onTrackingSetup) }
@@ -196,7 +203,7 @@ private fun MeasurementCard(measurement: CycleMeasurement, ended: Boolean, onTra
 
 @Composable
 private fun DetailsCard(prominent: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
-    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = if (prominent) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = if (prominent) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
         contentColor = MaterialTheme.colorScheme.onSurface),
         modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp), content = content)

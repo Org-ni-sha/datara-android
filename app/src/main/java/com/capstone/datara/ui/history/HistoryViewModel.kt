@@ -10,7 +10,9 @@ import com.capstone.datara.forecast.FeatureContract.HOUR_MS
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -40,7 +42,12 @@ class HistoryViewModel @Inject constructor(
     private val forecasts: ForecastDao
 ) : ViewModel() {
 
-    val state: StateFlow<HistoryUiState> = owners.owner.flatMapLatest { owner ->
+    private val refreshTick = MutableStateFlow(0)
+
+    /** Pull to refresh: re-reads Room now (the flows already update on every stored reading). */
+    fun refresh() { refreshTick.value++ }
+
+    val state: StateFlow<HistoryUiState> = combine(owners.owner, refreshTick) { owner, _ -> owner }.flatMapLatest { owner ->
         if (owner == null) return@flatMapLatest flowOf(HistoryUiState.Ready(HistoryData(emptyList(), emptyList(), emptyList(), 0)))
         cycles.observeAll(owner.userId)
             .map { all -> all.filter { it.deviceId == owner.deviceId } }

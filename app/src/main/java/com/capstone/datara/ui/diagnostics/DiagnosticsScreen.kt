@@ -39,7 +39,7 @@ fun DiagnosticsScreen(state: DiagnosticsUiState, onBack: () -> Unit, onRefresh: 
                 TextButton(onClick = onRefresh) { Text("Refresh") }
             }) }) { insets ->
             Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                .padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("Developer view · read-only · real on-device data", style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (state.loading) {
@@ -60,7 +60,7 @@ fun DiagnosticsScreen(state: DiagnosticsUiState, onBack: () -> Unit, onRefresh: 
 private fun ActiveModelCard(state: DiagnosticsUiState) {
     val local = state.activeModel == ActiveModel.LOCAL
     Card(shape = MaterialTheme.shapes.extraLarge, colors = CardDefaults.cardColors(
-        containerColor = if (local) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)) {
+        containerColor = if (local) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Active model", style = MaterialTheme.typography.labelLarge)
             Text(state.activeModel.uppercase(), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold,
@@ -74,8 +74,8 @@ private fun ActiveModelCard(state: DiagnosticsUiState) {
 
 @Composable
 private fun DiagnosticsCard(section: DiagnosticsSection) {
-    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(section.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
             section.rows.forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
@@ -92,8 +92,8 @@ private fun DiagnosticsCard(section: DiagnosticsSection) {
 
 @Composable
 private fun ForecastTable(rows: List<ForecastTableRow>) {
-    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Last ${rows.size} forecasts (MB)", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
             Column(Modifier.horizontalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 TableLine("Hour", "Model", "Global", "Local", "Left", header = true)

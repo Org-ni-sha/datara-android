@@ -13,21 +13,22 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
+import com.capstone.datara.ui.components.*
 
 @Composable
 internal fun QuotaProgressCard(state: QuotaDetailsModel) {
     val missing = state.usageUnavailable
-    val progress by animateFloatAsState(if (missing) 0f else state.progress.coerceIn(0f, 1f), tween(350), label = "Quota gauge")
     val largeFont = LocalDensity.current.fontScale > 1.3f
-    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val stacked = maxWidth < 280.dp || LocalDensity.current.fontScale > 1.4f
+                val tone = detailsQuotaTone(state)
                 val gauge: @Composable () -> Unit = {
-                    Box(Modifier.size(108.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxSize().semantics {
-                            contentDescription = if (missing) "Usage unavailable" else "${(state.progress * 100).roundToInt()} percent of quota used"
-                        }, strokeWidth = 9.dp, color = MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.primaryContainer)
+                    // Echoes the Home ring: same status colour, smaller
+                    QuotaRing(progress = if (missing) 0f else state.progress, color = tone.accent(), trackColor = tone.colors().container,
+                        description = if (missing) "Usage unavailable" else "${(state.progress * 100).roundToInt()} percent of quota used",
+                        size = 124.dp, stroke = 11.dp, modifier = Modifier.width(124.dp)) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(if (missing) "—" else "${(state.progress * 100).roundToInt()}%", style = MaterialTheme.typography.headlineMedium)
                             Text("used", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
