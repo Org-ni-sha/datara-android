@@ -110,7 +110,7 @@ private fun NotificationsContent(state: NotificationCenterState, onBack: () -> U
                     style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp)) }
                 items(alerts, key = { it.id }) { alert ->
                     Card(onClick = { onMarkRead(alert.id); selectedId = alert.id }, shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.cardColors(containerColor = if (alert.isRead) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.secondaryContainer),
+                        colors = CardDefaults.cardColors(containerColor = if (alert.isRead) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer),
                         modifier = Modifier.fillMaxWidth().semantics { stateDescription = if (alert.isRead) "Read" else "Unread" }) {
                         ListItem(leadingContent = { TonalIcon(if (alert.category == AlertCategory.FORECAST) DataraIcons.Clock else DataraIcons.Bell,
                             positive = alert.category == AlertCategory.REACHED) },
@@ -119,7 +119,7 @@ private fun NotificationsContent(state: NotificationCenterState, onBack: () -> U
                             supportingContent = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(alert.message, maxLines = 3, overflow = TextOverflow.Ellipsis)
                                 Text(alertMeta(alert), style = MaterialTheme.typography.labelSmall)
-                            } }, colors = ListItemDefaults.colors(containerColor = if (alert.isRead) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.secondaryContainer),
+                            } }, colors = ListItemDefaults.colors(containerColor = if (alert.isRead) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.primaryContainer),
                             modifier = Modifier.padding(vertical = 10.dp))
                     }
                 }

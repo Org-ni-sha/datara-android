@@ -27,7 +27,7 @@ internal fun QuotaProgressCard(state: QuotaDetailsModel) {
                     Box(Modifier.size(108.dp), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxSize().semantics {
                             contentDescription = if (missing) "Usage unavailable" else "${(state.progress * 100).roundToInt()} percent of quota used"
-                        }, strokeWidth = 9.dp, color = MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.secondaryContainer)
+                        }, strokeWidth = 9.dp, color = MaterialTheme.colorScheme.primary, trackColor = MaterialTheme.colorScheme.primaryContainer)
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(if (missing) "—" else "${(state.progress * 100).roundToInt()}%", style = MaterialTheme.typography.headlineMedium)
                             Text("used", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -123,7 +123,7 @@ private fun UsernameHelperText(uiState: UsernameUiState) {
         uiState.availability == UsernameAvailability.Taken ->
             "That username is taken. Try another." to MaterialTheme.colorScheme.error
         uiState.availability == UsernameAvailability.Available ->
-            "Username is available." to MaterialTheme.colorScheme.tertiary
+            "Username is available." to MaterialTheme.colorScheme.secondary
         uiState.availability == UsernameAvailability.Checking ->
             "Checking availability…" to MaterialTheme.colorScheme.onSurfaceVariant
         else -> "3–20 characters: letters, numbers and underscores." to MaterialTheme.colorScheme.onSurfaceVariant

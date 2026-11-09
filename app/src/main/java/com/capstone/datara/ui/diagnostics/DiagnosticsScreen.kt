@@ -60,7 +60,7 @@ fun DiagnosticsScreen(state: DiagnosticsUiState, onBack: () -> Unit, onRefresh: 
 private fun ActiveModelCard(state: DiagnosticsUiState) {
     val local = state.activeModel == ActiveModel.LOCAL
     Card(shape = MaterialTheme.shapes.extraLarge, colors = CardDefaults.cardColors(
-        containerColor = if (local) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)) {
+        containerColor = if (local) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Active model", style = MaterialTheme.typography.labelLarge)
             Text(state.activeModel.uppercase(), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold,

@@ -12,7 +12,10 @@ data class PetForecastUi(
     val body: String,
     /** The PET shown, or null (collecting, unavailable, beyond 30 days). */
     val reachAtMillis: Long? = null,
-    val isAvailable: Boolean = false
+    val isAvailable: Boolean = false,
+    /** While collecting: measured hours so far and hours needed (the Home ring's "n of 6 hours"). */
+    val observedHours: Int? = null,
+    val neededHours: Int? = null
 ) {
     companion object {
         /**
@@ -24,7 +27,8 @@ data class PetForecastUi(
             status is ForecastStatus.Collecting -> PetForecastUi(
                 "COLLECTING USAGE", "Collecting usage",
                 "A forecast appears once ${status.neededHours} of the last 24 hours have measured usage " +
-                    "(${status.observedHours} so far)."
+                    "(${status.observedHours} so far).",
+                observedHours = status.observedHours, neededHours = status.neededHours
             )
             status is ForecastStatus.Unavailable -> PetForecastUi("FORECAST UNAVAILABLE", "Forecast unavailable",
                 "The forecast can’t be calculated right now. Your usage is still being measured, and DATAra tries again every hour.")

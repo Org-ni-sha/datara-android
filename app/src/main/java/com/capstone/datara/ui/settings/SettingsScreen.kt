@@ -82,7 +82,7 @@ private fun SettingsContent(email: String?, onSaveName: (String) -> String?,
             Surface(onClick = { profile = true }, color = MaterialTheme.colorScheme.surface,
                 contentColor = MaterialTheme.colorScheme.onSurface, shape = MaterialTheme.shapes.large) {
                 Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(color = MaterialTheme.colorScheme.tertiaryContainer, shape = MaterialTheme.shapes.medium) {
+                    Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
                         Icon(DataraIcons.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(12.dp).size(28.dp))
                     }
                     Text(profileState.name.ifBlank { "Your profile" }, style = MaterialTheme.typography.headlineMedium)

@@ -1,6 +1,19 @@
 # Signed-in UI design and review
 
-## Current direction (2026-10-29)
+## Material 3 restyle (2026-11-09)
+
+The earlier look read as white cards on off-white. The restyle keeps the light greeting header and navy docked bar and adds depth and a focal point:
+
+- **Tonal colours:** a full light M3 scheme (navy primary, teal secondary, amber tertiary, filled `surfaceContainer*` roles) on a tinted page; AA contrast for every new pair.
+- **Status colours:** `quotaStatusTone` — teal on track, amber from 75%, deeper amber from 90%, soft red when reached, neutral when ended.
+- **Forecast ring hero:** Home's hero is a navy card with a ring of the share used and the PET inside; every state is reviewable through Preview options.
+- **Insights carousel:** Today, Daily average, Peak hour, Forecast vs. actual, from History's aggregation so both screens agree.
+- **Brand font:** Plus Jakarta Sans (SIL OFL) for display to label styles, tabular digits everywhere.
+- The redundant "Your mobile usage" heading under the greeting is gone. Other screens pick up the colours and font via the theme; their own restyle follows separately.
+
+M3 Expressive's wavy progress indicator is not public in the Material 3 version of Compose BOM 2026.02.01, so collecting uses the standard indeterminate ring.
+
+## Earlier direction (2026-10-29)
 
 User-defined usage-quota forecasting is the approved product direction. The current implementation remains a sample UI; real telemetry, persistence, inference and alert delivery are pending. This document describes the final Direction C adaptation and supersedes earlier navy-hero, lime-accent, circular-gauge and larger-radius designs.
 

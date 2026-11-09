@@ -51,7 +51,7 @@ fun HistoryScreen(state: HistoryUiState, onHome: () -> Unit, onSettings: () -> U
     QuotaTheme {
         ProvideVicoTheme(vicoTheme.copy(lineColor = MaterialTheme.colorScheme.outlineVariant,
             textColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            columnCartesianLayerColors = listOf(MaterialTheme.colorScheme.tertiary))) {
+            columnCartesianLayerColors = listOf(MaterialTheme.colorScheme.secondary))) {
             HistoryContent(state, onHome, onSettings, modifier, onNotifications, unreadCount, zone)
         }
     }
@@ -204,7 +204,7 @@ private fun TrendCard(snapshot: HistorySnapshot, window: HistoryWindow, onReadin
 private fun CycleSummary(item: CycleHistory) {
     val details = item.toDetails()
     HistoryCard {
-        Text(item.statusLabel.uppercase(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.tertiary)
+        Text(item.statusLabel.uppercase(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
         Text("${formatQuotaData(item.usage.usedBytes)} of ${formatQuotaData(item.cycle.quotaBytes)}", style = MaterialTheme.typography.headlineMedium)
         LinearProgressIndicator(progress = { details.progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(8.dp))
         Text("${formatCycleDate(item.cycle.startAt)} – ${item.cycle.endedAt?.let(::formatCycleDate) ?: "now"}",
@@ -224,7 +224,7 @@ private fun PetComparisonText(pet: PetComparison) {
             Text("Forecast vs actual", style = MaterialTheme.typography.titleSmall)
             Text("Predicted on ${formatCycleDate(pet.predictedAt)}: reach ${formatCycleDate(pet.predictedReachAt)}", style = MaterialTheme.typography.bodyMedium)
             Text("Reached ${formatCycleDate(pet.reachedAt)}", style = MaterialTheme.typography.bodyMedium)
-            Text(petErrorText(pet.errorMillis), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.tertiary)
+            Text(petErrorText(pet.errorMillis), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
         }
     }
 }
@@ -271,7 +271,7 @@ private fun UsageChart(points: List<UsagePoint>, window: HistoryWindow, unit: Qu
     CartesianChartHost(
         chart = rememberCartesianChart(
             rememberColumnCartesianLayer(columnProvider = ColumnCartesianLayer.ColumnProvider.series(
-                rememberLineComponent(fill = Fill(MaterialTheme.colorScheme.tertiary), thickness = if (window == HistoryWindow.DAY) 6.dp else 12.dp)),
+                rememberLineComponent(fill = Fill(MaterialTheme.colorScheme.secondary), thickness = if (window == HistoryWindow.DAY) 6.dp else 12.dp)),
                 rangeProvider = remember(points.size) { CartesianLayerRangeProvider.fixed(minX = 0.0, maxX = (points.size - 1).toDouble(), minY = 0.0) }),
             startAxis = VerticalAxis.rememberStart(valueFormatter = remember(unit) { CartesianValueFormatter.decimal(suffix = " ${unit.name}") }),
             bottomAxis = HorizontalAxis.rememberBottom(

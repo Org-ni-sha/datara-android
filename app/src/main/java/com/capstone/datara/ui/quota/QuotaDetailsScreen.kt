@@ -116,7 +116,7 @@ private fun QuotaDetailsContent(
             .padding(horizontal = 20.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             if (state.isLoading) {
                 Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.tertiary)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.secondary)
                 }
                 return@Column
             }
@@ -131,7 +131,7 @@ private fun QuotaDetailsContent(
                         Text("Your forecast", style = MaterialTheme.typography.titleMedium)
                     }
                     Text(forecastTitle(state), style = MaterialTheme.typography.headlineMedium)
-                    Text(forecastBody(state), color = MaterialTheme.colorScheme.onTertiaryContainer, style = MaterialTheme.typography.bodyMedium)
+                    Text(forecastBody(state), color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.bodyMedium)
                 }
                 DetailsCard {
                     Text("Cycle information", style = MaterialTheme.typography.titleMedium)
@@ -196,7 +196,7 @@ private fun MeasurementCard(measurement: CycleMeasurement, ended: Boolean, onTra
 
 @Composable
 private fun DetailsCard(prominent: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
-    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = if (prominent) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surface,
+    Card(shape = MaterialTheme.shapes.large, colors = CardDefaults.cardColors(containerColor = if (prominent) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface),
         modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp), content = content)
