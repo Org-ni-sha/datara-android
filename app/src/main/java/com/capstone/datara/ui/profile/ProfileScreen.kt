@@ -76,10 +76,7 @@ fun ProfileScreen(profile: ProfileUiState, email: String?, onBack: () -> Unit,
                     Text("Couldn’t load your saved name. Check your connection; you can still set a new one.",
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                AnimatedVisibility(visible = profile.nameSaved) { Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.medium) {
-                    Text("Name saved.", modifier = Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite },
-                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                } }
+                // Success is a "Name saved" snackbar from the signed-in host; only errors stay here
                 AnimatedVisibility(visible = profile.saveError != null) { Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium) {
                     Text(profile.saveError.orEmpty(), modifier = Modifier.padding(16.dp).semantics { liveRegion = LiveRegionMode.Polite },
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
