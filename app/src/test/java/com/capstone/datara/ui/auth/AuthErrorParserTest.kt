@@ -36,7 +36,7 @@ class AuthErrorParserTest {
         val error = RuntimeException("HTTP request failed: Email not confirmed")
         val message = AuthErrorParser.parse(error, AuthAction.LOGIN)
 
-        assertEquals("Your email address has not been confirmed yet. Please check your inbox for the confirmation link.", message)
+        assertEquals("Confirm your email first. Check your inbox for the link.", message)
     }
 
     @Test
@@ -94,7 +94,7 @@ class AuthErrorParserTest {
         val error = RuntimeException("Token has expired or is invalid")
         val message = AuthErrorParser.parse(error, AuthAction.VERIFY_CODE)
 
-        assertEquals("The verification code is invalid or has expired. Please check the code or request a new one.", message)
+        assertEquals("That code is wrong or expired. Check it, or send a new one.", message)
     }
 
     @Test

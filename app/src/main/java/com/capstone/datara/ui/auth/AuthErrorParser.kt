@@ -73,7 +73,7 @@ object AuthErrorParser {
             }
             details.contains("email not confirmed") ||
                     details.contains("email_not_confirmed") -> {
-                "Your email address has not been confirmed yet. Please check your inbox for the confirmation link."
+                "Confirm your email first. Check your inbox for the link."
             }
             details.contains("over_request_rate_limit") ||
                     details.contains("too many requests") ||
@@ -144,7 +144,7 @@ object AuthErrorParser {
                     details.contains("token is invalid") ||
                     details.contains("invalid token") ||
                     details.contains("expired") -> {
-                "The verification code is invalid or has expired. Please check the code or request a new one."
+                "That code is wrong or expired. Check it, or send a new one."
             }
             details.contains("too many requests") ||
                     details.contains("rate limit") ||

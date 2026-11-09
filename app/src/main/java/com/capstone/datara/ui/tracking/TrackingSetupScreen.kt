@@ -85,17 +85,17 @@ private fun TrackingSetupContent(
         Column(Modifier.fillMaxSize().padding(insets).verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             if (state.isComplete) AllSetCard(onHome ?: onBack)
-            Text("DATAra measures mobile data on this phone to forecast your quota. Wi-Fi isn’t counted, messages are never read and nothing is blocked.",
+            Text("DATAra measures mobile data to forecast your quota. Wi-Fi isn’t counted. Messages are never read.",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             SetupStep(1, "Usage Access", DataraIcons.Data, granted = access.usageAccess, required = true,
-                body = "Lets DATAra read your phone’s mobile data totals. Android turns it on in Settings: find DATAra and switch it on.") {
+                body = "Lets DATAra read mobile data totals. Find DATAra in the list and switch it on.") {
                 if (!access.usageAccess) OutlinedButton(onClick = onOpenUsageAccess, Modifier.heightIn(min = 48.dp)) { Text("Open Usage access settings") }
             }
 
             SetupStep(2, "Notifications and phone state", DataraIcons.Bell, granted = access.notifications && access.phoneState,
                 required = !access.notifications,
-                body = "A notification shows while tracking runs. Phone state tells 5G, LTE and 3G apart. Calls and messages are never read.") {
+                body = "Shows that tracking is on, and tells 5G, LTE and 3G apart. Calls and messages are never read.") {
                 GrantRow("Notifications", access.notifications, required = true)
                 GrantRow("Phone state", access.phoneState, required = false)
                 if (!access.notifications || !access.phoneState) {
@@ -108,7 +108,7 @@ private fun TrackingSetupContent(
             }
 
             SetupStep(3, "Keep tracking running", DataraIcons.Shield, granted = access.batteryUnrestricted, required = false,
-                body = "Android may stop tracking to save battery. Allow background running so it restarts on its own. Some phones also need Autostart on.") {
+                body = "Lets tracking restart if Android stops it. Some phones also need Autostart.") {
                 if (!access.batteryUnrestricted) OutlinedButton(onClick = onAllowBackground, Modifier.heightIn(min = 48.dp)) { Text("Allow background running") }
             }
 

@@ -116,7 +116,7 @@ private fun HistoryContent(state: HistoryUiState, onHome: () -> Unit, onSettings
                 data.isEmpty -> HistoryCard {
                     TonalIcon(DataraIcons.History, positive = true)
                     Text("No usage history yet", style = MaterialTheme.typography.headlineLarge)
-                    Text("History fills in from tracked mobile usage, one hour at a time. Make sure tracking is on, then check back in an hour.",
+                    Text("Usage appears here hour by hour once tracking is on.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     DataraActionButton("Go to Home", onHome)
                 }
@@ -148,7 +148,7 @@ private fun HistoryContent(state: HistoryUiState, onHome: () -> Unit, onSettings
                         }
                     } else if (cycle == null) HistoryCard {
                         Text("No quota yet", style = MaterialTheme.typography.titleMedium)
-                        Text("Set a quota on Home. Each cycle, with its daily usage and how the forecast did, will show here.",
+                        Text("Set a quota on Home to see its daily usage and forecast here.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         CycleSummary(cycle) { detailsId = cycle.cycle.cycleId }

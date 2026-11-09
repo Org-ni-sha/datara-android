@@ -189,14 +189,14 @@ class QuotaAlertEngineTest {
         cycle(used = quota, status = CycleStatus.REACHED)
         val reached = evaluate().single()
         assertEquals("Quota reached", reached.title)
-        assertTrue(reached.message, reached.message.contains("never blocks data, so your connection stays on"))
+        assertTrue(reached.message, reached.message.contains("Your internet stays on"))
 
         now = start + 10 * hour // 10:00 in Manila
         cycle(used = 100_000_000, id = "c3")
         forecastIn(2 * hour + 30 * 60_000L, cycleId = "c3")
         val soon = evaluate().single()
         assertEquals("Quota likely reached within 3 hours", soon.title)
-        assertEquals("At your recent pace, “Everyday” may reach 1 GB around 12:30 PM. 900 MB left. This is an estimate.", soon.message)
+        assertEquals("At your pace, “Everyday” may reach 1 GB around 12:30 PM. 900 MB left.", soon.message)
 
         cycle(used = 100_000_000, id = "c4")
         forecastIn(20 * hour, cycleId = "c4")

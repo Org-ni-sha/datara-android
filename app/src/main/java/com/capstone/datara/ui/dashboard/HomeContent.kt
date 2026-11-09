@@ -87,7 +87,7 @@ internal fun HomeContent(state: HomeUiState, onCreateQuota: () -> Unit,
         }
     }
     if (showInfo) AlertDialog(onDismissRequest = { showInfo = false }, title = { Text("What counts?") },
-        text = { Text("Mobile uploads and downloads on this phone, including promo freebies. Wi-Fi doesn’t count. Your quota isn’t your carrier balance, and DATAra never blocks your internet. The forecast is calculated on this phone.") },
+        text = { Text("Mobile data on this phone counts, including promo freebies. Wi-Fi doesn’t. Your quota isn’t your carrier balance, and DATAra never blocks your internet.") },
         confirmButton = { TextButton(onClick = { showInfo = false }) { Text("Got it") } })
 }
 

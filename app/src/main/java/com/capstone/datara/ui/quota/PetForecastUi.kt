@@ -31,7 +31,7 @@ data class PetForecastUi(
                 observedHours = status.observedHours, neededHours = status.neededHours
             )
             status is ForecastStatus.Unavailable -> PetForecastUi("FORECAST UNAVAILABLE", "Forecast unavailable",
-                "The forecast can’t be calculated right now. Your usage is still being measured, and DATAra tries again every hour.")
+                "Can’t forecast right now. DATAra tries again every hour.")
             else -> PetForecastUi(
                 "FORECASTING", "Preparing your forecast",
                 "The forecast is calculated on this device from your measured usage, once an hour."
@@ -42,12 +42,12 @@ data class PetForecastUi(
             val testModel = if (status.isPlaceholderModel) " Test model: not yet trained on study data." else ""
             val reach = status.reachAt ?: return PetForecastUi(
                 "ESTIMATED TIME TO QUOTA", "Beyond 30 days",
-                "At your recent pace you are not expected to reach this quota within 30 days.$testModel",
+                "At your pace, you won’t reach this quota within 30 days.$testModel",
                 isAvailable = true
             )
             return PetForecastUi(
                 "ESTIMATED TIME TO QUOTA", relative(reach - now),
-                "Estimated around ${formatDate(reach)}, from your measured usage. Your pace may change.$testModel",
+                "Estimated around ${formatDate(reach)}. Your pace may change.$testModel",
                 reachAtMillis = reach, isAvailable = true
             )
         }
