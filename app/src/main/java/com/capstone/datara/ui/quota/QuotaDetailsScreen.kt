@@ -94,8 +94,8 @@ private fun forecastTitle(state: QuotaDetailsModel): String = when {
 
 private fun forecastBody(state: QuotaDetailsModel): String = when {
     state.isEnded -> "This cycle has ended. Start another quota when you’re ready."
-    state.isReached -> state.reachedAtMillis?.let { "Reached around ${formatCycleDate(it)}. Reaching a quota does not block your internet." }
-        ?: "Reaching a quota does not block your internet."
+    state.isReached -> state.reachedAtMillis?.let { "Reached around ${formatCycleDate(it)}. Your internet stays on." }
+        ?: "Your internet stays on."
     state.sampleScenario == HomeSampleState.MISSING_PERMISSION -> "Usage is unavailable until access is restored. No current balance is assumed."
     state.sampleScenario == HomeSampleState.COLLECTING -> "A forecast will appear once there’s enough usage."
     state.sampleScenario != null -> "Illustrative estimate based on sample usage, not a live prediction."
@@ -171,7 +171,7 @@ private fun QuotaDetailsContent(
         AlertDialog(onDismissRequest = { confirmEnd = false },
             title = { Text("End this cycle?") },
             text = { Text(if (state.isSample) "Stop this sample cycle? You can still review its details until you create another quota. Your internet stays on."
-                else "Stop tracking this quota? You can still review its details until you create another quota. Your internet stays on.") },
+                else "End this cycle? Its details stay in History.") },
             confirmButton = {
                 TextButton(onClick = { confirmEnd = false; onEndCycle() },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("End cycle") }
@@ -188,7 +188,7 @@ private fun MeasurementCard(measurement: CycleMeasurement, ended: Boolean, onTra
         Text(when {
             through == null -> "No usage readings yet. Readings arrive every 10 minutes while tracking is on."
             ended -> "Measured up to ${formatCycleDate(through)}."
-            else -> "Measured up to ${formatCycleDate(through)}. Updates every 10 minutes while tracking is on."
+            else -> "Updated ${formatCycleDate(through)}. Refreshes every 10 minutes while tracking."
         }, style = MaterialTheme.typography.bodyMedium)
         if (measurement.isIncomplete) {
             Text(if (measurement.unmeasuredMillis > 0) "Some usage may be missing: tracking was off for about ${formatDuration(measurement.unmeasuredMillis)} of this cycle."

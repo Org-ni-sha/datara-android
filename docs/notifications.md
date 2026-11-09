@@ -50,8 +50,8 @@ There is no alarm, worker or polling of its own.
 
 - 75%: "75% of your quota used: 750 MB of 1 GB used on “Everyday”. 250 MB left. Nothing is blocked."
 - 90%: "90% of your quota used" … "Only 100 MB left. Nothing is blocked."
-- Reached: "Quota reached: You have used the 1 GB you set for “Everyday”. DATAra never blocks data, so your connection stays on."
-- Forecast: "Quota likely reached within a day / within 3 hours: At your recent pace, “Everyday” may reach 1 GB around 12:30 PM. 900 MB left. This is an estimate."
+- Reached: "Quota reached: You’ve used the 1 GB you set for “Everyday”. Your internet stays on."
+- Forecast: "Quota likely reached within a day / within 3 hours: At your pace, “Everyday” may reach 1 GB around 12:30 PM. 900 MB left."
 
 ## Notification center and Settings
 

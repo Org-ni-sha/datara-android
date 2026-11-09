@@ -392,14 +392,14 @@ private fun WelcomeCopy(modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "See when you'll reach your data limit, before you hit it.",
+            text = "See when you'll reach your data limit.",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Set a quota and DATAra forecasts when your mobile data use will reach it.",
+            text = "Set a quota. DATAra forecasts the rest from your usage.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center

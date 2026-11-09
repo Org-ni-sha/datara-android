@@ -43,15 +43,15 @@ object AlertCopy {
             )
             NotificationType.QUOTA_REACHED -> AlertText(
                 "Quota reached",
-                "You have used the $quota you set for $name. DATAra never blocks data, so your connection stays on."
+                "You’ve used the $quota you set for $name. Your internet stays on."
             )
             NotificationType.FORECAST_24H -> AlertText(
                 "Quota likely reached within a day",
-                "At your recent pace, $name may reach $quota ${around(reachAt, now, zone, locale)}. $left left. This is an estimate."
+                "At your pace, $name may reach $quota ${around(reachAt, now, zone, locale)}. $left left."
             )
             NotificationType.FORECAST_3H -> AlertText(
                 "Quota likely reached within 3 hours",
-                "At your recent pace, $name may reach $quota ${around(reachAt, now, zone, locale)}. $left left. This is an estimate."
+                "At your pace, $name may reach $quota ${around(reachAt, now, zone, locale)}. $left left."
             )
             else -> throw IllegalArgumentException("Unknown notification type: $type")
         }

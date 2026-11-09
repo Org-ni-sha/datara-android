@@ -23,7 +23,7 @@ There is no `baseline_bytes` (see the ERD). Used in cycle is the sum of the 10-m
 - **Remaining** = `quota_bytes - used`. It goes negative past the quota and is clamped at 0 only for display.
 - **Percent used** = `used / quota_bytes × 100`, unclamped.
 - **`reached_at`:** the end of the reading in which the running sum reached `quota_bytes` (`>=`), clamped to the window.
-- **Updates:** usage only changes when a reading is stored, so Details shows "Measured up to …", the end of the latest reading.
+- **Updates:** usage only changes when a reading is stored, so Details shows "Updated …", the end of the latest reading.
 
 How each `measurement_status` counts:
 

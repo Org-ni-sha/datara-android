@@ -115,7 +115,7 @@ private fun SettingsContent(email: String?, onSaveName: (String) -> String?,
                 StatusLine(DataraIcons.Bell, "Notifications", status.access.notifications, "Allowed", "Off")
                 StatusLine(DataraIcons.Lock, "Battery optimization", status.access.batteryUnrestricted, "Unrestricted", "Restricted")
                 Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Usage Access and notifications are needed to measure mobile data; an unrestricted battery lets tracking restart on its own.",
+                    Text("Usage Access and notifications are needed to measure. Unrestricted battery lets tracking restart.",
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedButton(onClick = onTrackingSetup, modifier = Modifier.heightIn(min = 48.dp)) { Text("Open tracking setup") }
                 }

@@ -1,5 +1,6 @@
 package com.capstone.datara.ui.notifications
 
+import androidx.compose.ui.platform.LocalDensity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -80,16 +81,27 @@ private fun NotificationsContent(state: NotificationCenterState, onBack: () -> U
                         style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                     Spacer(Modifier.height(4.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp),
-                        itemVerticalAlignment = Alignment.CenterVertically) {
-                        listOf(false to "All", true to "Unread").forEach { (option, label) ->
-                            FilterChip(selected = unreadOnly == option, onClick = { unreadOnly = option }, label = { Text(label) },
-                                modifier = Modifier.heightIn(min = 48.dp),
-                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer))
+                    // Filters on the left, "Mark all as read" on the right edge; stacked at large font sizes
+                    val filters: @Composable () -> Unit = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(false to "All", true to "Unread").forEach { (option, label) ->
+                                FilterChip(selected = unreadOnly == option, onClick = { unreadOnly = option }, label = { Text(label) },
+                                    modifier = Modifier.heightIn(min = 48.dp),
+                                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer))
+                            }
                         }
+                    }
+                    val markAll: @Composable () -> Unit = {
                         TextButton(onClick = { onMarkAllRead(); scope.launch { snackbar.showSnackbar("All notifications marked as read") } },
-                            enabled = state.unreadCount > 0) { Text("Mark all as read") }
+                            enabled = state.unreadCount > 0, contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Mark all as read") }
+                    }
+                    if (LocalDensity.current.fontScale > 1.3f) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { filters(); markAll() }
+                    } else {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            filters(); markAll()
+                        }
                     }
                 }
             }
@@ -131,7 +143,7 @@ private fun NotificationsContent(state: NotificationCenterState, onBack: () -> U
                 Text(alert.title, style = MaterialTheme.typography.headlineMedium)
                 Text(alertTime(alert.receivedAtMillis), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(alert.message, style = MaterialTheme.typography.bodyLarge)
-                Text("The figures are from when this alert was sent. Quota details show the latest totals. DATAra never blocks your data.",
+                Text("Figures are from when this alert was sent. Quota details has the latest.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 alert.cycleId?.let { cycleId -> DataraActionButton("View quota details", { selectedId = null; onOpenCycle(cycleId) }) }
                 TextButton(onClick = { selectedId = null }) { Text("Close") }

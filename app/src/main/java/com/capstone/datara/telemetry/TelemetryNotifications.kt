@@ -44,10 +44,10 @@ object TelemetryNotifications {
     fun tracking(context: Context, measuredBytes: Long): Notification =
         NotificationCompat.Builder(context, TRACKING_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_datara)
-            .setContentTitle("Measuring mobile data use")
+            .setContentTitle("Tracking mobile data")
             .setContentText(
-                if (measuredBytes > 0) "${formatMegabytes(measuredBytes)} measured since tracking started. Nothing is blocked."
-                else "Counts mobile data on this device to forecast your quota. Nothing is blocked."
+                if (measuredBytes > 0) "${formatMegabytes(measuredBytes)} measured so far"
+                else "Counting mobile data for your forecast"
             )
             .setContentIntent(openApp(context))
             .setOngoing(true)
@@ -64,7 +64,7 @@ object TelemetryNotifications {
         NotificationCompat.Builder(context, PAUSED_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_datara)
             .setContentTitle("Usage tracking paused")
-            .setContentText("Android stopped tracking in the background. Open DATAra to resume.")
+            .setContentText("Android paused tracking. Open DATAra to resume.")
             .setContentIntent(openApp(context))
             .setAutoCancel(true)
             .build()

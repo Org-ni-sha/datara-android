@@ -127,7 +127,7 @@ fun ForgotPasswordScreen(
 
     val (title, subtitle) = when (state.step) {
         ResetPasswordStep.ENTER_EMAIL ->
-            "Reset password" to "Enter your account email. If it's registered, we'll send a 6-digit code."
+            "Reset password" to "We'll email a 6-digit code if this account exists."
         ResetPasswordStep.ENTER_CODE ->
             "Reset password" to "If an account exists for that email, we sent it a 6-digit code."
         ResetPasswordStep.SET_NEW_PASSWORD ->
