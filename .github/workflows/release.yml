@@ -1,0 +1,119 @@
+# Release — builds a signed release APK and publishes it as a GitHub Release.
+#
+# How to trigger it: push a version tag, for example
+#     git tag v0.9.0
+#     git push origin v0.9.0
+# (or press "Run workflow" on the Actions tab, which builds the APK without publishing a Release).
+#
+# What it does: GitHub starts a fresh Linux machine, rebuilds the signing key and the app's
+# settings from the repository secrets below, builds the release APK, checks that it is signed,
+# and attaches it to a Release named after the tag. Nothing secret is ever printed or committed:
+# the keystore only exists on the temporary machine and is deleted with it.
+#
+# Repository secrets it needs (GitHub → the repo → Settings → Secrets and variables → Actions):
+#   DATARA_KEYSTORE_BASE64    the release keystore (.jks) encoded as base64 text
+#   DATARA_KEYSTORE_PASSWORD  the keystore password
+#   DATARA_KEY_ALIAS          the key's alias inside the keystore (e.g. datara)
+#   DATARA_KEY_PASSWORD       the key's password
+#   SUPABASE_URL              same values as in local.properties
+#   SUPABASE_ANON_KEY
+#   GOOGLE_WEB_CLIENT_ID
+#
+# app/build.gradle.kts reads all of these from environment variables (falling back to
+# local.properties on a laptop), so the steps below only pass them in as `env`.
+#
+# ⚠ Do not install this APK over the debug build on the demo phone: a different signing key means
+# Android refuses the update, and uninstalling would delete the phone's data.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+# Creating a Release needs write access to the repository's contents (releases, not code).
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish the release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      # Same Java and Gradle setup as android-ci.yml
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # The keystore is a binary file, so it is stored as base64 text in a secret and turned back
+      # into a file here, outside the project folder. Fails early with a clear message if missing.
+      - name: Restore the signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.DATARA_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::The DATARA_KEYSTORE_BASE64 secret is missing. See the comments at the top of release.yml."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/datara-release.jks"
+
+      - name: Run unit tests and build the release APK
+        env:
+          DATARA_KEYSTORE_FILE: ${{ runner.temp }}/datara-release.jks
+          DATARA_KEYSTORE_PASSWORD: ${{ secrets.DATARA_KEYSTORE_PASSWORD }}
+          DATARA_KEY_ALIAS: ${{ secrets.DATARA_KEY_ALIAS }}
+          DATARA_KEY_PASSWORD: ${{ secrets.DATARA_KEY_PASSWORD }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: ./gradlew testDebugUnitTest assembleRelease --stacktrace
+
+      # If any signing secret was wrong or missing, Gradle builds an *unsigned* APK
+      # (app-release-unsigned.apk). Stop here instead of publishing something that won't install.
+      - name: Check the APK is signed and name it
+        id: apk
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          if [ ! -f "$APK" ]; then
+            echo "::error::No signed APK was built. Check the four DATARA_* signing secrets."
+            ls app/build/outputs/apk/release/ || true
+            exit 1
+          fi
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs "$APK" | grep -i "SHA-256 digest"
+          NAME="datara-${GITHUB_REF_NAME}.apk"
+          cp "$APK" "$NAME"
+          echo "file=$NAME" >> "$GITHUB_OUTPUT"
+
+      # Always keep the APK as a downloadable artifact of the run (also for "Run workflow").
+      - name: Upload the APK to the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: datara-release-apk
+          path: ${{ steps.apk.outputs.file }}
+          retention-days: 30
+
+      # Only for a pushed tag: create the GitHub Release and attach the APK.
+      - name: Publish the GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "${{ steps.apk.outputs.file }}" \
+            --title "DATAra $GITHUB_REF_NAME" \
+            --generate-notes
+
+      - name: Delete the keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/datara-release.jks"

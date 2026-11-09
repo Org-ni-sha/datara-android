@@ -10,3 +10,12 @@ SUPABASE_ANON_KEY=your-anon-key-here
 # Optional: Google sign-in. Web OAuth client ID from Google Cloud Console -> APIs & Services ->
 # Credentials (type "Web application"). Leave blank to hide the Google button.
 GOOGLE_WEB_CLIENT_ID=
+
+# Optional: release signing (only needed to build a signed release APK on this laptop; GitHub
+# Actions gets the same names from repository secrets). Keep the keystore OUTSIDE the repo and
+# back it up: without it, later versions can't be installed over this one.
+# The path can be absolute (use forward slashes) or relative to the project folder.
+DATARA_KEYSTORE_FILE=
+DATARA_KEYSTORE_PASSWORD=
+DATARA_KEY_ALIAS=
+DATARA_KEY_PASSWORD=

@@ -15,6 +15,18 @@ val localProperties = Properties().apply {
     if (file.exists()) load(file.inputStream())
 }
 
+// A secret or setting: an environment variable first (GitHub Actions passes repository secrets
+// this way, see .github/workflows/release.yml), then local.properties (a laptop), else blank.
+// Never write a real value in this file.
+fun setting(name: String): String =
+    System.getenv(name)?.takeIf { it.isNotBlank() } ?: localProperties.getProperty(name, "")
+
+// Release signing. Only when every value is present and the keystore file exists; otherwise the
+// release build still assembles, unsigned (so Android CI, which has no keystore, keeps passing).
+val releaseKeystore = setting("DATARA_KEYSTORE_FILE").takeIf { it.isNotBlank() }?.let { rootProject.file(it) }
+val canSignRelease = releaseKeystore?.exists() == true &&
+    listOf("DATARA_KEYSTORE_PASSWORD", "DATARA_KEY_ALIAS", "DATARA_KEY_PASSWORD").all { setting(it).isNotBlank() }
+
 android {
     namespace = "com.capstone.datara"
     compileSdk {
@@ -28,9 +40,10 @@ android {
         // versionCode is internal and must only ever increase — bump it on every build
         // handed to someone else. versionName is the string shown in Android's App info,
         // and is what D9's hidden diagnostics screen counts taps on.
-        // 0.x while pre-defense; 1.0.0 is reserved for the defense build.
-        versionCode = 2
-        versionName = "0.1.0"
+        // 0.x while pre-defense; 1.0.0 (versionCode 4, tag v1.0.0) is reserved for the
+        // Nov 12 defense build with the final model.
+        versionCode = 3
+        versionName = "0.9.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -38,19 +51,30 @@ android {
         buildConfigField(
             "String",
             "SUPABASE_URL",
-            "\"${localProperties.getProperty("SUPABASE_URL", "")}\""
+            "\"${setting("SUPABASE_URL")}\""
         )
         buildConfigField(
             "String",
             "SUPABASE_ANON_KEY",
-            "\"${localProperties.getProperty("SUPABASE_ANON_KEY", "")}\""
+            "\"${setting("SUPABASE_ANON_KEY")}\""
         )
         // Web OAuth client ID for Google sign-in. Blank hides the Google button.
         buildConfigField(
             "String",
             "GOOGLE_WEB_CLIENT_ID",
-            "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID", "")}\""
+            "\"${setting("GOOGLE_WEB_CLIENT_ID")}\""
         )
+    }
+
+    signingConfigs {
+        if (canSignRelease) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = setting("DATARA_KEYSTORE_PASSWORD")
+                keyAlias = setting("DATARA_KEY_ALIAS")
+                keyPassword = setting("DATARA_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -58,6 +82,7 @@ android {
             optimization {
                 enable = false
             }
+            if (canSignRelease) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
