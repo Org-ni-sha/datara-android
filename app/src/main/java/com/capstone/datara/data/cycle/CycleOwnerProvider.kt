@@ -2,9 +2,8 @@ package com.capstone.datara.data.cycle
 
 import com.capstone.datara.data.local.device.DeviceRepository
 import com.capstone.datara.data.repository.AuthRepository
-import io.github.jan.supabase.auth.status.SessionStatus
+import com.capstone.datara.data.session.signedInUserIds
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,8 +26,9 @@ class SessionCycleOwnerProvider @Inject constructor(
     private val devices: DeviceRepository
 ) : CycleOwnerProvider {
 
+    // Offline after the token expired (RefreshFailure) the owner stays the saved session's user,
+    // so forecasts and alerts keep running; signedInUserIds drops the repeat when it returns.
     override val owner: Flow<CycleOwner?> = auth.sessionStatus
-        .map { status -> (status as? SessionStatus.Authenticated)?.session?.user?.id }
-        .distinctUntilChanged()
+        .signedInUserIds(auth.savedSession)
         .map { userId -> userId?.let { CycleOwner(it, devices.ensureRegistered(it).deviceId) } }
 }
