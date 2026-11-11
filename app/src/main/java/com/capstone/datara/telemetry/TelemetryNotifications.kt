@@ -40,15 +40,16 @@ object TelemetryNotifications {
         )
     }
 
-    /** Copy users see constantly: what is measured, and that nothing is blocked. */
-    fun tracking(context: Context, measuredBytes: Long): Notification =
+    /**
+     * Copy users see constantly: what is measured, and that nothing is blocked. No byte count:
+     * a count kept by the service restarts at zero after every update, reboot or service restart,
+     * which reads as lost data. The real figures are on Home, from the database.
+     */
+    fun tracking(context: Context): Notification =
         NotificationCompat.Builder(context, TRACKING_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_datara)
             .setContentTitle("Tracking mobile data")
-            .setContentText(
-                if (measuredBytes > 0) "${formatMegabytes(measuredBytes)} measured so far"
-                else "Counting mobile data for your forecast"
-            )
+            .setContentText("Counting mobile data for your forecast. Nothing is blocked.")
             .setContentIntent(openApp(context))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -57,7 +58,6 @@ object TelemetryNotifications {
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
 
-    fun notifyTracking(context: Context, measuredBytes: Long) = post(context, TRACKING_NOTIFICATION_ID, tracking(context, measuredBytes))
 
     fun notifyPaused(context: Context) = post(
         context, PAUSED_NOTIFICATION_ID,
@@ -71,7 +71,6 @@ object TelemetryNotifications {
     )
 
     /** Decimal megabytes, the quota screens' unit (1 MB = 1,000,000 bytes). */
-    fun formatMegabytes(bytes: Long): String = "%.1f MB".format(bytes / 1_000_000.0)
 
     private fun post(context: Context, id: Int, notification: Notification) {
         ensureChannels(context)

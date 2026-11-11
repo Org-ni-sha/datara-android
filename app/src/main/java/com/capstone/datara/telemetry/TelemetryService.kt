@@ -27,7 +27,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 
 /**
@@ -62,9 +61,6 @@ class TelemetryService : Service() {
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var cellularCallback: ConnectivityManager.NetworkCallback? = null
 
-    /** Bytes counted since this service started, for the notification. */
-    private val measuredBytes = AtomicLong()
-
     /** Set when the service stops without the user asking, so tracking resumes on restart. */
     private var keepCollecting = false
 
@@ -74,7 +70,7 @@ class TelemetryService : Service() {
         ServiceCompat.startForeground(
             this,
             TelemetryNotifications.TRACKING_NOTIFICATION_ID,
-            TelemetryNotifications.tracking(this, measuredBytes.get()),
+            TelemetryNotifications.tracking(this),
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
         )
 
@@ -119,8 +115,6 @@ class TelemetryService : Service() {
         try {
             val sample = collector.collectPrimary(switchedFrom, switches.cellularSeenThisInterval)
             switches.onIntervalClosed()
-            measuredBytes.addAndGet(sample.bytesTotal)
-            TelemetryNotifications.notifyTracking(this, measuredBytes.get())
             Log.d(TAG, "Sample [${sample.status}${switchedFrom?.let { ", switch from $it" } ?: ""}] " +
                 "${sample.bytesTotal} B in ${sample.elapsedMs} ms on ${sample.networkType}, " +
                 "${sample.signalDbm} dBm, ${sample.carrier}")
