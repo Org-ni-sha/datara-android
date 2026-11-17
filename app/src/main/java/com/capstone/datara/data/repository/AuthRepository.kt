@@ -1,5 +1,7 @@
 package com.capstone.datara.data.repository
 
+import com.capstone.datara.data.session.SavedSessionSource
+import com.capstone.datara.data.session.SupabaseSavedSessionSource
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.providers.Google
@@ -27,6 +29,9 @@ class AuthRepository @Inject constructor(
     private val functions: Functions
 ) {
     val sessionStatus: StateFlow<SessionStatus> = auth.sessionStatus
+
+    /** The session saved on the phone, for resolving the user offline (see `signedInUserId`). */
+    val savedSession: SavedSessionSource = SupabaseSavedSessionSource(auth)
 
     /**
      * Signs the user up and passes [name] as auth metadata.

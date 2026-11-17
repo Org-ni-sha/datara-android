@@ -3,13 +3,18 @@ package com.capstone.datara.data.session
 import io.github.jan.supabase.auth.Auth
 import javax.inject.Inject
 
-/** The signed-in user's id (`public.users.id`), or null when signed out. */
+/**
+ * The signed-in user's id (`public.users.id`), or null when signed out. Offline after the access
+ * token expired the user is still signed in (see [signedInUserId]).
+ */
 fun interface CurrentUserSource {
-    fun userId(): String?
+    suspend fun userId(): String?
 }
 
 class SupabaseCurrentUserSource @Inject constructor(
     private val auth: Auth
 ) : CurrentUserSource {
-    override fun userId(): String? = auth.currentUserOrNull()?.id
+    private val saved = SupabaseSavedSessionSource(auth)
+
+    override suspend fun userId(): String? = auth.sessionStatus.value.signedInUserId(saved)
 }
