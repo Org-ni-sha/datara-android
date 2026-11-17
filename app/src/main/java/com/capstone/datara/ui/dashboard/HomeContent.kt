@@ -110,7 +110,9 @@ internal data class HeroContent(
     val collecting: Boolean get() = !loading && !empty && !missing && !ended && !reached && (hideUsage || observedHours != null)
     val tone: QuotaTone get() = quotaStatusTone(progress,
         when { ended -> CycleStatus.ENDED; reached -> CycleStatus.REACHED; else -> CycleStatus.ACTIVE })
-    val percentUsed: Int get() = (progress.coerceAtLeast(0f) * 100).toInt()
+    val percentUsed: Int get() = displayPercentUsed(progress)
+    /** Usage past the quota, shown as an amount instead of a percentage over 100. */
+    val overBytes: Long get() = bytesOverQuota(amountBytes, usedBytes)
     private val beyond: Boolean get() = headline == "Beyond 30 days"
 
     /** The ring's big centre value: hours measured, the PET ("19 days") or the share used. */
@@ -126,7 +128,7 @@ internal data class HeroContent(
         missing -> "Usage unavailable"
         collecting -> "hours measured"
         ended -> "used at end"
-        reached -> "used"
+        reached -> "quota reached"
         beyond -> "not within 30 days"
         reachDate != null -> "around $reachDate"
         headline.startsWith("About ") -> "to reach your quota"
@@ -231,16 +233,24 @@ private fun ForecastHero(hero: HeroContent, onCreate: () -> Unit, onAccess: () -
             Text(if (hero.collecting) "Learning your usage… ${hero.body}" else hero.body,
                 style = MaterialTheme.typography.bodyMedium, color = soft)
             if (!hero.missing && !hero.hideUsage) {
-                val remaining = formatQuotaData(hero.remainingBytes)
+                // Past the quota the first tile shows how far over, not "0 B left"
+                val over = hero.overBytes > 0
+                val remaining = formatQuotaData(if (over) hero.overBytes else hero.remainingBytes)
+                val remainingLabel = when {
+                    over && hero.ended -> "Over the quota at end"
+                    over -> "Over your ${formatQuotaData(hero.amountBytes)} quota"
+                    hero.ended -> "Unused at end"
+                    else -> "Left of ${formatQuotaData(hero.amountBytes)}"
+                }
                 val used = formatQuotaData(hero.usedBytes)
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     if (maxWidth < 280.dp || LocalDensity.current.fontScale > 1.3f) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            QuotaMetric(remaining, if (hero.ended) "Unused at end" else "Left of ${formatQuotaData(hero.amountBytes)}", Modifier.fillMaxWidth())
+                            QuotaMetric(remaining, remainingLabel, Modifier.fillMaxWidth())
                             QuotaMetric(used, if (hero.ended) "Used at end" else "Used this cycle", Modifier.fillMaxWidth())
                         }
                     } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        QuotaMetric(remaining, if (hero.ended) "Unused at end" else "Left of ${formatQuotaData(hero.amountBytes)}", Modifier.weight(1f))
+                        QuotaMetric(remaining, remainingLabel, Modifier.weight(1f))
                         QuotaMetric(used, if (hero.ended) "Used at end" else "Used this cycle", Modifier.weight(1f))
                     }
                 }
@@ -260,6 +270,8 @@ private fun ForecastHero(hero: HeroContent, onCreate: () -> Unit, onAccess: () -
 private fun ringDescription(hero: HeroContent): String = when {
     hero.missing -> "Usage unavailable. Usage Access is needed."
     hero.collecting -> "Learning your usage. ${hero.ringValue} ${hero.ringCaption}."
+    (hero.reached || hero.ended) && hero.overBytes > 0 ->
+        "Quota reached, ${formatQuotaData(hero.overBytes)} over. ${hero.tone.label}."
     else -> "${hero.percentUsed} percent of quota used. ${hero.ringValue}, ${hero.ringCaption}. ${hero.tone.label}."
 }
 
