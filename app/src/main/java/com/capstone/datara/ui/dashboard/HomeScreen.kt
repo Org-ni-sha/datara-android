@@ -54,7 +54,8 @@ fun DashboardScreen(
     preferencesViewModel: NotificationPreferencesViewModel = hiltViewModel(),
     alertNavigationViewModel: AlertNavigationViewModel = hiltViewModel(),
     profileViewModel: ProfileViewModel = hiltViewModel(),
-    historyViewModel: HistoryViewModel = hiltViewModel()
+    historyViewModel: HistoryViewModel = hiltViewModel(),
+    liveTodayViewModel: LiveTodayViewModel = hiltViewModel()
 ) {
     val cycleDetails by cycleViewModel.details.collectAsState()
     val cycleAction by cycleViewModel.action.collectAsState()
@@ -66,6 +67,7 @@ fun DashboardScreen(
     val profileState by profileViewModel.uiState.collectAsState()
     val authState by authViewModel.uiState.collectAsState()
     val historyState by historyViewModel.state.collectAsState()
+    val liveTodayBytes by liveTodayViewModel.todayBytes.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val notify: (String) -> Unit = { message -> scope.launch { snackbar.showSnackbar(message) } }
@@ -182,7 +184,7 @@ fun DashboardScreen(
             week = (historyState as? HistoryUiState.Ready)?.data?.let { data ->
                 HomeWeek.from(data.week, HistoryAggregation.snapshot(HistoryWindow.WEEK, data, null, java.time.ZoneId.systemDefault()).averageDailyBytes)
             },
-            insights = (historyState as? HistoryUiState.Ready)?.data?.let { HomeInsight.from(it, java.time.ZoneId.systemDefault()) }.orEmpty(),
+            insights = (historyState as? HistoryUiState.Ready)?.data?.let { HomeInsight.from(it, java.time.ZoneId.systemDefault(), liveTodayBytes) }.orEmpty(),
             greeting = homeGreeting(java.time.LocalTime.now().hour, profileState.name, profileState.username),
             onRefresh = { historyViewModel.refresh(); settingsViewModel.refresh() })
     }
