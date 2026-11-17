@@ -32,12 +32,13 @@ data class HomeInsight(val kind: Kind, val value: String?, val label: String) {
         private const val HOUR = 3_600_000L
 
         /**
-         * Insights from the same aggregation History shows: today's day bucket, the 7-day
+         * Insights from the same aggregation History shows: today's day bucket (or the live
+         * [LiveToday] total when Home has one, which adds the current hour), the 7-day
          * window's average per measured day, the busiest hour of the last 24 hours, and the PET
          * comparison of the latest reached cycle (left out when no cycle has reached its quota).
          */
-        fun from(data: HistoryData, zone: ZoneId): List<HomeInsight> {
-            val today = data.week.lastOrNull()?.bytes
+        fun from(data: HistoryData, zone: ZoneId, liveTodayBytes: Long? = null): List<HomeInsight> {
+            val today = liveTodayBytes ?: data.week.lastOrNull()?.bytes
             val week = HistoryAggregation.snapshot(HistoryWindow.WEEK, data, null, zone)
             val peak = data.day.filter { it.bytes != null }.maxByOrNull { it.bytes!! }
             val pet = data.cycles.firstOrNull { it.pet != null }?.pet
