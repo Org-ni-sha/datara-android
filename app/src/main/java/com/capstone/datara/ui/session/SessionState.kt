@@ -10,7 +10,10 @@ enum class SessionState {
     /** Supabase is still restoring any persisted session — show the splash, decide nothing yet. */
     Initializing,
 
-    /** A valid session and a finished profile; the user skips the login screen. */
+    /**
+     * A signed-in session and a finished profile; the user skips the login screen. Includes an
+     * offline user whose access token expired and could not be refreshed yet.
+     */
     Authenticated,
 
     /**
@@ -19,7 +22,7 @@ enum class SessionState {
      */
     NeedsUsername,
 
-    /** No usable session. Covers both a genuinely signed-out user and a failed token refresh. */
+    /** No session: never signed in, signed out, or the session was revoked and cleared. */
     Unauthenticated
 }
 
@@ -28,15 +31,19 @@ enum class SessionState {
  * profile is known. A signed-in status maps to [SessionState.Authenticated]; [withProfile] then
  * refines it.
  *
- * [SessionStatus.RefreshFailure] is deliberately treated as unauthenticated: the refresh token
- * is stale or revoked, so the only recovery is signing in again. Treating it as authenticated
- * would land the user on a dashboard whose every request then fails with a 401.
+ * [SessionStatus.RefreshFailure] is signed in. In supabase-kt 3.8 it only means the access token
+ * expired and the refresh could not reach the server (no internet, or a server error); the
+ * session stays saved and supabase-kt retries until the network is back, then returns to
+ * Authenticated. A revoked or invalid refresh token clears the session instead, which arrives
+ * as [SessionStatus.NotAuthenticated]. So an app opened offline after an hour still reaches
+ * Home, which reads only the phone's Room data; [withProfile] lets the user through when the
+ * profile lookup cannot reach the server.
  */
 fun SessionStatus.toSessionState(): SessionState = when (this) {
     is SessionStatus.Initializing -> SessionState.Initializing
     is SessionStatus.Authenticated -> SessionState.Authenticated
     is SessionStatus.NotAuthenticated -> SessionState.Unauthenticated
-    is SessionStatus.RefreshFailure -> SessionState.Unauthenticated
+    is SessionStatus.RefreshFailure -> SessionState.Authenticated
 }
 
 /**
