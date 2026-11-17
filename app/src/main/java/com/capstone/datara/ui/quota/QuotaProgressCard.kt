@@ -12,7 +12,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
 import com.capstone.datara.ui.components.*
 
 @Composable
@@ -27,18 +26,33 @@ internal fun QuotaProgressCard(state: QuotaDetailsModel) {
                 val gauge: @Composable () -> Unit = {
                     // Echoes the Home ring: same status colour, smaller
                     QuotaRing(progress = if (missing) 0f else state.progress, color = tone.accent(), trackColor = tone.colors().container,
-                        description = if (missing) "Usage unavailable" else "${(state.progress * 100).roundToInt()} percent of quota used",
+                        description = when {
+                            missing -> "Usage unavailable"
+                            state.overQuotaBytes > 0 -> "Quota reached, ${formatQuotaData(state.overQuotaBytes)} over"
+                            else -> "${state.percentUsed} percent of quota used"
+                        },
                         size = 124.dp, stroke = 11.dp, modifier = Modifier.width(124.dp)) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(if (missing) "—" else "${(state.progress * 100).roundToInt()}%", style = MaterialTheme.typography.headlineMedium)
+                            Text(if (missing) "—" else "${state.percentUsed}%", style = MaterialTheme.typography.headlineMedium)
                             Text("used", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
                 val remaining: @Composable () -> Unit = {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(if (state.isEnded) "Unused at end" else "Remaining quota", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(if (missing) "Unavailable" else formatQuotaData(state.remainingBytes ?: 0), style = MaterialTheme.typography.headlineLarge)
+                        // Past the quota this shows how far over, instead of "0 B" remaining
+                        val over = !missing && state.overQuotaBytes > 0
+                        Text(when {
+                            over && state.isEnded -> "Over the quota at end"
+                            over -> "Over quota"
+                            state.isEnded -> "Unused at end"
+                            else -> "Remaining quota"
+                        }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(when {
+                            missing -> "Unavailable"
+                            over -> formatQuotaData(state.overQuotaBytes)
+                            else -> formatQuotaData(state.remainingBytes ?: 0)
+                        }, style = MaterialTheme.typography.headlineLarge)
                     }
                 }
                 if (stacked) Column(verticalArrangement = Arrangement.spacedBy(20.dp)) { gauge(); remaining() }

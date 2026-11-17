@@ -12,8 +12,15 @@ fun homeGreeting(hour: Int, name: String?, username: String?): String {
     return if (who == null) part else "$part, $who"
 }
 
-/** Home's header subtitle. */
-fun homeSubtitle(quotaName: String?): String = quotaName?.let { "Tracking “$it”" } ?: "Set a quota to start forecasting"
+/**
+ * Home's header subtitle: the active quota's name, or that it has been [reached] (usage still
+ * counts until the user ends it); with no active quota, an invitation to set one.
+ */
+fun homeSubtitle(quotaName: String?, reached: Boolean = false): String = when {
+    quotaName == null -> "Set a quota to start forecasting"
+    reached -> "“$quotaName” reached"
+    else -> "Tracking “$quotaName”"
+}
 
 /** Why a live cycle is not being measured properly, most blocking first. */
 enum class TrackingIssue(val title: String, val body: String) {

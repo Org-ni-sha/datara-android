@@ -3,6 +3,18 @@ package com.capstone.datara.ui.quota
 import com.capstone.datara.data.cycle.CycleStatus
 import com.capstone.datara.domain.cycle.CycleState
 
+/**
+ * The share of the quota shown on screen, in whole percent: rounded down, so "100%" appears only
+ * once the quota is really reached, and never above 100. Usage keeps counting after the quota is
+ * reached (DATAra never blocks data), and that extra is shown as an amount ([bytesOverQuota]),
+ * because "130%" reads like a mistake.
+ */
+fun displayPercentUsed(progress: Float): Int =
+    kotlin.math.floor(progress.coerceIn(0f, 1f) * 100f + 1e-3f).toInt().coerceIn(0, 100)
+
+/** Bytes used beyond the quota; 0 below it or when usage is unavailable. */
+fun bytesOverQuota(quotaBytes: Long, usedBytes: Long?): Long = usedBytes?.let { (it - quotaBytes).coerceAtLeast(0) } ?: 0
+
 /** How complete a cycle's measurement is. */
 data class CycleMeasurement(
     /** End of the latest counted 10-minute reading; null before the first one. */
@@ -42,6 +54,9 @@ data class QuotaDetailsModel(
     val isEnded: Boolean get() = endedAtMillis != null
     val canEnd: Boolean get() = hasQuota && !isEnded
     val usageUnavailable: Boolean get() = usedBytes == null
+    /** Whole percent for display, at most 100 ([displayPercentUsed]). */
+    val percentUsed: Int get() = displayPercentUsed(progress)
+    val overQuotaBytes: Long get() = bytesOverQuota(quotaBytes, usedBytes)
 
     companion object {
         const val DEFAULT_NAME = "My data quota"

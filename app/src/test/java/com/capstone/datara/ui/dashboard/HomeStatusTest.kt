@@ -61,6 +61,18 @@ class HomeStatusTest {
         assertFalse(empty.isLive)
     }
 
+    @Test fun pastTheQuotaTheRingStopsAt100AndTheExtraIsAnAmount() {
+        val over = HeroContent.live(live.copy(usedBytes = 6_500_000_000, remainingBytes = 0, progress = 1.3f, isReached = true))
+        assertEquals("100%", over.ringValue)
+        assertEquals("quota reached", over.ringCaption)
+        assertEquals(1_500_000_000L, over.overBytes)
+        val ended = HeroContent.live(live.copy(usedBytes = 6_500_000_000, remainingBytes = 0, progress = 1.3f, isReached = true,
+            endedAtMillis = 1))
+        assertEquals("100%", ended.ringValue)
+        assertEquals("used at end", ended.ringCaption)
+        assertEquals(0L, HeroContent.live(live).overBytes)
+    }
+
     @Test fun reachedCycleHasNoBanner() {
         val hero = HeroContent.live(live.copy(isReached = true), TrackingIssue.SERVICE_STOPPED)
         assertNull(hero.issue)
@@ -71,5 +83,7 @@ class HomeStatusTest {
         assertEquals("Good afternoon, @cybe", homeGreeting(13, " ", "cybe"))
         assertEquals("Good evening", homeGreeting(22, null, null))
         assertEquals("Tracking “Defense”", homeSubtitle("Defense"))
+        assertEquals("“Defense” reached", homeSubtitle("Defense", reached = true))
+        assertEquals("Set a quota to start forecasting", homeSubtitle(null, reached = true))
     }
 }

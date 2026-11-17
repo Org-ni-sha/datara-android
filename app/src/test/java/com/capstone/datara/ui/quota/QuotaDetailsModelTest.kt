@@ -80,4 +80,26 @@ class QuotaDetailsModelTest {
         assertEquals("2 h", formatDuration(120 * 60_000L))
         assertEquals("1 h 20 min", formatDuration(80 * 60_000L + 10_000))
     }
+
+    @Test fun displayPercentRoundsDownAndStopsAt100() {
+        assertEquals(0, displayPercentUsed(0f))
+        assertEquals(29, displayPercentUsed(0.29f))          // float error must not show 28
+        assertEquals(99, displayPercentUsed(0.996f))         // 100% only once reached
+        assertEquals(100, displayPercentUsed(1f))
+        assertEquals(100, displayPercentUsed(1.3f))          // 30% over still reads 100%
+        assertEquals(0, displayPercentUsed(-0.1f))
+    }
+
+    @Test fun overQuotaIsAnAmount() {
+        assertEquals(0L, bytesOverQuota(2_000_000_000, 1_500_000_000))
+        assertEquals(0L, bytesOverQuota(2_000_000_000, null))
+        assertEquals(600_000_000L, bytesOverQuota(2_000_000_000, 2_600_000_000))
+        val over = tracked(CycleUsage(2_600_000_000, 0, start + 600_000, start + 600_000, 0, 0))
+        assertEquals(100, over.percentUsed)
+        assertEquals(600_000_000L, over.overQuotaBytes)
+        assertEquals(0L, over.remainingBytes)
+        val under = tracked(CycleUsage(500_000_000, 0, null, start + 600_000, 0, 0))
+        assertEquals(25, under.percentUsed)
+        assertEquals(0L, under.overQuotaBytes)
+    }
 }
