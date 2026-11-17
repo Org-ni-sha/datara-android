@@ -34,7 +34,7 @@ internal fun HomeContent(onCreateQuota: () -> Unit, onSignOut: () -> Unit,
     val hero = HeroContent.select(live, liveLoading, trackingIssue)
     Scaffold(modifier, containerColor = MaterialTheme.colorScheme.background,
         topBar = { DataraAppBar(greeting, showLogo = true,
-            subtitle = homeSubtitle(hero.name.takeIf { !hero.empty && !hero.loading && !hero.ended && !hero.reached }), actions = {
+            subtitle = homeSubtitle(hero.name.takeIf { !hero.empty && !hero.loading && !hero.ended }, reached = hero.reached), actions = {
             NotificationBell(unreadCount, onNotifications)
         }) }, bottomBar = { QuotaBottomBar(false, {}, onHistory, onSettings) }) { insets ->
         // Pull to re-read usage and tracking status, as on History; the spinner is brief because Room reads are fast

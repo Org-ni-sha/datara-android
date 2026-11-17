@@ -83,5 +83,7 @@ class HomeStatusTest {
         assertEquals("Good afternoon, @cybe", homeGreeting(13, " ", "cybe"))
         assertEquals("Good evening", homeGreeting(22, null, null))
         assertEquals("Tracking “Defense”", homeSubtitle("Defense"))
+        assertEquals("“Defense” reached", homeSubtitle("Defense", reached = true))
+        assertEquals("Set a quota to start forecasting", homeSubtitle(null, reached = true))
     }
 }
