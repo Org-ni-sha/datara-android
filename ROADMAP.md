@@ -159,7 +159,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
   - Objective: minimize next-hour usage error across users (for example MAE on bytes). PET accuracy is measured in B4 by projection.
   - Hyperparameter optimization via Optuna or GridSearchCV (`learning_rate`, `max_depth`, `n_estimators`, `subsample`, `reg_lambda`).
   - Split by **respondent**, not by row — random row splits leak the same user into train and test and will inflate every metric.
-- [x] **Phase B4 — Model Evaluation & Thesis Metrics:** *(Done: `datara_ml/evaluate.py`, report in `artifacts/eval/report.md`. Whole devices held out: next-hour MAE 46.0 MB (last hour 48.3, 24 h average 56.2); PET MAE 10.2 h against 79.4 h for the repeated 24 h average, 86% within ±24 h, bias −6.1 h (early). Forecast alerts as classification: within 24 h F1 0.73 (precision 0.59, recall 0.96), within 3 h F1 0.66. Feature importance by gain.)*
+- [x] **Phase B4 — Model Evaluation & Thesis Metrics:** *(Done: `datara_ml/evaluate.py`, report in `artifacts/eval/report.md`. Whole devices held out: next-hour MAE 46.0 MB (last hour 48.3, 24 h average 56.2, linear regression on the same features 59.5); PET MAE 10.2 h against 30.8 h for the linear regression and 79.4 h for the repeated 24 h average, 86% within ±24 h, bias −6.1 h (early). Forecast alerts as classification: within 24 h F1 0.73 (precision 0.59, recall 0.96), within 3 h F1 0.66. Feature importance by gain.)*
   - Compute panel-required evaluation metrics:
     - **MAE** (Mean Absolute Error) in minutes/hours.
     - **RMSE** (Root Mean Squared Error).
