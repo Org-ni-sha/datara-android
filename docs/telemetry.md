@@ -31,7 +31,7 @@ On a POCO F3, a 36-hour pause of the 30-second timer was fully covered by Networ
 
 ## Measurement rules
 
-`MeasurementRules` and `PrimaryTick` mirror data-harvester's files of the same names (schema version 3, harvester v1.6.7 rules). `MeasurementRulesTest` and `PrimaryTickTest` repeat the harvester's cases. If a rule changes, change it in both repositories together.
+`MeasurementRules` and `PrimaryTick` mirror data-harvester's files of the same names and follow the same rules as harvester 1.6.8 and 1.6.9, including the interface-returned rule below. DATAra's rows carry schema version 3. The harvester's carry 4, which it bumped when it adopted that rule; the rules behind the two numbers are the same. `MeasurementRulesTest` and `PrimaryTickTest` repeat the harvester's cases. If a rule changes, change it in both repositories together.
 
 - **Status values:** `OK`, `BASELINE`, `COUNTER_RESET`, `COUNTER_JUMP`, `UNSUPPORTED`, `GAP`, `INTERRUPTED`, `CLOCK_ERROR`.
 - **Gaps:** a 30 s interval over 75 s, or a 10 min interval over 21 min, is a `GAP`. It keeps its real bytes.
@@ -47,11 +47,14 @@ Differences from the harvester:
 - Zero-usage durable spans are kept.
 - `CellInfo.UNAVAILABLE` is stored as `-999`.
 - Battery, screen and charging state are not collected: they are not model inputs.
-- **Interface-returned rule (behaviour change):** each checkpoint records whether a cellular data network was up at its reading. If the baseline was read while mobile data was down and the next reading finds it up, that interval is `COUNTER_RESET` with 0 bytes and re-baselines.
+- Harvester 1.6.8's heartbeat alarm (about every 40 s, to wake the 30-second timer during sleep) and 1.6.9's re-posting of a swiped-away notification are not in DATAra. Sleep gaps are covered by the 10-minute NetworkStatsManager reads, which the forecast uses.
+
+**Interface-returned rule** (DATAra first; adopted by the harvester in 1.6.8):
+- Each checkpoint records whether a cellular data network was up at its reading. If the baseline was read while mobile data was down and the next reading finds it up, that interval is `COUNTER_RESET` with 0 bytes and re-baselines.
   - **Why:** phones that tear mobile data down on Wi-Fi (MIUI's default, `mobile_data_always_on = 0`) report low mobile counters while it is down. When it returns they report the interface's lifetime total.
   - **What 1.6.7 did with it:** on a POCO F3, harvester 1.6.7 counted **1.2 GB in 29 s** after Wi-Fi → mobile, while NetworkStatsManager measured 23.5 MB. At ~41 MB/s it was under the jump ceiling, and the drop hold never saw a drop.
   - **With this rule:** the same test summed to 13,853,039 B of 30 s samples against 13,853,374 B durable.
-  - **Data-harvester:** the training data likely contains these spikes. Adopt the rule there (and bump its schema version) or filter them in B1.
+  - **Data-harvester:** 1.6.8 adopted the rule and bumped its schema version to 4. Rows from earlier versions (schema version 3 or lower) can still contain these spikes, so B1 cleans them (datara-ml `datara_ml/phantom_spikes.py`).
 
 ## Permissions
 
