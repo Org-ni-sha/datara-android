@@ -37,6 +37,10 @@ interface TelemetryDao {
     @Query("SELECT * FROM usage_samples WHERE rowid IN (SELECT rowid FROM usage_samples ORDER BY rowid DESC LIMIT :limit) ORDER BY rowid")
     fun observeRecentSamples(limit: Int): Flow<List<UsageSampleEntity>>
 
+    /** Samples whose interval ended after [from], oldest first, re-emitted on every stored sample (Home's live Today). */
+    @Query("SELECT * FROM usage_samples WHERE interval_end > :from ORDER BY rowid")
+    fun observeSamplesEndingAfter(from: Long): Flow<List<UsageSampleEntity>>
+
     /** Samples whose interval ended in [from, until), oldest first: the input of one rollup. */
     @Query("SELECT * FROM usage_samples WHERE interval_end >= :from AND interval_end < :until ORDER BY rowid")
     suspend fun samplesEndingIn(from: Long, until: Long): List<UsageSampleEntity>
