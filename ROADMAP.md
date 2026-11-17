@@ -6,13 +6,13 @@
 
 ---
 
-## Current direction and implementation status (2026-10-29)
+## Current direction and implementation status (updated 2026-11-17)
 
 User-defined usage-quota forecasting is the approved product direction. The user chooses an amount in MB or GB to track; PET means the estimated time when device-measured mobile consumption reaches that amount. It does not predict carrier balance depletion, promo expiry or loss of connectivity. Traffic covered by freebies or zero-rating still counts when recorded by the device; the app does not classify carrier billing buckets or reconcile a carrier balance. Quotas inform the user and never block or throttle traffic.
 
-Authentication and the branded launch flow are implemented. Home, Create Quota, Quota Details, History, Notifications, Settings and Profile are implemented as UI previews using sample/session state. Telemetry (D4) and the Room database (D2) are built; quota persistence, inference, OS alert delivery and cloud sync remain pending. Completed UI checkboxes below do not mean their production integrations are complete.
+**Defense build (2026-11-17):** every app phase except cloud sync is built and runs on real data: authentication (D1), Room (D2), quota cycles (D3), telemetry (D4), Home (D5), on-device forecasting with the final Global model `final-2026-11-17` and the local layer (D6), History (D7), alerts (D8) and the hidden diagnostics screen (D9). The ML pipeline (B1–B5) and the E3 comparison are done in `datara-ml`. Still open: C3 sync, E1 offline test, E2 battery number, E4/E5. Usage data stays on the phone; Supabase holds accounts and profiles only.
 
-The applied C2 schema still contains legacy promo tables. Quota schema design and new migrations are pending; this direction does not authorize deleting deployed tables. The manuscript, data labels and evaluation protocol must be aligned before research implementation proceeds. The original title above is historical, not a newly approved thesis title.
+The quota schema (`20261104000001`) replaced the legacy promo tables on the hosted project on 2026-11-04. The manuscript, data labels and evaluation protocol must be aligned before research implementation proceeds. The original title above is historical, not a newly approved thesis title.
 
 ## 1. System Ecosystem & Architecture
 
@@ -141,11 +141,11 @@ The claim the thesis actually defends is *"per-user personalization improves PET
 
 *Blocked by: A4.*
 
-- [ ] **Phase B1 — Exploratory Data Analysis (EDA) & Cleaning:**
+- [x] **Phase B1 — Exploratory Data Analysis (EDA) & Cleaning:** *(Done: phantom-spike repair for harvester ≤ 1.6.7 and the measurement-gaps fix, hourly usage from NetworkStatsManager. See datara-ml README "B1" and `docs/measurement-gaps.md`.)*
   - Inspect distributions, handle missing intervals, detect spikes/outliers.
   - Analyze diurnal (day/night) usage patterns and weekend vs. weekday variations.
   - Check for device- or carrier-specific measurement bias using the metadata from A3.
-- [ ] **Phase B2 — Feature Engineering:**
+- [x] **Phase B2 — Feature Engineering:** *(Done: feature contract v4, 12 features, reproduced in the app and checked by the parity test.)*
   - `rolling_consumption_rate`: 1-hour, 3-hour, and 24-hour moving averages.
     - **Resolution constraint:** `NetworkStatsManager` is coarsely bucketed (roughly 2-hour granularity for detailed queries), so on-device features are running totals, not true 10-minute resolution. Engineer features the client can actually reproduce at inference time — a feature the app cannot compute is useless no matter how well it trains.
   - `time_features`: hour of day (cyclical sine/cosine), day of week, is_weekend.
@@ -154,12 +154,12 @@ The claim the thesis actually defends is *"per-user personalization improves PET
   - **Contract v2 (2026-11-06):** the target and byte lags come from NetworkStatsManager windows (spread over clock hours; hours inside windows over 2 h are unobserved), not the 30-second rows, which capture only 77.8% of usage over hours both measured. See datara-ml `docs/measurement-gaps.md`.
   - **Target (decided, see Decision 2):** mobile bytes used in the **next hour** per device (hourly NetworkStatsManager totals since contract v2). Trained with the **Tweedie loss on raw bytes** (decided 2026-11-06), which handles the many zero hours and predicts the mean; log1p squared error predicted a typical hour and underestimated total usage by more than half. The PET is not a training label; the app derives it by projecting hourly predictions against the remaining quota.
   - Every feature must be computable on the phone from the same 30 s and 10 min readings at the start of the hour, using the same definitions as the app (lags such as last hour, last 24 h average, same hour yesterday).
-- [ ] **Phase B3 — Global XGBoost Model Training & Hyperparameter Tuning:**
+- [x] **Phase B3 — Global XGBoost Model Training & Hyperparameter Tuning:** *(Done: `final-2026-11-17`, 2026-11-17 export, 2,672 hours from 20 devices. Tweedie objective, power 1.5, depth 2, 150 trees, chosen by grid search on PET error inside nested 5-fold cross-validation grouped by device.)*
   - Algorithm: `XGBRegressor` / `XGBoost`.
   - Objective: minimize next-hour usage error across users (for example MAE on bytes). PET accuracy is measured in B4 by projection.
   - Hyperparameter optimization via Optuna or GridSearchCV (`learning_rate`, `max_depth`, `n_estimators`, `subsample`, `reg_lambda`).
   - Split by **respondent**, not by row — random row splits leak the same user into train and test and will inflate every metric.
-- [ ] **Phase B4 — Model Evaluation & Thesis Metrics:**
+- [x] **Phase B4 — Model Evaluation & Thesis Metrics:** *(Done: `datara_ml/evaluate.py`, report in `artifacts/eval/report.md`. Whole devices held out: next-hour MAE 46.0 MB (last hour 48.3, 24 h average 56.2); PET MAE 10.2 h against 79.4 h for the repeated 24 h average, 86% within ±24 h, bias −6.1 h (early). Forecast alerts as classification: within 24 h F1 0.73 (precision 0.59, recall 0.96), within 3 h F1 0.66. Feature importance by gain.)*
   - Compute panel-required evaluation metrics:
     - **MAE** (Mean Absolute Error) in minutes/hours.
     - **RMSE** (Root Mean Squared Error).
@@ -168,7 +168,7 @@ The claim the thesis actually defends is *"per-user personalization improves PET
   - Report two levels of error: next-hour usage error (MAE/RMSE on bytes or MB) and **PET error** (MAE in hours), the thesis metric.
   - **PET evaluation without real quotas:** the harvester data has no user-set quotas, so evaluate PET by simulating cycles on held-out participants: pick a start time and a quota amount, run the same hour-by-hour projection the app uses, and compare the projected PET with the hour cumulative usage actually crossed the quota. Use several quota sizes, and do not score simulated cycles that never cross the quota within the data.
   - Generate feature importance plots (SHAP values, gain) for thesis documentation.
-- [ ] **Phase B5 — Model Export to ONNX (`.onnx`):**
+- [x] **Phase B5 — Model Export to ONNX (`.onnx`):** *(Done: exported with `onnxmltools`; the golden parity fixture is replayed by `FeatureParityTest` on the JVM and `DeviceParityTest` on a POCO F3.)*
   - Convert trained XGBoost model using `onnxmltools` / `skl2onnx`.
   - Validate inference parity between Python XGBoost and ONNX Runtime.
   - Export final asset: `global_xgboost.onnx`. Record the exact input tensor shape, feature order, and dtype — D6 must reproduce them precisely.
@@ -259,9 +259,9 @@ The former promo catalog, promo entry and expiry setup are superseded. A chosen 
 #### Phase D5: Home & Floating Navigation
 - [x] Home replaces the old dashboard placeholder; floating Material 3 navigation connects Home, History and Settings.
 - [x] Home UI covers no active quota, collecting usage, forecast available, missing permission and quota reached, plus an ended-cycle presentation. Scenarios were under Preview options with explicitly sample data until v0.9.1 removed them; Home now shows only the real cycle.
-- [x] Prominent forecast hero, quota progress/details action and seven-day usage bars. Collecting and missing-access states do not fabricate measured balances. The chart uses an independent History fixture.
+- [x] Prominent forecast hero, quota progress/details action and seven-day usage bars. Collecting and missing-access states do not fabricate measured balances. The 7-day chart reads the same measured daily totals as History.
 - [x] Direction C light QuotaTheme: white hero/surfaces, navy text/actions, teal progress, soft blue panels and mint navigation selection. Authentication stays dark navy; no theme toggle.
-- [ ] Connect Home and Details to persisted quota state, real access status, telemetry and D6 inference; retain honest loading/unavailable states.
+- [x] Connect Home and Details to persisted quota state, real access status, telemetry and D6 inference; retain honest loading/unavailable states. *(Real data only since v0.9.1.)*
 
 Promo/expiry cards and live network badges are not part of the current UI. Signal and speed remain planned model inputs; omitting display badges does not remove them from the prediction pipeline.
 
@@ -272,7 +272,7 @@ Promo/expiry cards and live network badges are not part of the current UI. Signa
 - [x] Bundle `global_xgboost.onnx` in `app/src/main/assets/models/`. *(The final `final-2026-11-17` (contract v4, Tweedie power 1.5, hyperparameters chosen by PET error): 2,672 hours from 20 devices; held out by device, PET MAE 10.2 h (nested) vs 79.4 h for the repeated 24 h average, none beyond 30 days; next-hour MAE 46.0 MB vs 48.3 MB for the last-hour baseline. See [forecast](docs/forecast.md).)*
 - [x] Build on-device Feature Extractor producing one hourly feature row in exactly B2's definitions. *(Contract v2, 2026-11-06: hourly bytes from the NetworkStatsManager `durable_readings`, network features from the 30-second `usage_samples`. The 30-second readings miss about a quarter of usage; see datara-ml `docs/measurement-gaps.md`.)*
   - Must reproduce B2's feature order, shapes, and dtypes **exactly**. Add a parity test against a known input/output pair captured from the Python pipeline — silent feature-order mismatch produces plausible-looking wrong predictions, which is the worst possible failure mode for a defense demo. *(`FeatureParityTest` replays datara-ml's golden fixture: features, ONNX output and PET.)*
-- [x] **Dual-Model Conditional Switch:** *(`LocalLayer`, `ModelSwitch`: per-time-of-day residual correction in log space; LOCAL after 168 learned hours when its recent MAE is ≥ 5% below global, back to GLOBAL when it is no better.)*
+- [x] **Dual-Model Conditional Switch:** *(`LocalLayer`, `ModelSwitch`: per-time-of-day usage-ratio correction (actual ÷ predicted, 0.2–5×); LOCAL after 168 learned hours when its recent MAE is ≥ 5% below global, back to GLOBAL when it is no better.)*
   - `ModelType.GLOBAL`: baseline pre-trained ONNX model, used for new users.
   - `ModelType.LOCAL`: global ONNX output multiplied (or offset) by the per-user correction learned from hourly prediction errors (Decision 2).
   - Switch to LOCAL once the user has ≥ 7 days of telemetry **and** the corrected predictions' recent error is lower than the global model's; switch back automatically if it becomes worse.
@@ -312,9 +312,9 @@ Promo/expiry cards and live network badges are not part of the current UI. Signa
 
 - [ ] **Phase E1 — Offline & Connectivity-Loss Resilience Testing.** Two distinct scenarios — the old single "airplane mode" test was incoherent, since airplane mode disables cellular and there is consequently no mobile data to track:
   - **No-network inference:** with the network fully off, confirm PET inference still runs on stored telemetry and the dashboard renders a prediction.
-  - **Cellular up, Supabase unreachable:** with mobile data live but sync failing, confirm tracking continues, snapshots persist to Room, the sync queue accumulates, and it drains correctly once connectivity returns.
+  - **Supabase unreachable:** with no route to Supabase for more than an hour (the access token's lifetime), confirm the app still opens to Home, and that tracking, hourly forecasts and alerts continue; once connectivity returns the session renews by itself. *(Before #52 an expired token offline was treated as signed out, which stopped forecasts; fixed in #52.)* Draining the sync queue is part of C3, which is not built.
 - [ ] **Phase E2 — Battery & Overhead Benchmarking:** Profile foreground service and background worker energy usage using Android Studio Energy Profiler. Report measured drain over a fixed window (e.g. %/hour over 8 hours) — panels ask for a number, not a claim of efficiency.
-- [ ] **Phase E3 — Global vs. Local Accuracy Comparison:** Compare PET error (observed vs. predicted quota-reaching time) under Global vs. Local personalization, using the prediction log from D6, which records both models for the same hours.
+- [x] **Phase E3 — Global vs. Local Accuracy Comparison:** *(Done in datara-ml's evaluation, which replays the app's local layer on held-out devices: 6 of 20 devices learned 168 hours and 3 switched to Local. With the switch, PET MAE was 10.1 h against 10.2 h for Global alone; where the local layer was ready it was not better than Global (11.4 vs 10.5 h). Personalization works as designed but does not yet improve accuracy.)* Compare PET error (observed vs. predicted quota-reaching time) under Global vs. Local personalization, using the prediction log from D6, which records both models for the same hours.
   - **State the win condition in advance:** the improvement in MAE that makes the personalization layer worth having (e.g. "Local must reduce MAE by ≥ 15% over Global"). Report it honestly if the local layer does not help — a negative result with a clear explanation defends far better than a metric chosen after the fact.
   - Report A3 measurement resolution, gaps and quota-crossing uncertainty separately from model error. State how incomplete/ended cycles are handled; do not use carrier balance depletion as the target.
 - [ ] **Phase E4 — Automated Test Coverage Audit** *(write tests continuously per phase; this phase is the final gap audit, not the first time tests are written — see the testing expectations in [`AGENTS.md`](AGENTS.md))*:
