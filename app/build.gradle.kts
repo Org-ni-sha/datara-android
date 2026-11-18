@@ -41,9 +41,9 @@ android {
         // handed to someone else. versionName is the string shown in Android's App info,
         // and is what D9's hidden diagnostics screen counts taps on.
         // 0.x was pre-defense; 1.0.0 (versionCode 6, tag v1.0.0) is the Nov 19 defense build
-        // with the final model.
-        versionCode = 6
-        versionName = "1.0.0"
+        // with the final model. 1.0.1 (versionCode 7) adds 32-bit ARM phones.
+        versionCode = 7
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -83,9 +83,11 @@ android {
                 enable = false
             }
             if (canSignRelease) signingConfig = signingConfigs.getByName("release")
-            // Release ships only the 64-bit ARM native libraries (ONNX Runtime is most of the APK):
-            // about 155 MB -> 50 MB. Debug keeps every ABI so x86_64 emulators still run the tests.
-            ndk { abiFilters += "arm64-v8a" }
+            // Release ships only the ARM native libraries (ONNX Runtime is most of the APK):
+            // about 155 MB -> 73 MB. 64-bit for most phones, 32-bit (armeabi-v7a, +24 MB) for budget
+            // phones on a 32-bit system such as some Galaxy A13 4G units, which reject a 64-bit-only APK
+            // as "not compatible". Debug keeps every ABI so x86_64 emulators still run the tests.
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         }
     }
     compileOptions {
