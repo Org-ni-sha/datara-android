@@ -42,12 +42,33 @@ class SignedInUserTest {
     }
 
     @Test
-    fun `signed out and initializing have no user`() = runBlocking {
+    fun `signed out has no user`() = runBlocking {
         listOf(
             SessionStatus.NotAuthenticated(isSignOut = true),
-            SessionStatus.NotAuthenticated(isSignOut = false),
-            SessionStatus.Initializing
+            SessionStatus.NotAuthenticated(isSignOut = false)
         ).forEach { assertNull(it.signedInUserId(savedOnPhone)) }
+    }
+
+    @Test
+    fun `initializing is the user of the session saved on the phone`() = runBlocking {
+        // supabase-kt sets Initializing at process start and whenever the app goes to the background
+        assertEquals(USER, SessionStatus.Initializing.signedInUserId(savedOnPhone))
+    }
+
+    @Test
+    fun `initializing with no saved session is signed out`() = runBlocking {
+        assertNull(SessionStatus.Initializing.signedInUserId(nothingSaved))
+    }
+
+    @Test
+    fun `leaving the app keeps the owner`() = runBlocking {
+        // Opened (Authenticated), left (Initializing), opened again: background work keeps its user
+        val statuses = flowOf(
+            SessionStatus.Authenticated(session),
+            SessionStatus.Initializing,
+            SessionStatus.Authenticated(session(userId = USER, accessToken = jwt(USER, extra = "refreshed")))
+        )
+        assertEquals(listOf(USER), statuses.signedInUserIds(savedOnPhone).toList())
     }
 
     @Test
@@ -60,7 +81,7 @@ class SignedInUserTest {
             SessionStatus.Authenticated(session(userId = USER, accessToken = jwt(USER, extra = "refreshed"))),
             SessionStatus.NotAuthenticated(isSignOut = true)
         )
-        assertEquals(listOf(null, USER, null), statuses.signedInUserIds(savedOnPhone).toList())
+        assertEquals(listOf(USER, null), statuses.signedInUserIds(savedOnPhone).toList())
     }
 
     @Test
