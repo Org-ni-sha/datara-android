@@ -30,12 +30,19 @@ class SupabaseSavedSessionSource(private val auth: Auth) : SavedSessionSource {
  *   server (offline, or a server error); supabase-kt keeps retrying and returns to Authenticated
  *   when the network is back. A revoked refresh token clears the session instead
  *   ([SessionStatus.NotAuthenticated]), so the user here is still signed in.
- * - [SessionStatus.NotAuthenticated] and [SessionStatus.Initializing]: null.
+ * - [SessionStatus.Initializing]: the user of the session saved on the phone, too. supabase-kt
+ *   sets it while it reads the saved session at process start, and again **every time the app
+ *   goes to the background**: its Android lifecycle hook (`setupPlatform.kt`, `onStop`) stops the
+ *   auto refresh and sets Initializing until the app is opened again. The telemetry service, the
+ *   forecast, alerts and the rollup run in the background, so treating it as signed out stopped
+ *   them all after the user had opened and left the app (1.0.1). A signed-out phone has no saved
+ *   session, so this is still null for it.
+ * - [SessionStatus.NotAuthenticated]: null.
  */
 suspend fun SessionStatus.signedInUserId(saved: SavedSessionSource): String? = when (this) {
     is SessionStatus.Authenticated -> session.userId()
-    is SessionStatus.RefreshFailure -> saved.load()?.userId()
-    is SessionStatus.NotAuthenticated, SessionStatus.Initializing -> null
+    is SessionStatus.RefreshFailure, SessionStatus.Initializing -> saved.load()?.userId()
+    is SessionStatus.NotAuthenticated -> null
 }
 
 /**

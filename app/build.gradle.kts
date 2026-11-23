@@ -41,9 +41,10 @@ android {
         // handed to someone else. versionName is the string shown in Android's App info,
         // and is what D9's hidden diagnostics screen counts taps on.
         // 0.x was pre-defense; 1.0.0 (versionCode 6, tag v1.0.0) is the Nov 19 defense build
-        // with the final model. 1.0.1 (versionCode 7) adds 32-bit ARM phones.
-        versionCode = 7
-        versionName = "1.0.1"
+        // with the final model. 1.0.1 (versionCode 7) adds 32-bit ARM phones. 1.0.2 (versionCode 8)
+        // keeps forecasts, alerts and the rollup running after the app is opened and left.
+        versionCode = 8
+        versionName = "1.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
